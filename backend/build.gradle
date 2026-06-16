@@ -1,0 +1,26 @@
+// LAN+ backend (stub) — standalone, pure-JDK (no external dependencies, no Minecraft/Forge).
+// Implements docs/dev/PROTOCOL.md: presence, friends, users, invites, and the relay ticket
+// endpoints, plus the realtime WebSocket. In-memory only (no persistence) — a reference backend.
+// Build:  ./gradlew :backend:jar   -> backend/build/libs/lanplus-backend-<version>.jar
+// Run:    java -jar lanplus-backend-<version>.jar   (zero classpath; JDK only)
+plugins {
+    id 'java'
+}
+
+group = 'dev.bgame.lanplus'
+version = '1.0.0'
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+}
+
+tasks.named('jar', Jar).configure {
+    archiveBaseName = 'lanplus-backend'
+    manifest {
+        attributes('Main-Class': 'dev.bgame.lanplus.backend.BackendServer')
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

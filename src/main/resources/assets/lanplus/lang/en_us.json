@@ -1,0 +1,49 @@
+{
+  "key.categories.lanplus": "LAN+",
+  "key.lanplus.friends": "Open Friends",
+
+  "gui.lanplus.title": "LAN+ Friends",
+  "gui.lanplus.tab.friends": "Friends",
+  "gui.lanplus.tab.blocked": "Blocked",
+  "gui.lanplus.tab.add": "Add",
+  "gui.lanplus.refresh": "Refresh",
+
+  "gui.lanplus.status.connected": "Connected",
+  "gui.lanplus.status.local": "Local-only",
+  "gui.lanplus.status.refreshing": "Refreshing…",
+
+  "gui.lanplus.friends.empty": "No friends yet",
+  "gui.lanplus.blocked.empty": "No blocked players",
+  "gui.lanplus.detail.none": "Select a friend",
+
+  "gui.lanplus.chat.placeholder": "Chat (placeholder)",
+
+  "gui.lanplus.add.title": "Add a friend",
+  "gui.lanplus.add.hint": "Username or friend code",
+  "gui.lanplus.add.button": "Add",
+  "gui.lanplus.add.note": "Type a username or friend code (e.g. BGME-4829).",
+  "gui.lanplus.add.searching": "Searching for %s…",
+  "gui.lanplus.add.sent": "Friend request sent to %s",
+  "gui.lanplus.add.notfound": "User not found: %s",
+  "gui.lanplus.add.yourcode": "Your friend code: %s",
+  "gui.lanplus.add.yourcode.unknown": "Your friend code: —",
+
+  "gui.lanplus.action.join": "Join",
+  "gui.lanplus.action.message": "Message",
+  "gui.lanplus.action.block": "Block",
+  "gui.lanplus.action.remove": "Remove",
+  "gui.lanplus.placeholder": "Not implemented yet",
+  "gui.lanplus.join.connecting": "Connecting to %s…",
+  "gui.lanplus.join.failed": "Could not resolve invite",
+
+  "gui.lanplus.conn.online": "Online",
+  "gui.lanplus.conn.stale": "Away",
+  "gui.lanplus.conn.offline": "Offline",
+  "gui.lanplus.conn.unknown": "Unknown",
+
+  "gui.lanplus.state.online": "Online",
+  "gui.lanplus.state.offline": "Offline",
+  "gui.lanplus.state.singleplayer": "In singleplayer",
+  "gui.lanplus.state.hosting": "Hosting: %s",
+  "gui.lanplus.state.playing": "Playing on %s"
+}
