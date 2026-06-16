@@ -26,7 +26,7 @@ public final class BackendServer {
 
     private BackendServer(BackendConfig cfg) {
         this.cfg = cfg;
-        this.store = new Store(cfg.heartbeatTtlMs, cfg.baseDomain);
+        this.store = new Store(cfg.heartbeatTtlMs, cfg.baseDomain, cfg.dataFile);
     }
 
     public static void main(String[] args) throws Exception {
@@ -38,12 +38,15 @@ public final class BackendServer {
         ScheduledExecutorService sched = Executors.newSingleThreadScheduledExecutor(daemon("backend-sched"));
         sched.scheduleAtFixedRate(hub::pingAll, 20, 20, TimeUnit.SECONDS);
         sched.scheduleAtFixedRate(store::sweep, 30, 30, TimeUnit.SECONDS);
+        sched.scheduleAtFixedRate(store::flush, 10, 10, TimeUnit.SECONDS);
+        Runtime.getRuntime().addShutdownHook(new Thread(store::flush, "backend-flush"));
 
         ServerSocket server = new ServerSocket();
         server.setReuseAddress(true);
         server.bind(cfg.bind);
         log("LAN+ backend up — http+ws " + cfg.bind + ", relay " + cfg.relayHost + ":" + cfg.relayPort
-                + ", base domain " + cfg.baseDomain);
+                + ", base domain " + cfg.baseDomain
+                + ", data " + (cfg.dataFile == null || cfg.dataFile.isBlank() ? "in-memory" : cfg.dataFile));
         while (true) {
             Socket socket = server.accept();
             pool.execute(() -> handle(socket));
@@ -92,6 +95,18 @@ public final class BackendServer {
             if (m.equals("POST") && path.equals("/friends/add")) {
                 return friendsAdd(req);
             }
+            if (m.equals("POST") && path.equals("/friends/remove")) {
+                return friendsRemove(req);
+            }
+            if (m.equals("POST") && path.equals("/friends/accept")) {
+                return friendsAccept(req);
+            }
+            if (m.equals("POST") && path.equals("/friends/decline")) {
+                return friendsDecline(req);
+            }
+            if (m.equals("GET") && path.equals("/friends/requests")) {
+                return ok(store.friendRequests(uuid(req.param("uuid"))));
+            }
             if (m.equals("GET") && path.startsWith("/friends/")) {
                 return ok(store.friendList(uuid(path.substring("/friends/".length()))));
             }
@@ -109,8 +124,7 @@ public final class BackendServer {
                 return inviteCreate(req);
             }
             if (m.equals("GET") && path.startsWith("/invite/")) {
-                Map<String, Object> r = store.resolveInvite(path.substring("/invite/".length()));
-                return r == null ? NOT_FOUND : ok(r);
+                return inviteResolve(req, path.substring("/invite/".length()));
             }
             if (m.equals("POST") && path.equals("/relay/ticket")) {
                 return relayTicket(req);
@@ -152,14 +166,58 @@ public final class BackendServer {
 
     private Resp friendsAdd(Http.Request req) {
         Map<String, Object> b = Json.parseObject(req.body());
-        store.addFriend(uuid((String) b.get("uuid")), uuid((String) b.get("friendUuid")));
+        UUID uuid = uuid((String) b.get("uuid"));
+        UUID friendUuid = uuid((String) b.get("friendUuid"));
+        boolean accepted = store.addFriendRequest(uuid, friendUuid);
+        if (!accepted) {
+            Object username = store.me(uuid).get("username");
+            hub.send(friendUuid, ordered("type", "FRIEND_REQUEST",
+                    "fromUuid", uuid.toString(), "fromUsername", username));
+        }
+        return ok(Map.of("success", true));
+    }
+
+    private Resp friendsRemove(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        store.removeFriend(uuid((String) b.get("uuid")), uuid((String) b.get("friendUuid")));
+        return ok(Map.of("success", true));
+    }
+
+    private Resp friendsAccept(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        store.acceptRequest(uuid((String) b.get("uuid")), uuid((String) b.get("friendUuid")));
+        return ok(Map.of("success", true));
+    }
+
+    private Resp friendsDecline(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        store.declineRequest(uuid((String) b.get("uuid")), uuid((String) b.get("friendUuid")));
         return ok(Map.of("success", true));
     }
 
     private Resp inviteCreate(Http.Request req) {
         Map<String, Object> b = Json.parseObject(req.body());
-        String code = store.createInvite((String) b.get("address"), (String) b.get("worldName"));
+        UUID hostUuid = b.get("hostUuid") != null ? uuid((String) b.get("hostUuid")) : null;
+        String code = store.createInvite(hostUuid, (String) b.get("address"), (String) b.get("worldName"));
         return ok(ordered("code", code, "expiresIn", 3600));
+    }
+
+    private Resp inviteResolve(Http.Request req, String code) {
+        Map<String, Object> r = store.resolveInvite(code);
+        if (r == null) {
+            return NOT_FOUND;
+        }
+        String guest = req.param("uuid");
+        if (guest != null && !guest.isBlank()) {
+            Store.Invite invite = store.invite(code);
+            if (invite != null && invite.hostUuid() != null) {
+                UUID guestUuid = uuid(guest);
+                hub.send(invite.hostUuid(), ordered("type", "INVITE_REDEEMED",
+                        "guestUuid", guestUuid.toString(), "code", code));
+                log("invite " + code + " redeemed by " + guestUuid + " -> host " + invite.hostUuid());
+            }
+        }
+        return ok(r);
     }
 
     private Resp relayTicket(Http.Request req) {

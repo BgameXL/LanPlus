@@ -9,13 +9,16 @@ final class BackendConfig {
     final String relayHost;
     final int relayPort;
     final int heartbeatTtlMs;
+    final String dataFile;
 
-    private BackendConfig(InetSocketAddress bind, String baseDomain, String relayHost, int relayPort, int heartbeatTtlMs) {
+    private BackendConfig(InetSocketAddress bind, String baseDomain, String relayHost, int relayPort,
+                          int heartbeatTtlMs, String dataFile) {
         this.bind = bind;
         this.baseDomain = baseDomain;
         this.relayHost = relayHost;
         this.relayPort = relayPort;
         this.heartbeatTtlMs = heartbeatTtlMs;
+        this.dataFile = dataFile;
     }
 
     static BackendConfig fromEnv() {
@@ -24,7 +27,8 @@ final class BackendConfig {
                 env("LANPLUS_BACKEND_BASE_DOMAIN", "lanplus.dev"),
                 env("LANPLUS_BACKEND_RELAY_HOST", "relay.lanplus.dev"),
                 intEnv("LANPLUS_BACKEND_RELAY_PORT", 8443),
-                intEnv("LANPLUS_BACKEND_HEARTBEAT_TTL_SECONDS", 45) * 1000);
+                intEnv("LANPLUS_BACKEND_HEARTBEAT_TTL_SECONDS", 45) * 1000,
+                env("LANPLUS_BACKEND_DATA_FILE", "lanplus-data.json"));
     }
 
     private static InetSocketAddress addr(String s) {

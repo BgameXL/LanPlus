@@ -1,5 +1,10 @@
 package dev.bgame.lanplus.backend;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -15,8 +20,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * backend-derived connectivity.
  * No persistence — everything is lost on restart, which is fine for a reference/dev backend.
  *
- * Simplifications vs a real backend: users auto-register on first contact; friend links are made
- * mutual on add (so two players see each other without both adding); there is no authentication.
+ * Simplifications vs a real backend: users auto-register on first contact; adding a friend sends a
+ * request the other side must accept (auto-accepted if mutual); there is no authentication.
  */
 final class Store {
 
@@ -54,26 +59,40 @@ final class Store {
 
     record Ticket(UUID uuid, String domain, long expiresAt) {}
 
-    record Invite(String address, String worldName, long expiresAt) {}
+    record Invite(UUID hostUuid, String address, String worldName, long expiresAt) {}
 
     private final long ttlMs;
     private final String baseDomain;
+    private final Path dataFile;
+    private volatile boolean dirty = false;
 
     private final Map<UUID, User> users = new ConcurrentHashMap<>();
     private final Map<UUID, Presence> presences = new ConcurrentHashMap<>();
     private final Map<UUID, Set<UUID>> friends = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<UUID>> requests = new ConcurrentHashMap<>();
     private final Map<String, Invite> invites = new ConcurrentHashMap<>();
     private final Map<String, Ticket> tickets = new ConcurrentHashMap<>();
 
-    Store(long ttlMs, String baseDomain) {
+    Store(long ttlMs, String baseDomain, String dataFile) {
         this.ttlMs = ttlMs;
         this.baseDomain = baseDomain;
+        this.dataFile = (dataFile == null || dataFile.isBlank()) ? null : Path.of(dataFile);
+        load();
     }
 
     User ensureUser(UUID uuid, String username) {
-        User u = users.computeIfAbsent(uuid, k -> new User(k, username, uniqueFriendCode(username), uniqueDomain()));
-        if (username != null && !username.isBlank()) {
+        boolean[] created = {false};
+        User u = users.computeIfAbsent(uuid, k -> {
+            created[0] = true;
+            return new User(k, username, uniqueFriendCode(), uniqueDomain());
+        });
+        boolean changed = created[0];
+        if (username != null && !username.isBlank() && !username.equals(u.username)) {
             u.username = username;
+            changed = true;
+        }
+        if (changed) {
+            markDirty();
         }
         return u;
     }
@@ -159,10 +178,78 @@ final class Store {
     }
 
     // friends
-    void addFriend(UUID uuid, UUID friendUuid) {
+    boolean addFriendRequest(UUID uuid, UUID friendUuid) {
+        if (uuid.equals(friendUuid)) {
+            return false;
+        }
+        ensureUser(uuid, null);
         ensureUser(friendUuid, null);
-        friends.computeIfAbsent(uuid, k -> ConcurrentHashMap.newKeySet()).add(friendUuid);
-        friends.computeIfAbsent(friendUuid, k -> ConcurrentHashMap.newKeySet()).add(uuid); // mutual
+        if (friendsOf(uuid).contains(friendUuid)) {
+            return true; // already friends
+        }
+        if (requests.getOrDefault(uuid, Set.of()).contains(friendUuid)) {
+            return acceptRequest(uuid, friendUuid); // they already asked us — accept
+        }
+        requests.computeIfAbsent(friendUuid, k -> ConcurrentHashMap.newKeySet()).add(uuid);
+        markDirty();
+        return false;
+    }
+
+    boolean acceptRequest(UUID uuid, UUID friendUuid) {
+        clearRequest(uuid, friendUuid);
+        linkFriends(uuid, friendUuid);
+        return true;
+    }
+
+    void declineRequest(UUID uuid, UUID friendUuid) {
+        clearRequest(uuid, friendUuid);
+    }
+
+    void removeFriend(UUID uuid, UUID friendUuid) {
+        boolean changed = false;
+        Set<UUID> a = friends.get(uuid);
+        if (a != null) {
+            changed |= a.remove(friendUuid);
+        }
+        Set<UUID> b = friends.get(friendUuid);
+        if (b != null) {
+            changed |= b.remove(uuid);
+        }
+        if (changed) {
+            markDirty();
+        }
+    }
+
+    List<Object> friendRequests(UUID uuid) {
+        List<Object> out = new ArrayList<>();
+        for (UUID rid : requests.getOrDefault(uuid, Set.of())) {
+            User u = users.get(rid);
+            if (u != null) {
+                out.add(ordered("uuid", rid.toString(), "username", u.username, "online", "ONLINE".equals(connectivity(rid))));
+            }
+        }
+        return out;
+    }
+
+    private void clearRequest(UUID a, UUID b) {
+        boolean changed = false;
+        Set<UUID> ra = requests.get(a);
+        if (ra != null) {
+            changed |= ra.remove(b);
+        }
+        Set<UUID> rb = requests.get(b);
+        if (rb != null) {
+            changed |= rb.remove(a);
+        }
+        if (changed) {
+            markDirty();
+        }
+    }
+
+    private void linkFriends(UUID a, UUID b) {
+        friends.computeIfAbsent(a, k -> ConcurrentHashMap.newKeySet()).add(b);
+        friends.computeIfAbsent(b, k -> ConcurrentHashMap.newKeySet()).add(a);
+        markDirty();
     }
 
     Set<UUID> friendsOf(UUID uuid) {
@@ -192,20 +279,22 @@ final class Store {
         return out;
     }
 
-    String createInvite(String address, String worldName) {
+    String createInvite(UUID hostUuid, String address, String worldName) {
         String code;
         do {
             code = randomCode();
-        } while (invites.putIfAbsent(code, new Invite(address, worldName, System.currentTimeMillis() + 3_600_000)) != null);
+        } while (invites.putIfAbsent(code, new Invite(hostUuid, address, worldName, System.currentTimeMillis() + 3_600_000)) != null);
         return code;
     }
 
-    Map<String, Object> resolveInvite(String code) {
+    Invite invite(String code) {
         Invite i = invites.get(code);
-        if (i == null || System.currentTimeMillis() > i.expiresAt()) {
-            return null;
-        }
-        return ordered("address", i.address(), "worldName", i.worldName());
+        return (i == null || System.currentTimeMillis() > i.expiresAt()) ? null : i;
+    }
+
+    Map<String, Object> resolveInvite(String code) {
+        Invite i = invite(code);
+        return i == null ? null : ordered("address", i.address(), "worldName", i.worldName());
     }
 
     // relay tickets
@@ -231,14 +320,100 @@ final class Store {
         tickets.entrySet().removeIf(e -> now > e.getValue().expiresAt());
     }
 
+    private void markDirty() {
+        dirty = true;
+    }
+
+    synchronized void flush() {
+        if (!dirty || dataFile == null) {
+            return;
+        }
+        try {
+            List<Object> userList = new ArrayList<>();
+            for (User u : users.values()) {
+                userList.add(ordered("uuid", u.uuid.toString(), "username", u.username,
+                        "friendCode", u.friendCode, "domain", u.domain));
+            }
+            String json = Json.write(ordered("users", userList,
+                    "friends", edgesJson(friends), "requests", edgesJson(requests)));
+            if (dataFile.getParent() != null) {
+                Files.createDirectories(dataFile.getParent());
+            }
+            Path tmp = dataFile.resolveSibling(dataFile.getFileName() + ".tmp");
+            Files.writeString(tmp, json, StandardCharsets.UTF_8);
+            Files.move(tmp, dataFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            dirty = false;
+        } catch (IOException e) {
+        }
+    }
+
+    private void load() {
+        if (dataFile == null || !Files.isReadable(dataFile)) {
+            return;
+        }
+        try {
+            Map<String, Object> root = Json.parseObject(Files.readString(dataFile, StandardCharsets.UTF_8));
+            if (root.get("users") instanceof List<?> list) {
+                for (Object o : list) {
+                    if (o instanceof Map<?, ?> m) {
+                        UUID uuid = UUID.fromString((String) m.get("uuid"));
+                        users.put(uuid, new User(uuid, (String) m.get("username"),
+                                (String) m.get("friendCode"), (String) m.get("domain")));
+                    }
+                }
+            }
+            edgesLoad(root.get("friends"), friends);
+            edgesLoad(root.get("requests"), requests);
+        } catch (IOException | RuntimeException e) {
+        }
+    }
+
+    private static Map<String, Object> edgesJson(Map<UUID, Set<UUID>> edges) {
+        Map<String, Object> obj = new LinkedHashMap<>();
+        for (Map.Entry<UUID, Set<UUID>> e : edges.entrySet()) {
+            if (e.getValue().isEmpty()) {
+                continue;
+            }
+            List<Object> ids = new ArrayList<>();
+            for (UUID id : e.getValue()) {
+                ids.add(id.toString());
+            }
+            obj.put(e.getKey().toString(), ids);
+        }
+        return obj;
+    }
+
+    private static void edgesLoad(Object node, Map<UUID, Set<UUID>> into) {
+        if (node instanceof Map<?, ?> m) {
+            for (Map.Entry<?, ?> e : m.entrySet()) {
+                Set<UUID> set = ConcurrentHashMap.newKeySet();
+                if (e.getValue() instanceof List<?> ids) {
+                    for (Object id : ids) {
+                        set.add(UUID.fromString((String) id));
+                    }
+                }
+                into.put(UUID.fromString((String) e.getKey()), set);
+            }
+        }
+    }
+
     // helpers
-    private String uniqueFriendCode(String username) {
-        String base = codeBase(username);
+    private static final String CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ"; // no 0/1 or I/L/O/U
+
+    private String uniqueFriendCode() {
         String code;
         do {
-            code = base + "-" + (1000 + RNG.nextInt(9000));
+            code = "LAN-" + randomFrom(CODE_ALPHABET, 5);
         } while (friendCodeTaken(code));
         return code;
+    }
+
+    private static String randomFrom(String alphabet, int len) {
+        StringBuilder sb = new StringBuilder(len);
+        for (int i = 0; i < len; i++) {
+            sb.append(alphabet.charAt(RNG.nextInt(alphabet.length())));
+        }
+        return sb.toString();
     }
 
     private boolean friendCodeTaken(String code) {
@@ -248,14 +423,6 @@ final class Store {
             }
         }
         return false;
-    }
-
-    private static String codeBase(String username) {
-        String letters = username == null ? "" : username.replaceAll("[^A-Za-z]", "").toUpperCase(Locale.ROOT);
-        if (letters.isEmpty()) {
-            letters = "PLR";
-        }
-        return (letters + "XXXX").substring(0, 4);
     }
 
     private String uniqueDomain() {
