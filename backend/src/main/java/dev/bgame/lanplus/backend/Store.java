@@ -57,9 +57,12 @@ final class Store {
         volatile boolean hostingAnnounced;
     }
 
-    record Ticket(UUID uuid, String domain, long expiresAt) {}
+    record Ticket(UUID uuid, String domain, boolean requireToken, long expiresAt) {}
 
     record Invite(UUID hostUuid, String address, String worldName, long expiresAt) {}
+
+    /** A guest invite token bound to a host's relay domain (offline/gated hosting). */
+    record GuestToken(String hostDomain, long expiresAt) {}
 
     private final long ttlMs;
     private final String baseDomain;
@@ -72,6 +75,7 @@ final class Store {
     private final Map<UUID, Set<UUID>> requests = new ConcurrentHashMap<>();
     private final Map<String, Invite> invites = new ConcurrentHashMap<>();
     private final Map<String, Ticket> tickets = new ConcurrentHashMap<>();
+    private final Map<String, GuestToken> guestTokens = new ConcurrentHashMap<>();
 
     Store(long ttlMs, String baseDomain, String dataFile) {
         this.ttlMs = ttlMs;
@@ -279,12 +283,35 @@ final class Store {
         return out;
     }
 
-    String createInvite(UUID hostUuid, String address, String worldName) {
+    String createInvite(UUID hostUuid, String address, String worldName, boolean gated) {
+        long expiresAt = System.currentTimeMillis() + 3_600_000;
+        String guestAddress = address;
+        if (gated && hostUuid != null) {
+            // Offline/gated host: bind a single-label relay token to the host's domain and hand guests a
+            // token address instead of the host's own domain — the relay validates the token before
+            // routing (the in-world uuid is spoofable in offline-mode, so it can't be the gate).
+            String hostDomain = ensureUser(hostUuid, null).domain;
+            String token = uniqueGuestToken();
+            guestTokens.put(token, new GuestToken(hostDomain, expiresAt));
+            guestAddress = token + "." + baseDomain + portSuffix(address);
+        }
         String code;
         do {
             code = randomCode();
-        } while (invites.putIfAbsent(code, new Invite(hostUuid, address, worldName, System.currentTimeMillis() + 3_600_000)) != null);
+        } while (invites.putIfAbsent(code, new Invite(hostUuid, guestAddress, worldName, expiresAt)) != null);
         return code;
+    }
+
+    /** Resolve a guest invite token to its host's relay domain, or null if unknown/expired. */
+    String validateGuestToken(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        GuestToken t = guestTokens.get(token);
+        if (t == null || System.currentTimeMillis() > t.expiresAt()) {
+            return null;
+        }
+        return t.hostDomain();
     }
 
     Invite invite(String code) {
@@ -298,10 +325,10 @@ final class Store {
     }
 
     // relay tickets
-    Object[] mintTicketToken(UUID uuid) {
+    Object[] mintTicketToken(UUID uuid, boolean gated) {
         User u = ensureUser(uuid, null);
         String token = randomHex(32);
-        Ticket t = new Ticket(uuid, u.domain, System.currentTimeMillis() + 3_600_000);
+        Ticket t = new Ticket(uuid, u.domain, gated, System.currentTimeMillis() + 3_600_000);
         tickets.put(token, t);
         return new Object[]{token, t};
     }
@@ -318,6 +345,7 @@ final class Store {
         long now = System.currentTimeMillis();
         invites.entrySet().removeIf(e -> now > e.getValue().expiresAt());
         tickets.entrySet().removeIf(e -> now > e.getValue().expiresAt());
+        guestTokens.entrySet().removeIf(e -> now > e.getValue().expiresAt());
     }
 
     private void markDirty() {
@@ -440,6 +468,28 @@ final class Store {
             }
         }
         return false;
+    }
+
+    /** A DNS-safe single-label guest token, e.g. "g" + 20 hex chars (starts with a letter for DNS). */
+    private String uniqueGuestToken() {
+        String token;
+        do {
+            token = "g" + randomHex(10);
+        } while (guestTokens.containsKey(token));
+        return token;
+    }
+
+    /** The ":port" tail of a host:port address, or "" when no explicit port (MC then defaults to 25565). */
+    private static String portSuffix(String address) {
+        if (address == null) {
+            return "";
+        }
+        int colon = address.lastIndexOf(':');
+        if (colon < 0) {
+            return "";
+        }
+        String port = address.substring(colon + 1).trim();
+        return port.matches("\\d+") ? ":" + port : "";
     }
 
     private static String randomCode() {

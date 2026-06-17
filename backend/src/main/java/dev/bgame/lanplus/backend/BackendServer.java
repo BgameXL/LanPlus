@@ -132,6 +132,9 @@ public final class BackendServer {
             if (m.equals("GET") && path.equals("/relay/validate")) {
                 return relayValidate(req);
             }
+            if (m.equals("GET") && path.equals("/relay/guest/validate")) {
+                return relayGuestValidate(req);
+            }
         } catch (RuntimeException e) {
             return BAD;
         }
@@ -198,8 +201,11 @@ public final class BackendServer {
     private Resp inviteCreate(Http.Request req) {
         Map<String, Object> b = Json.parseObject(req.body());
         UUID hostUuid = b.get("hostUuid") != null ? uuid((String) b.get("hostUuid")) : null;
-        String code = store.createInvite(hostUuid, (String) b.get("address"), (String) b.get("worldName"));
-        return ok(ordered("code", code, "expiresIn", 3600));
+        boolean gated = Boolean.TRUE.equals(b.get("gated"));
+        String code = store.createInvite(hostUuid, (String) b.get("address"), (String) b.get("worldName"), gated);
+        Store.Invite inv = store.invite(code);
+        String address = inv != null ? inv.address() : (String) b.get("address");
+        return ok(ordered("code", code, "address", address, "expiresIn", 3600));
     }
 
     private Resp inviteResolve(Http.Request req, String code) {
@@ -222,10 +228,11 @@ public final class BackendServer {
 
     private Resp relayTicket(Http.Request req) {
         Map<String, Object> b = Json.parseObject(req.body());
-        Object[] minted = store.mintTicketToken(uuid((String) b.get("uuid")));
+        boolean gated = Boolean.TRUE.equals(b.get("gated"));
+        Object[] minted = store.mintTicketToken(uuid((String) b.get("uuid")), gated);
         String token = (String) minted[0];
         Store.Ticket ticket = (Store.Ticket) minted[1];
-        log("relay ticket issued for " + ticket.uuid() + " -> " + ticket.domain());
+        log("relay ticket issued for " + ticket.uuid() + " -> " + ticket.domain() + (gated ? " (gated)" : ""));
         return ok(ordered(
                 "ticket", token,
                 "relayHost", cfg.relayHost,
@@ -239,7 +246,16 @@ public final class BackendServer {
         if (ticket == null) {
             return new Resp(401, null);
         }
-        return ok(ordered("uuid", ticket.uuid().toString(), "domain", ticket.domain()));
+        return ok(ordered("uuid", ticket.uuid().toString(), "domain", ticket.domain(),
+                "requireToken", ticket.requireToken()));
+    }
+
+    private Resp relayGuestValidate(Http.Request req) {
+        String domain = store.validateGuestToken(req.param("token"));
+        if (domain == null) {
+            return new Resp(401, null);
+        }
+        return ok(ordered("domain", domain));
     }
 
     // WebSocket events
