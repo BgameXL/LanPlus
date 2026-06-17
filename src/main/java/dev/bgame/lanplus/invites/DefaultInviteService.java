@@ -22,16 +22,19 @@ public final class DefaultInviteService implements InviteService, PresenceManage
     private final PresenceManager presence;
     private final Supplier<PlayerIdentity> identity;
     private final BooleanSupplier relayEnabled;
+    private final BooleanSupplier offlineHosting;
 
     private final AtomicBoolean minting = new AtomicBoolean(false);
     private volatile String activeCode;
 
     public DefaultInviteService(LanPlusNetwork network, PresenceManager presence,
-                                Supplier<PlayerIdentity> identity, BooleanSupplier relayEnabled) {
+                                Supplier<PlayerIdentity> identity, BooleanSupplier relayEnabled,
+                                BooleanSupplier offlineHosting) {
         this.network = network;
         this.presence = presence;
         this.identity = identity;
         this.relayEnabled = relayEnabled;
+        this.offlineHosting = offlineHosting;
         presence.addListener(this);
     }
 
@@ -41,7 +44,8 @@ public final class DefaultInviteService implements InviteService, PresenceManage
         if (id == null || address == null) {
             return CompletableFuture.completedFuture(null);
         }
-        return network.createInvite(id.uuid(), address, worldName);
+        boolean gated = offlineHosting.getAsBoolean() && relayEnabled.getAsBoolean();
+        return network.createInvite(id.uuid(), address, worldName, gated);
     }
 
     @Override
@@ -66,8 +70,6 @@ public final class DefaultInviteService implements InviteService, PresenceManage
         if (activeCode != null || snapshot.address() == null) {
             return;
         }
-        // With the relay enabled, the detector first reports the unreachable loopback address; wait
-        // for the coordinator to open the tunnel and republish the public domain before minting.
         if (relayEnabled.getAsBoolean() && isLoopback(snapshot.address())) {
             return;
         }
@@ -76,7 +78,6 @@ public final class DefaultInviteService implements InviteService, PresenceManage
         }
         create(snapshot.address(), snapshot.worldName()).whenComplete((invite, err) -> {
             minting.set(false);
-            // Only publish if we are still hosting (the player may have stopped while we waited).
             if (invite != null && presence.current().state() == GameplayState.HOSTING) {
                 activeCode = invite.code();
                 presence.setJoinCode(invite.code());

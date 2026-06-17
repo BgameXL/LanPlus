@@ -60,13 +60,13 @@ final class Wire {
 
     record Success(boolean success) {}
 
-    record InviteCreate(String hostUuid, String address, String worldName) {}
+    record InviteCreate(String hostUuid, String address, String worldName, boolean gated) {}
 
-    record InviteCreated(String code, int expiresIn) {}
+    record InviteCreated(String code, String address, int expiresIn) {}
 
     record InviteResolved(String address, String worldName) {}
 
-    record RelayTicketRequest(String uuid) {}
+    record RelayTicketRequest(String uuid, boolean gated) {}
 
     record RelayTicketDto(String ticket, String relayHost, int relayPort, String domain, int expiresIn) {
         RelayTicket toApi() {

@@ -2,9 +2,10 @@
   "required": true,
   "minVersion": "0.8",
   "package": "dev.bgame.lanplus.mixin",
-  "compatibilityLevel": "JAVA_8",
+  "compatibilityLevel": "JAVA_17",
   "refmap": "lanplus.refmap.json",
   "mixins": [
+    "PlayerListMixin"
   ],
   "client": [
   ],

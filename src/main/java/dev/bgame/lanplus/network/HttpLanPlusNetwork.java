@@ -119,10 +119,29 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
 
     @Override
     public CompletableFuture<Boolean> addFriend(UUID uuid, UUID friendUuid) {
+        return friendsEdge("/friends/add", uuid, friendUuid);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> removeFriend(UUID uuid, UUID friendUuid) {
+        return friendsEdge("/friends/remove", uuid, friendUuid);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> acceptFriend(UUID uuid, UUID friendUuid) {
+        return friendsEdge("/friends/accept", uuid, friendUuid);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> declineFriend(UUID uuid, UUID friendUuid) {
+        return friendsEdge("/friends/decline", uuid, friendUuid);
+    }
+
+    private CompletableFuture<Boolean> friendsEdge(String path, UUID uuid, UUID friendUuid) {
         if (!configured()) {
             return CompletableFuture.completedFuture(false);
         }
-        return post("/friends/add", new Wire.FriendAdd(uuid.toString(), friendUuid.toString()))
+        return post(path, new Wire.FriendAdd(uuid.toString(), friendUuid.toString()))
                 .thenApply(resp -> {
                     Wire.Success ok = GSON.fromJson(resp.body(), Wire.Success.class);
                     return ok != null && ok.success();
@@ -130,6 +149,31 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 .exceptionally(err -> {
                     onError(err);
                     return false;
+                });
+    }
+
+    @Override
+    public CompletableFuture<List<ResolvedUser>> getFriendRequests(UUID uuid) {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get("/friends/requests?uuid=" + uuid)
+                .thenApply(resp -> {
+                    Wire.ResolvedUserDto[] arr = GSON.fromJson(resp.body(), Wire.ResolvedUserDto[].class);
+                    if (arr == null) {
+                        return List.<ResolvedUser>of();
+                    }
+                    List<ResolvedUser> out = new ArrayList<>(arr.length);
+                    for (Wire.ResolvedUserDto d : arr) {
+                        if (d != null && d.uuid() != null) {
+                            out.add(d.toApi());
+                        }
+                    }
+                    return out;
+                })
+                .exceptionally(err -> {
+                    onError(err);
+                    return List.of();
                 });
     }
 
@@ -167,14 +211,18 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
-    public CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName) {
+    public CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated) {
         if (!configured()) {
             return CompletableFuture.completedFuture(null);
         }
-        return post("/invite/create", new Wire.InviteCreate(hostUuid.toString(), address, worldName))
+        return post("/invite/create", new Wire.InviteCreate(hostUuid.toString(), address, worldName, gated))
                 .thenApply(resp -> {
                     Wire.InviteCreated c = GSON.fromJson(resp.body(), Wire.InviteCreated.class);
-                    return c == null ? null : new Invite(c.code(), address, worldName, c.expiresIn());
+                    if (c == null) {
+                        return null;
+                    }
+                    String guestAddress = c.address() != null ? c.address() : address;
+                    return new Invite(c.code(), guestAddress, worldName, c.expiresIn());
                 })
                 .exceptionally(err -> {
                     onError(err);
@@ -187,7 +235,9 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(null);
         }
-        return get("/invite/" + code)
+        PlayerIdentity id = identity.get();
+        String query = id != null ? "?uuid=" + id.uuid() : "";
+        return get("/invite/" + code + query)
                 .thenApply(resp -> {
                     Wire.InviteResolved r = GSON.fromJson(resp.body(), Wire.InviteResolved.class);
                     return r == null ? null : new Invite(code, r.address(), r.worldName(), 0);
@@ -199,12 +249,12 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
-    public CompletableFuture<RelayTicket> requestRelayTicket() {
+    public CompletableFuture<RelayTicket> requestRelayTicket(boolean gated) {
         PlayerIdentity id = identity.get();
         if (!configured() || id == null) {
             return CompletableFuture.completedFuture(null);
         }
-        return post("/relay/ticket", new Wire.RelayTicketRequest(id.uuid().toString()))
+        return post("/relay/ticket", new Wire.RelayTicketRequest(id.uuid().toString(), gated))
                 .thenApply(resp -> {
                     Wire.RelayTicketDto dto = GSON.fromJson(resp.body(), Wire.RelayTicketDto.class);
                     return dto == null || dto.ticket() == null ? null : dto.toApi();
@@ -364,7 +414,6 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             reachable = true;
             webSocket.sendText(GSON.toJson(Map.of("type", "AUTH", "uuid", uuid.toString())), true);
             webSocket.request(1);
-            // Resync after a (re)connection — events may have been missed while disconnected.
             listener.onConnected();
         }
 
@@ -392,7 +441,6 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             reachable = false;
             HttpLanPlusNetwork.this.webSocket = null;
-            // Reconnect unless this was an intentional disconnect() (which clears eventsEnabled first).
             scheduleReconnect();
             return null;
         }
@@ -414,8 +462,13 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                     case "FRIEND_STARTED_HOSTING" -> listener.onFriendStartedHosting(
                             UUID.fromString(obj.get("uuid").getAsString()),
                             optionalString(obj, "joinCode"));
+                    case "FRIEND_REQUEST" -> listener.onFriendRequest(
+                            UUID.fromString(obj.get("fromUuid").getAsString()),
+                            optionalString(obj, "fromUsername"));
+                    case "INVITE_REDEEMED" -> listener.onInviteRedeemed(
+                            UUID.fromString(obj.get("guestUuid").getAsString()));
                     case "PING" -> webSocket.sendText(GSON.toJson(Map.of("type", "PONG")), true);
-                    default -> { /* unknown frame: ignored, not accepted as core logic (PROTOCOL.md) */ }
+                    default -> {}
                 }
             } catch (RuntimeException e) {
                 LOGGER.warn("LAN+ failed to handle WebSocket message: {}", e.toString());

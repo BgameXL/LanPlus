@@ -4,8 +4,9 @@
 
   "gui.lanplus.title": "LAN+ Friends",
   "gui.lanplus.tab.friends": "Friends",
-  "gui.lanplus.tab.blocked": "Blocked",
+  "gui.lanplus.tab.join": "Join",
   "gui.lanplus.tab.add": "Add",
+  "gui.lanplus.tab.details": "Details",
   "gui.lanplus.refresh": "Refresh",
 
   "gui.lanplus.status.connected": "Connected",
@@ -13,15 +14,13 @@
   "gui.lanplus.status.refreshing": "Refreshing…",
 
   "gui.lanplus.friends.empty": "No friends yet",
-  "gui.lanplus.blocked.empty": "No blocked players",
+  "gui.lanplus.friends.tooltip": "Friends",
   "gui.lanplus.detail.none": "Select a friend",
-
-  "gui.lanplus.chat.placeholder": "Chat (placeholder)",
 
   "gui.lanplus.add.title": "Add a friend",
   "gui.lanplus.add.hint": "Username or friend code",
   "gui.lanplus.add.button": "Add",
-  "gui.lanplus.add.note": "Type a username or friend code (e.g. BGME-4829).",
+  "gui.lanplus.add.note": "Type a username or friend code (e.g. LAN-7K2QF).",
   "gui.lanplus.add.searching": "Searching for %s…",
   "gui.lanplus.add.sent": "Friend request sent to %s",
   "gui.lanplus.add.notfound": "User not found: %s",
@@ -29,10 +28,11 @@
   "gui.lanplus.add.yourcode.unknown": "Your friend code: —",
 
   "gui.lanplus.action.join": "Join",
-  "gui.lanplus.action.message": "Message",
-  "gui.lanplus.action.block": "Block",
   "gui.lanplus.action.remove": "Remove",
-  "gui.lanplus.placeholder": "Not implemented yet",
+  "gui.lanplus.join.title": "Join by code",
+  "gui.lanplus.join.hint": "Invite code",
+  "gui.lanplus.join.button": "Join",
+  "gui.lanplus.join.note": "Enter a friend's invite code to join their world.",
   "gui.lanplus.join.connecting": "Connecting to %s…",
   "gui.lanplus.join.failed": "Could not resolve invite",
 
@@ -45,5 +45,42 @@
   "gui.lanplus.state.offline": "Offline",
   "gui.lanplus.state.singleplayer": "In singleplayer",
   "gui.lanplus.state.hosting": "Hosting: %s",
-  "gui.lanplus.state.playing": "Playing on %s"
+  "gui.lanplus.state.playing": "Playing on %s",
+
+  "gui.lanplus.host.tooltip": "Host a world",
+  "gui.lanplus.host.title": "Host a World",
+  "gui.lanplus.host.loading": "Loading worlds…",
+  "gui.lanplus.host.noworlds": "No worlds found — create one in Singleplayer first",
+  "gui.lanplus.host.access": "Who can join:",
+  "gui.lanplus.host.access.everyone": "Everyone",
+  "gui.lanplus.host.access.friends": "Friends only",
+  "gui.lanplus.host.access.invited": "Invite only",
+  "gui.lanplus.host.nonpremium": "Allow non-premium: %s",
+  "gui.lanplus.host.nonpremium.on": "ON",
+  "gui.lanplus.host.nonpremium.off": "OFF",
+  "gui.lanplus.host.nonpremium.tip": "Opens the world in offline-mode so non-premium players can join. Forces 'Everyone' and disables identity checks — anyone with the address can join and usernames are not verified.",
+  "gui.lanplus.host.start": "Host",
+
+  "gui.lanplus.invite.title": "Invite friends",
+  "gui.lanplus.invite.hostnow": "Host now",
+  "gui.lanplus.invite.nofriends": "No friends to invite",
+
+  "gui.lanplus.details.title": "Hosting details",
+  "gui.lanplus.details.nothosting": "You are not hosting a world",
+  "gui.lanplus.details.world": "World: %s",
+  "gui.lanplus.details.access": "Access: %s",
+  "gui.lanplus.details.address": "Server address",
+  "gui.lanplus.details.code": "Invite code",
+  "gui.lanplus.details.show": "Show",
+  "gui.lanplus.details.hide": "Hide",
+  "gui.lanplus.details.copy": "Copy",
+  "gui.lanplus.details.copied": "Copied to clipboard",
+
+  "gui.lanplus.requests.title": "Requests",
+  "gui.lanplus.requests.empty": "No requests",
+  "gui.lanplus.requests.accepted": "Friend request accepted",
+  "gui.lanplus.requests.declined": "Request declined",
+  "gui.lanplus.removed": "Removed %s",
+
+  "disconnect.lanplus.not_invited": "You are not invited to this LAN+ world"
 }

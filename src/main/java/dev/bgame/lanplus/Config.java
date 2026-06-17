@@ -16,7 +16,7 @@ public final class Config {
 
     private static final ForgeConfigSpec.ConfigValue<String> BACKEND_URL = BUILDER
             .comment("Base HTTP(S) URL of the LAN+ backend (e.g. http://localhost:8080). Empty = local-only mode.")
-            .define("backendUrl", "");
+            .define("backendUrl", "https://backend.lanplus.dev");
 
     private static final ForgeConfigSpec.IntValue HEARTBEAT_SECONDS = BUILDER
             .comment("How often to push a presence heartbeat to the backend, in seconds.")
@@ -34,8 +34,10 @@ public final class Config {
             .define("relayDevAddress", "");
 
     private static final ForgeConfigSpec.BooleanValue RELAY_DEV_PLAINTEXT = BUILDER
-            .comment("Whether 'relayDevAddress' connects without TLS. Set true only for a local relay",
-                    "started with LANPLUS_RELAY_TLS=false; leave false for a real TLS relay.")
+            .comment("Connect to the relay without TLS. Applies to both the backend-ticket path and",
+                    "'relayDevAddress', so a fully local backend+relay can be tested without certs.",
+                    "Set true only for a local relay started with LANPLUS_RELAY_TLS=false;",
+                    "leave false for a real TLS relay.")
             .define("relayDevPlaintext", false);
 
     static final ForgeConfigSpec SPEC = BUILDER.build();

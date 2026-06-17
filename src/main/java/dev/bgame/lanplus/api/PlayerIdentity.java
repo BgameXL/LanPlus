@@ -7,7 +7,7 @@ import java.util.UUID;
  * The local player's identity, supplied to the network layer at send time so that
  * {@link PresenceSnapshot} can stay free of identity/transport concerns.
  *
- * <p>Resolved from the Minecraft session on the client (CLAUDE.md #4); this type itself is
+ * Resolved from the Minecraft session on the client (CLAUDE.md #4); this type itself is
  * side-agnostic.
  *
  * @param uuid     player UUID

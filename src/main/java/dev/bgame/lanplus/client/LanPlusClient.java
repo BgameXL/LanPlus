@@ -39,21 +39,18 @@ public final class LanPlusClient {
         presence = new DefaultPresenceManager(network);
         friends = new DefaultFriendsService(network, LanPlusClient::localIdentity);
 
-        // Relay tunnel: when hosting, opens an internet-reachable tunnel and republishes the public
-        // address. Registered before invites so the public domain is set before a join code is minted.
         boolean relayDev = !Config.relayDevAddress.isBlank();
-        relayTunnel = new TcpRelayTunnel(relayDev && Config.relayDevPlaintext);
+        relayTunnel = new TcpRelayTunnel(Config.relayDevPlaintext);
         new RelayHostingCoordinator(presence, relayTunnel, network,
-                () -> Config.relayEnabled,
+                () -> Config.relayEnabled, HostController::isOfflineHosting,
                 relayDev ? LanPlusClient::devRelayTicket : null);
 
-        // Subscribes to presence to auto-mint a join code while hosting.
-        invites = new DefaultInviteService(network, presence, LanPlusClient::localIdentity, () -> Config.relayEnabled);
+        invites = new DefaultInviteService(network, presence, LanPlusClient::localIdentity,
+                () -> Config.relayEnabled, HostController::isOfflineHosting);
 
         String url = backendUrl();
         LOGGER.info("LAN+ client initialised (backend: {})", url.isBlank() ? "local-only" : url);
 
-        // Prime the friend list and open the WebSocket (no-op in local-only mode).
         friends.connect();
     }
 
@@ -80,7 +77,6 @@ public final class LanPlusClient {
         return Config.backendUrl;
     }
 
-    /** Dev-only ticket synthesized from {@code relayDevAddress} (paired with a NO_AUTH relay). */
     private static RelayTicket devRelayTicket() {
         String addr = Config.relayDevAddress;
         int colon = addr.lastIndexOf(':');

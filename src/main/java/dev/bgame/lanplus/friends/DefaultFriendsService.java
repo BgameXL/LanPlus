@@ -4,7 +4,9 @@ import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.PresenceUpdate;
+import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.UserProfile;
+import dev.bgame.lanplus.invites.HostAccessControl;
 import dev.bgame.lanplus.network.LanPlusNetwork;
 import org.slf4j.Logger;
 
@@ -25,6 +27,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     private final Map<UUID, Friend> cache = new ConcurrentHashMap<>();
     private final List<FriendsListener> listeners = new CopyOnWriteArrayList<>();
     private volatile UserProfile localProfile;
+    private volatile List<ResolvedUser> requestCache = List.of();
 
     public DefaultFriendsService(LanPlusNetwork network, Supplier<PlayerIdentity> identity) {
         this.network = network;
@@ -34,6 +37,11 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     @Override
     public List<Friend> friends() {
         return List.copyOf(cache.values());
+    }
+
+    @Override
+    public List<ResolvedUser> requests() {
+        return requestCache;
     }
 
     @Override
@@ -47,6 +55,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
         if (uuid == null) {
             return CompletableFuture.completedFuture(friends());
         }
+        refreshRequests();
         return network.getFriends(uuid).thenApply(list -> {
             cache.keySet().retainAll(list.stream().map(Friend::uuid).toList());
             for (Friend friend : list) {
@@ -77,6 +86,43 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     }
 
     @Override
+    public CompletableFuture<Boolean> remove(UUID friendUuid) {
+        UUID uuid = localUuid();
+        if (uuid == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return network.removeFriend(uuid, friendUuid).thenCompose(ok ->
+                ok ? refresh().thenApply(ignored -> true) : CompletableFuture.completedFuture(false));
+    }
+
+    @Override
+    public CompletableFuture<Boolean> accept(UUID requesterUuid) {
+        UUID uuid = localUuid();
+        if (uuid == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return network.acceptFriend(uuid, requesterUuid).thenCompose(ok -> {
+            if (ok) {
+                refreshRequests();
+                return refresh().thenApply(ignored -> true);
+            }
+            return CompletableFuture.completedFuture(false);
+        });
+    }
+
+    @Override
+    public CompletableFuture<Boolean> decline(UUID requesterUuid) {
+        UUID uuid = localUuid();
+        if (uuid == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return network.declineFriend(uuid, requesterUuid).thenApply(ok -> {
+            refreshRequests();
+            return ok;
+        });
+    }
+
+    @Override
     public void connect() {
         UUID uuid = localUuid();
         if (uuid == null) {
@@ -84,11 +130,11 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
         }
         refresh();
         fetchProfile();
+        refreshRequests();
         network.connectEvents(uuid, this);
         LOGGER.info("LAN+ friends realtime channel requested");
     }
 
-    /** Fetch the local player's own profile (friend code) and cache it. */
     private void fetchProfile() {
         UUID uuid = localUuid();
         if (uuid == null) {
@@ -99,6 +145,17 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
                 localProfile = profile;
                 notifyChanged();
             }
+        });
+    }
+
+    private void refreshRequests() {
+        UUID uuid = localUuid();
+        if (uuid == null) {
+            return;
+        }
+        network.getFriendRequests(uuid).thenAccept(list -> {
+            requestCache = list;
+            notifyChanged();
         });
     }
 
@@ -117,13 +174,11 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
         listeners.remove(listener);
     }
 
-    // --- LanPlusNetwork.BackendEventListener (WebSocket frames, off the main thread) --------------
-
     @Override
     public void onConnected() {
-        // Realtime channel (re)connected: pull a fresh list (and profile) to catch up on missed updates.
         refresh();
         fetchProfile();
+        refreshRequests();
     }
 
     @Override
@@ -139,6 +194,17 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
         if (patched != null) {
             notifyChanged();
         }
+    }
+
+    @Override
+    public void onFriendRequest(UUID fromUuid, String fromUsername) {
+        refreshRequests();
+    }
+
+    @Override
+    public void onInviteRedeemed(UUID guestUuid) {
+        HostAccessControl.invite(guestUuid);
+        LOGGER.info("LAN+ invite redeemed by {} — admitted to hosted world", guestUuid);
     }
 
     @Override

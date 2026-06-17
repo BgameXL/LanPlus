@@ -15,32 +15,32 @@ import java.util.concurrent.CompletableFuture;
 public interface LanPlusNetwork {
 
     CompletableFuture<Void> pushPresence(PresenceSnapshot snapshot);
-
     CompletableFuture<List<Friend>> getFriends(UUID uuid);
-
     CompletableFuture<Boolean> addFriend(UUID uuid, UUID friendUuid);
-
+    CompletableFuture<Boolean> removeFriend(UUID uuid, UUID friendUuid);
+    CompletableFuture<Boolean> acceptFriend(UUID uuid, UUID friendUuid);
+    CompletableFuture<Boolean> declineFriend(UUID uuid, UUID friendUuid);
+    CompletableFuture<List<ResolvedUser>> getFriendRequests(UUID uuid);
     CompletableFuture<ResolvedUser> resolveUser(String query);
-
     CompletableFuture<UserProfile> fetchProfile(UUID uuid);
-
-    CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName);
-
+    CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated);
     CompletableFuture<Invite> resolveInvite(String code);
-
-    CompletableFuture<RelayTicket> requestRelayTicket();
+    CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);
 
     void connectEvents(UUID uuid, BackendEventListener listener);
-
     void disconnect();
-
     boolean isConnected();
-
     interface BackendEventListener {
 
         void onPresenceUpdate(PresenceUpdate update);
 
         void onFriendStartedHosting(UUID uuid, String joinCode);
+
+        default void onFriendRequest(UUID fromUuid, String fromUsername) {
+        }
+
+        default void onInviteRedeemed(UUID guestUuid) {
+        }
 
         default void onConnected() {
         }

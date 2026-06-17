@@ -29,17 +29,20 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
     private final RelayTunnel tunnel;
     private final LanPlusNetwork network;
     private final BooleanSupplier relayEnabled;
+    private final BooleanSupplier offlineHosting;
     private final Supplier<RelayTicket> devTicket;
 
     private volatile boolean tunneling;
     private volatile boolean active;
 
     public RelayHostingCoordinator(PresenceManager presence, RelayTunnel tunnel, LanPlusNetwork network,
-                                   BooleanSupplier relayEnabled, Supplier<RelayTicket> devTicket) {
+                                   BooleanSupplier relayEnabled, BooleanSupplier offlineHosting,
+                                   Supplier<RelayTicket> devTicket) {
         this.presence = presence;
         this.tunnel = tunnel;
         this.network = network;
         this.relayEnabled = relayEnabled;
+        this.offlineHosting = offlineHosting;
         this.devTicket = devTicket;
         presence.addListener(this);
     }
@@ -59,7 +62,7 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
         }
         int localPort = loopbackPort(snapshot.address());
         if (localPort < 0) {
-            return; // address is already the public domain we republished, or not a local host
+            return;
         }
         tunneling = true;
         active = true;
@@ -82,7 +85,6 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
                     }
                     return;
                 }
-                // Republish only if still hosting (the player may have stopped while we waited).
                 if (presence.current().state() == GameplayState.HOSTING) {
                     presence.updateState(GameplayState.HOSTING, worldName, domain);
                     LOGGER.info("LAN+ hosting via relay: {}", domain);
@@ -105,7 +107,7 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
     private CompletableFuture<RelayTicket> ticket() {
         return devTicket != null
                 ? CompletableFuture.completedFuture(devTicket.get())
-                : network.requestRelayTicket();
+                : network.requestRelayTicket(offlineHosting.getAsBoolean());
     }
 
     private static int loopbackPort(String address) {
