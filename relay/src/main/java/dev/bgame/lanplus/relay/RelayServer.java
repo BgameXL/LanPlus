@@ -28,9 +28,10 @@ public final class RelayServer {
 
         RoutingTable table = new RoutingTable();
         TicketValidator validator = new TicketValidator(cfg);
+        GuestTokenValidator guestTokens = new GuestTokenValidator(cfg);
         RateLimiter limiter = new RateLimiter(cfg.mcRatePerMin);
         ControlListener control = new ControlListener(table, validator, pool);
-        MinecraftListener minecraft = new MinecraftListener(table, limiter);
+        MinecraftListener minecraft = new MinecraftListener(table, limiter, guestTokens);
 
         ServerSocket relaySocket = openRelaySocket(cfg);
         relaySocket.bind(cfg.relayBind);

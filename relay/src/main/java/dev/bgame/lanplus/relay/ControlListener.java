@@ -40,20 +40,22 @@ final class ControlListener {
 
     private void hello(Socket socket, InputStream in, Map<String, String> msg) throws IOException {
         OutputStream out = socket.getOutputStream();
-        String domain = validator.validate(msg.get("ticket"));
-        if (domain == null) {
+        TicketValidator.Result result = validator.validate(msg.get("ticket"));
+        if (result == null) {
             reject(out, "invalid ticket");
             Pump.closeQuietly(socket);
             return;
         }
-        HostSession session = new HostSession(socket, domain);
+        String domain = result.domain();
+        HostSession session = new HostSession(socket, domain, result.requireToken());
         if (!table.register(domain, session)) {
             reject(out, "domain busy");
             Pump.closeQuietly(socket);
             return;
         }
         session.send(Json.obj("type", "ASSIGNED", "domain", domain));
-        RelayServer.log("host assigned " + domain + " (" + socket.getRemoteSocketAddress() + ")");
+        RelayServer.log("host assigned " + domain + (result.requireToken() ? " (gated)" : "")
+                + " (" + socket.getRemoteSocketAddress() + ")");
         try {
             while (Io.readLine(in) != null) {
                 // no client-initiated control messages handled yet

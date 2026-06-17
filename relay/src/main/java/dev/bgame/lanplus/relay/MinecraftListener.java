@@ -14,10 +14,12 @@ final class MinecraftListener {
 
     private final RoutingTable table;
     private final RateLimiter limiter;
+    private final GuestTokenValidator guestTokens;
 
-    MinecraftListener(RoutingTable table, RateLimiter limiter) {
+    MinecraftListener(RoutingTable table, RateLimiter limiter, GuestTokenValidator guestTokens) {
         this.table = table;
         this.limiter = limiter;
+        this.guestTokens = guestTokens;
     }
 
     void handle(Socket player) {
@@ -33,9 +35,9 @@ final class MinecraftListener {
             if (hs == null || hs.serverAddress == null) {
                 return;
             }
-            HostSession host = table.lookup(hs.serverAddress);
+            HostSession host = route(hs.serverAddress);
             if (host == null) {
-                return; // unknown domain / host offline
+                return; // unknown domain / invalid token / host offline
             }
             String sid = table.addPending(player, hs.raw);
             if (!host.send(Json.obj("type", "SESSION", "id", sid))) {
@@ -49,5 +51,16 @@ final class MinecraftListener {
                 Pump.closeQuietly(player);
             }
         }
+    }
+
+    private HostSession route(String serverAddress) {
+        HostSession direct = table.lookup(serverAddress);
+        if (direct != null) {
+            return direct.requireToken() ? null : direct;
+        }
+        int dot = serverAddress.indexOf('.');
+        String token = dot < 0 ? serverAddress : serverAddress.substring(0, dot);
+        String domain = guestTokens.validate(token);
+        return domain == null ? null : table.lookup(domain);
     }
 }

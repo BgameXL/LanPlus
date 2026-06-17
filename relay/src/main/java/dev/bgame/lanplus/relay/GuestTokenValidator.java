@@ -8,30 +8,25 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 
-final class TicketValidator {
-
-    record Result(String domain, boolean requireToken) {}
+final class GuestTokenValidator {
 
     private final RelayConfig cfg;
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .build();
 
-    TicketValidator(RelayConfig cfg) {
+    GuestTokenValidator(RelayConfig cfg) {
         this.cfg = cfg;
     }
 
-    Result validate(String ticket) {
-        if (cfg.noAuth) {
-            return new Result(Wordlist.randomDomain(cfg.baseDomain), false);
-        }
-        if (ticket == null || ticket.isBlank()) {
+    String validate(String token) {
+        if (cfg.noAuth || token == null || token.isBlank()) {
             return null;
         }
         try {
             HttpRequest req = HttpRequest.newBuilder(URI.create(
-                            cfg.backendUrl + "/relay/validate?ticket="
-                                    + URLEncoder.encode(ticket, StandardCharsets.UTF_8)))
+                            cfg.backendUrl + "/relay/guest/validate?token="
+                                    + URLEncoder.encode(token, StandardCharsets.UTF_8)))
                     .timeout(Duration.ofSeconds(5))
                     .GET()
                     .build();
@@ -39,12 +34,10 @@ final class TicketValidator {
             if (resp.statusCode() != 200) {
                 return null;
             }
-            var json = Json.parse(resp.body());
-            String domain = MinecraftHandshake.normalize(json.get("domain"));
-            boolean requireToken = "true".equals(json.get("requireToken"));
-            return domain == null ? null : new Result(domain, requireToken);
+            String domain = Json.parse(resp.body()).get("domain");
+            return domain == null ? null : MinecraftHandshake.normalize(domain);
         } catch (Exception e) {
-            RelayServer.log("ticket validation failed: " + e);
+            RelayServer.log("guest token validation failed: " + e);
             return null;
         }
     }
