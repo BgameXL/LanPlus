@@ -9,7 +9,7 @@ import java.util.concurrent.CompletableFuture;
  * Resolves {@link SkinRef}s into textures client-side and caches them.
  *
  * The backend only ever carries the reference;
- * this service downloads the actual texture from the provider (Mojang / Ely.by / custom URL) or
+ * this service downloads the actual texture from the provider or
  * via P2P fallback on LAN, and caches it locally keyed by hash.
  *
  * This interface stays side-agnostic on purpose (no Minecraft types): binding a resolved
@@ -19,6 +19,8 @@ public interface SkinService {
 
     /** The local player's current skin reference, or {@code null} if unknown. */
     SkinRef localSkin();
+
+    void setLocalSkin(SkinRef ref);
 
     /**
      * Ensure a player's skin reference is resolved and cached, downloading as needed.

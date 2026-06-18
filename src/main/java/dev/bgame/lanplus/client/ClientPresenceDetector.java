@@ -3,8 +3,12 @@ package dev.bgame.lanplus.client;
 import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.Lanplus;
 import dev.bgame.lanplus.api.GameplayState;
+import dev.bgame.lanplus.api.SkinRef;
+import dev.bgame.lanplus.api.SkinType;
 import dev.bgame.lanplus.presence.PresenceManager;
+import dev.bgame.lanplus.skins.SkinService;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.User;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraftforge.api.distmarker.Dist;
@@ -13,11 +17,14 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import java.util.Objects;
+
 @Mod.EventBusSubscriber(modid = Lanplus.MODID, value = Dist.CLIENT)
 public final class ClientPresenceDetector {
 
     private static int tickCounter = 0;
     private static GameplayState lastState = null;
+    private static SkinRef lastSkin = null;
 
     private ClientPresenceDetector() {}
 
@@ -35,13 +42,43 @@ public final class ClientPresenceDetector {
         GameplayState state = detectState(mc);
         if (state != lastState) {
             lastState = state;
+            publishSkinIfChanged(mc, presence);
             presence.updateState(state, detectWorldName(mc, state), detectAddress(mc, state));
         }
 
         int intervalTicks = Math.max(5, Config.heartbeatSeconds) * 20;
         if (++tickCounter >= intervalTicks) {
             tickCounter = 0;
+            publishSkinIfChanged(mc, presence);
             presence.heartbeat();
+        }
+    }
+
+    private static void publishSkinIfChanged(Minecraft mc, PresenceManager presence) {
+        SkinRef ref = detectSkin(mc);
+        if (Objects.equals(ref, lastSkin)) {
+            return;
+        }
+        lastSkin = ref;
+        SkinService skins = LanPlusClient.skins();
+        if (skins != null) {
+            skins.setLocalSkin(ref);
+        }
+        presence.updateSkin(ref);
+    }
+
+    private static SkinRef detectSkin(Minecraft mc) {
+        if (!Config.skinUrl.isBlank()) {
+            return new SkinRef(SkinType.CUSTOM, Config.skinUrl, null, Config.skinSlim ? "slim" : null);
+        }
+        User user = mc.getUser();
+        if (user == null) {
+            return null;
+        }
+        try {
+            return new SkinRef(SkinType.MOJANG, user.getProfileId().toString(), null, null);
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 

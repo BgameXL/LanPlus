@@ -8,6 +8,7 @@ import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.UserProfile;
 import dev.bgame.lanplus.client.LanPlusClient;
+import dev.bgame.lanplus.client.SkinTextures;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.invites.HostAccessControl;
 import dev.bgame.lanplus.invites.InviteService;
@@ -15,6 +16,9 @@ import dev.bgame.lanplus.presence.PresenceManager;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import net.minecraft.client.resources.DefaultPlayerSkin;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.ConnectScreen;
 import net.minecraft.client.gui.screens.GenericDirtMessageScreen;
@@ -161,11 +165,19 @@ public final class FriendsScreen extends Screen {
             if (selected || hover) {
                 g.fill(LEFT_X, y, LEFT_X + LEFT_W, y + ROW_H, selected ? 0x40FFFFFF : 0x20FFFFFF);
             }
-            g.fill(LEFT_X + 6, y + ROW_H / 2 - 3, LEFT_X + 12, y + ROW_H / 2 + 3, statusColor(f.connectivity()));
-            g.drawString(this.font, f.username(), LEFT_X + 18, y + 4, 0xFFFFFFFF);
-            g.drawString(this.font, secondaryText(f), LEFT_X + 18, y + 14, 0xFF9AA0A6);
+            drawAvatar(g, f.uuid(), LEFT_X + 4, y + 3, 18);
+            g.fill(LEFT_X + 26, y + ROW_H / 2 - 3, LEFT_X + 32, y + ROW_H / 2 + 3, statusColor(f.connectivity()));
+            g.drawString(this.font, f.username(), LEFT_X + 38, y + 4, 0xFFFFFFFF);
+            g.drawString(this.font, secondaryText(f), LEFT_X + 38, y + 14, 0xFF9AA0A6);
             y += ROW_H;
         }
+    }
+
+    private void drawAvatar(GuiGraphics g, UUID uuid, int x, int y, int size) {
+        SkinTextures textures = LanPlusClient.skinTextures();
+        SkinTextures.Resolved resolved = textures == null ? null : textures.get(uuid);
+        ResourceLocation tex = resolved != null ? resolved.texture() : DefaultPlayerSkin.getDefaultSkin(uuid);
+        PlayerFaceRenderer.draw(g, tex, x, y, size);
     }
 
     /** Incoming friend requests live in the left pane of the Add tab, each with accept/decline. */

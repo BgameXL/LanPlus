@@ -14,13 +14,13 @@ final class Wire {
 
     private Wire() {}
 
-    record Skin(String type, String id, String hash) {
+    record Skin(String type, String id, String hash, String model) {
         static Skin from(SkinRef ref) {
-            return ref == null ? null : new Skin(ref.type().name(), ref.id(), ref.hash());
+            return ref == null ? null : new Skin(ref.type().name(), ref.id(), ref.hash(), ref.model());
         }
 
         SkinRef toApi() {
-            return new SkinRef(SkinType.valueOf(type), id, hash);
+            return new SkinRef(SkinType.valueOf(type), id, hash, model);
         }
     }
 

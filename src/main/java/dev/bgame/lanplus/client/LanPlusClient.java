@@ -2,8 +2,12 @@ package dev.bgame.lanplus.client;
 
 import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.Config;
+import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.RelayTicket;
+import dev.bgame.lanplus.api.SkinRef;
+import dev.bgame.lanplus.discord.DiscordPresence;
+import dev.bgame.lanplus.discord.DiscordRichPresence;
 import dev.bgame.lanplus.friends.DefaultFriendsService;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.invites.DefaultInviteService;
@@ -15,9 +19,16 @@ import dev.bgame.lanplus.network.RelayTunnel;
 import dev.bgame.lanplus.network.TcpRelayTunnel;
 import dev.bgame.lanplus.presence.DefaultPresenceManager;
 import dev.bgame.lanplus.presence.PresenceManager;
+import dev.bgame.lanplus.skins.DefaultSkinService;
+import dev.bgame.lanplus.skins.SkinService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
 import org.slf4j.Logger;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class LanPlusClient {
 
@@ -28,6 +39,10 @@ public final class LanPlusClient {
     private static FriendsService friends;
     private static InviteService invites;
     private static RelayTunnel relayTunnel;
+    private static SkinService skins;
+    private static SkinTextures skinTextures;
+    private static DiscordPresence discord;
+    private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
 
     private LanPlusClient() {}
 
@@ -38,6 +53,14 @@ public final class LanPlusClient {
         network = new HttpLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity);
         presence = new DefaultPresenceManager(network);
         friends = new DefaultFriendsService(network, LanPlusClient::localIdentity);
+
+        skinTextures = new SkinTextures();
+        skins = new DefaultSkinService(skinTextures);
+        friends.addListener(LanPlusClient::resolveFriendSkins);
+
+        discord = new DiscordRichPresence(Config.discordEnabled ? Config.discordAppId : "");
+        presence.addListener(discord::update);
+        discord.update(presence.current());
 
         boolean relayDev = !Config.relayDevAddress.isBlank();
         relayTunnel = new TcpRelayTunnel(Config.relayDevPlaintext);
@@ -64,6 +87,30 @@ public final class LanPlusClient {
 
     public static InviteService invites() {
         return invites;
+    }
+
+    public static SkinService skins() {
+        return skins;
+    }
+
+    public static SkinTextures skinTextures() {
+        return skinTextures;
+    }
+
+    public static DiscordPresence discord() {
+        return discord;
+    }
+
+    private static void resolveFriendSkins(List<Friend> list) {
+        if (skins == null) {
+            return;
+        }
+        for (Friend f : list) {
+            SkinRef ref = f.skin();
+            if (ref != null && !ref.equals(resolvedSkinRefs.put(f.uuid(), ref))) {
+                skins.resolve(f.uuid(), ref);
+            }
+        }
     }
 
     public static LanPlusNetwork network() {
