@@ -28,7 +28,7 @@ final class BackendConfig {
                 env("LANPLUS_BACKEND_RELAY_HOST", "relay.lanplus.dev"),
                 intEnv("LANPLUS_BACKEND_RELAY_PORT", 8443),
                 intEnv("LANPLUS_BACKEND_HEARTBEAT_TTL_SECONDS", 45) * 1000,
-                env("LANPLUS_BACKEND_DATA_FILE", "lanplus-data.json"));
+                env("LANPLUS_BACKEND_DATA_FILE", "lanplus.db"));
     }
 
     private static InetSocketAddress addr(String s) {

@@ -7,8 +7,12 @@ import java.net.Socket;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -38,8 +42,7 @@ public final class BackendServer {
         ScheduledExecutorService sched = Executors.newSingleThreadScheduledExecutor(daemon("backend-sched"));
         sched.scheduleAtFixedRate(hub::pingAll, 20, 20, TimeUnit.SECONDS);
         sched.scheduleAtFixedRate(store::sweep, 30, 30, TimeUnit.SECONDS);
-        sched.scheduleAtFixedRate(store::flush, 10, 10, TimeUnit.SECONDS);
-        Runtime.getRuntime().addShutdownHook(new Thread(store::flush, "backend-flush"));
+        Runtime.getRuntime().addShutdownHook(new Thread(store::close, "backend-close"));
 
         ServerSocket server = new ServerSocket();
         server.setReuseAddress(true);
@@ -104,6 +107,18 @@ public final class BackendServer {
             if (m.equals("POST") && path.equals("/friends/decline")) {
                 return friendsDecline(req);
             }
+            if (m.equals("POST") && path.equals("/friends/mute")) {
+                return friendsRelation(req, "mute");
+            }
+            if (m.equals("POST") && path.equals("/friends/unmute")) {
+                return friendsRelation(req, "unmute");
+            }
+            if (m.equals("POST") && path.equals("/friends/block")) {
+                return friendsRelation(req, "block");
+            }
+            if (m.equals("POST") && path.equals("/friends/unblock")) {
+                return friendsRelation(req, "unblock");
+            }
             if (m.equals("GET") && path.equals("/friends/requests")) {
                 return ok(store.friendRequests(uuid(req.param("uuid"))));
             }
@@ -119,6 +134,13 @@ public final class BackendServer {
             }
             if (m.equals("GET") && path.equals("/users/search")) {
                 return ok(store.search(req.param("q")));
+            }
+            if (m.equals("GET") && path.equals("/profile")) {
+                Map<String, Object> p = store.profile(uuid(req.param("uuid")));
+                return p == null ? NOT_FOUND : ok(p);
+            }
+            if (m.equals("POST") && path.equals("/profile/update")) {
+                return profileUpdate(req);
             }
             if (m.equals("POST") && path.equals("/invite/create")) {
                 return inviteCreate(req);
@@ -154,13 +176,20 @@ public final class BackendServer {
                 "state", b.get("state"),
                 "worldName", b.get("worldName"),
                 "joinCode", b.get("joinCode"));
-        Object presenceUpdate = Map.of("type", "PRESENCE_UPDATE", "data", data);
+
+        Set<UUID> recipients = new LinkedHashSet<>();
         for (UUID friend : store.friendsOf(uuid)) {
+            if (!store.isMutedOrBlocked(friend, uuid)) {
+                recipients.add(friend);
+            }
+        }
+        Object presenceUpdate = Map.of("type", "PRESENCE_UPDATE", "data", data);
+        for (UUID friend : recipients) {
             hub.send(friend, presenceUpdate);
         }
         if (announceHosting) {
             Object event = ordered("type", "FRIEND_STARTED_HOSTING", "uuid", uuid.toString(), "joinCode", b.get("joinCode"));
-            for (UUID friend : store.friendsOf(uuid)) {
+            for (UUID friend : recipients) {
                 hub.send(friend, event);
             }
         }
@@ -171,11 +200,27 @@ public final class BackendServer {
         Map<String, Object> b = Json.parseObject(req.body());
         UUID uuid = uuid((String) b.get("uuid"));
         UUID friendUuid = uuid((String) b.get("friendUuid"));
-        boolean accepted = store.addFriendRequest(uuid, friendUuid);
-        if (!accepted) {
+        Store.AddResult result = store.addFriendRequest(uuid, friendUuid);
+        if (result == Store.AddResult.REQUESTED) {
             Object username = store.me(uuid).get("username");
             hub.send(friendUuid, ordered("type", "FRIEND_REQUEST",
                     "fromUuid", uuid.toString(), "fromUsername", username));
+        }
+        return ok(Map.of("success", result != Store.AddResult.BLOCKED));
+    }
+
+    private Resp friendsRelation(Http.Request req, String action) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        UUID uuid = uuid((String) b.get("uuid"));
+        UUID target = uuid((String) b.get("targetUuid"));
+        switch (action) {
+            case "mute" -> store.setMuted(uuid, target, true);
+            case "unmute" -> store.setMuted(uuid, target, false);
+            case "block" -> store.setBlocked(uuid, target, true);
+            case "unblock" -> store.setBlocked(uuid, target, false);
+            default -> {
+                return BAD;
+            }
         }
         return ok(Map.of("success", true));
     }
@@ -196,6 +241,60 @@ public final class BackendServer {
         Map<String, Object> b = Json.parseObject(req.body());
         store.declineRequest(uuid((String) b.get("uuid")), uuid((String) b.get("friendUuid")));
         return ok(Map.of("success", true));
+    }
+
+    private static final Set<String> PRONOUN_OPTIONS = Set.of("he/him", "she/her", "they/them");
+    private static final Pattern HANDLE = Pattern.compile("[A-Za-z0-9_.]{1,30}");
+    private static final Pattern OBVIOUS_DOMAIN = Pattern.compile("(?<![\\w.])[a-z0-9-]+\\.[a-z]{2,24}(?![\\w])");
+
+    private Resp profileUpdate(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        UUID uuid = uuid((String) b.get("uuid"));
+        store.ensureUser(uuid, null);
+        if (b.containsKey("bio")) {
+            String bio = b.get("bio") == null ? "" : String.valueOf(b.get("bio"));
+            if (bio.length() > 300) {
+                return ok(error("bio_too_long"));
+            }
+            if (containsObviousLink(bio)) {
+                return ok(error("bio_link"));
+            }
+            store.setBio(uuid, bio);
+        }
+        if (b.containsKey("pronouns")) {
+            Object pr = b.get("pronouns");
+            String pronouns = pr == null ? null : String.valueOf(pr);
+            if (pronouns != null && !PRONOUN_OPTIONS.contains(pronouns)) {
+                return ok(error("bad_pronouns"));
+            }
+            store.setPronouns(uuid, pronouns);
+        }
+        if (b.get("links") instanceof Map<?, ?> links) {
+            for (Map.Entry<?, ?> e : links.entrySet()) {
+                String platform = String.valueOf(e.getKey());
+                if (!store.isLinkPlatform(platform)) {
+                    continue;
+                }
+                String value = e.getValue() == null ? null : String.valueOf(e.getValue());
+                if (value != null && !value.isBlank() && !HANDLE.matcher(value).matches()) {
+                    return ok(error("bad_link"));
+                }
+                store.setLink(uuid, platform, value);
+            }
+        }
+        return ok(Map.of("success", true));
+    }
+
+    private static Map<String, Object> error(String code) {
+        return ordered("success", false, "error", code);
+    }
+
+    private static boolean containsObviousLink(String text) {
+        String t = text.toLowerCase(Locale.ROOT);
+        if (t.contains("http://") || t.contains("https://") || t.contains("www.")) {
+            return true;
+        }
+        return OBVIOUS_DOMAIN.matcher(t).find();
     }
 
     private Resp inviteCreate(Http.Request req) {

@@ -1,24 +1,30 @@
 package dev.bgame.lanplus.backend;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.security.SecureRandom;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * In-memory state for the backend stub: users, presence, friends, invites and relay tickets, plus
- * backend-derived connectivity.
- * No persistence — everything is lost on restart, which is fine for a reference/dev backend.
+ * Backend state. Durable identity + social graph (users, friends, friend_requests, relationships)
+ * lives in SQLite; presence, invites and relay tickets stay in memory because they are ephemeral
+ * (TTL-bounded) and correct to lose on restart. See docs/dev/SQLITE.md.
+ *
+ * Concurrency: a single shared JDBC Connection guarded by {@link #lock} (SQLite admits one writer;
+ * WAL allows concurrent readers, but a single Connection is not thread-safe, so all DB access is
+ * serialized). Presence/invite/ticket maps are concurrent and need no lock.
  *
  * Simplifications vs a real backend: users auto-register on first contact; adding a friend sends a
  * request the other side must accept (auto-accepted if mutual); there is no authentication.
@@ -34,7 +40,7 @@ final class Store {
 
     static final class User {
         final UUID uuid;
-        volatile String username;
+        final String username;
         final String friendCode;
         final String domain;
 
@@ -61,18 +67,18 @@ final class Store {
 
     record Invite(UUID hostUuid, String address, String worldName, long expiresAt) {}
 
-    /** A guest invite token bound to a host's relay domain (offline/gated hosting). */
     record GuestToken(String hostDomain, long expiresAt) {}
+
+    /** Outcome of a friend-add: became friends, a request was queued, or it was refused (self/blocked). */
+    enum AddResult { ACCEPTED, REQUESTED, BLOCKED }
 
     private final long ttlMs;
     private final String baseDomain;
-    private final Path dataFile;
-    private volatile boolean dirty = false;
 
-    private final Map<UUID, User> users = new ConcurrentHashMap<>();
+    private final Object lock = new Object();
+    private final Connection connection;
+
     private final Map<UUID, Presence> presences = new ConcurrentHashMap<>();
-    private final Map<UUID, Set<UUID>> friends = new ConcurrentHashMap<>();
-    private final Map<UUID, Set<UUID>> requests = new ConcurrentHashMap<>();
     private final Map<String, Invite> invites = new ConcurrentHashMap<>();
     private final Map<String, Ticket> tickets = new ConcurrentHashMap<>();
     private final Map<String, GuestToken> guestTokens = new ConcurrentHashMap<>();
@@ -80,39 +86,112 @@ final class Store {
     Store(long ttlMs, String baseDomain, String dataFile) {
         this.ttlMs = ttlMs;
         this.baseDomain = baseDomain;
-        this.dataFile = (dataFile == null || dataFile.isBlank()) ? null : Path.of(dataFile);
-        load();
+        String path = (dataFile == null || dataFile.isBlank()) ? ":memory:" : dataFile;
+        this.connection = openDb(path);
     }
 
+    private static Connection openDb(String path) {
+        try {
+            Class.forName("org.sqlite.JDBC");
+            Connection c = DriverManager.getConnection("jdbc:sqlite:" + path);
+            try (Statement st = c.createStatement()) {
+                st.execute("PRAGMA journal_mode=WAL");
+                st.execute("PRAGMA synchronous=NORMAL");
+                st.execute("PRAGMA foreign_keys=ON");
+                st.execute("PRAGMA busy_timeout=5000");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS users ("
+                        + "uuid TEXT PRIMARY KEY, username TEXT, friend_code TEXT UNIQUE NOT NULL, "
+                        + "domain TEXT UNIQUE NOT NULL, last_seen INTEGER, last_modpack TEXT)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS friends ("
+                        + "a TEXT NOT NULL, b TEXT NOT NULL, PRIMARY KEY (a, b), CHECK (a < b))");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS friend_requests ("
+                        + "from_uuid TEXT NOT NULL, to_uuid TEXT NOT NULL, PRIMARY KEY (from_uuid, to_uuid))");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS relationships ("
+                        + "uuid TEXT NOT NULL, target TEXT NOT NULL, muted INTEGER NOT NULL DEFAULT 0, "
+                        + "blocked INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (uuid, target))");
+                // profiles (opt-in social identity; see docs/dev/PROFILES_DESIGN.md)
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_bio ("
+                        + "uuid TEXT PRIMARY KEY, text TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_identity ("
+                        + "uuid TEXT PRIMARY KEY, pronouns TEXT)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_links ("
+                        + "uuid TEXT PRIMARY KEY, discord TEXT, instagram TEXT, twitter TEXT, youtube TEXT, "
+                        + "twitch TEXT, tiktok TEXT, paypal TEXT, kofi TEXT)");
+            }
+            return c;
+        } catch (ClassNotFoundException | SQLException e) {
+            throw new IllegalStateException("LAN+ backend: cannot open SQLite database at " + path, e);
+        }
+    }
+
+    void close() {
+        synchronized (lock) {
+            try {
+                connection.close();
+            } catch (SQLException ignored) {
+            }
+        }
+    }
+
+    // users
     User ensureUser(UUID uuid, String username) {
-        boolean[] created = {false};
-        User u = users.computeIfAbsent(uuid, k -> {
-            created[0] = true;
-            return new User(k, username, uniqueFriendCode(), uniqueDomain());
-        });
-        boolean changed = created[0];
-        if (username != null && !username.isBlank() && !username.equals(u.username)) {
-            u.username = username;
-            changed = true;
+        synchronized (lock) {
+            try {
+                User u = findUser(uuid);
+                if (u == null) {
+                    String friendCode = uniqueFriendCode();
+                    String domain = uniqueDomain();
+                    try (PreparedStatement ps = connection.prepareStatement(
+                            "INSERT INTO users (uuid, username, friend_code, domain) VALUES (?,?,?,?)")) {
+                        ps.setString(1, uuid.toString());
+                        ps.setString(2, username);
+                        ps.setString(3, friendCode);
+                        ps.setString(4, domain);
+                        ps.executeUpdate();
+                    }
+                    return new User(uuid, username, friendCode, domain);
+                }
+                if (username != null && !username.isBlank() && !username.equals(u.username)) {
+                    try (PreparedStatement ps = connection.prepareStatement(
+                            "UPDATE users SET username=? WHERE uuid=?")) {
+                        ps.setString(1, username);
+                        ps.setString(2, uuid.toString());
+                        ps.executeUpdate();
+                    }
+                    return new User(uuid, username, u.friendCode, u.domain);
+                }
+                return u;
+            } catch (SQLException e) {
+                throw fail("ensureUser", e);
+            }
         }
-        if (changed) {
-            markDirty();
-        }
-        return u;
     }
 
     Map<String, Object> me(UUID uuid) {
         User u = ensureUser(uuid, null);
-        return ordered("uuid", uuid.toString(), "username", u.username == null ? "Player" : u.username, "friendCode", u.friendCode);
+        return ordered("uuid", uuid.toString(), "username", u.username == null ? "Player" : u.username,
+                "friendCode", u.friendCode);
     }
 
     Map<String, Object> resolve(String query) {
         if (query == null || query.isBlank()) {
             return null;
         }
-        for (User u : users.values()) {
-            if (query.equalsIgnoreCase(u.friendCode) || (u.username != null && query.equalsIgnoreCase(u.username))) {
-                return ordered("uuid", u.uuid.toString(), "username", u.username, "online", "ONLINE".equals(connectivity(u.uuid)));
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT uuid, username FROM users WHERE friend_code = ? COLLATE NOCASE "
+                            + "OR username = ? COLLATE NOCASE LIMIT 1")) {
+                ps.setString(1, query);
+                ps.setString(2, query);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        UUID uuid = UUID.fromString(rs.getString(1));
+                        return ordered("uuid", rs.getString(1), "username", rs.getString(2),
+                                "online", "ONLINE".equals(connectivity(uuid)));
+                    }
+                }
+            } catch (SQLException e) {
+                throw fail("resolve", e);
             }
         }
         return null;
@@ -123,18 +202,28 @@ final class Store {
         if (q == null || q.isBlank()) {
             return out;
         }
-        String needle = q.toLowerCase(Locale.ROOT);
-        for (User u : users.values()) {
-            boolean match = (u.username != null && u.username.toLowerCase(Locale.ROOT).contains(needle))
-                    || u.friendCode.toLowerCase(Locale.ROOT).contains(needle);
-            if (match) {
-                out.add(ordered("uuid", u.uuid.toString(), "username", u.username, "online", "ONLINE".equals(connectivity(u.uuid))));
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT uuid, username FROM users WHERE username LIKE ? COLLATE NOCASE "
+                            + "OR friend_code LIKE ? COLLATE NOCASE")) {
+                String like = "%" + q + "%";
+                ps.setString(1, like);
+                ps.setString(2, like);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        UUID uuid = UUID.fromString(rs.getString(1));
+                        out.add(ordered("uuid", rs.getString(1), "username", rs.getString(2),
+                                "online", "ONLINE".equals(connectivity(uuid))));
+                    }
+                }
+            } catch (SQLException e) {
+                throw fail("search", e);
             }
         }
         return out;
     }
 
-    // presence
+    // presence (in-memory: ephemeral, derived connectivity)
     boolean upsertPresence(UUID uuid, String username, String state, String worldName,
                            String address, String joinCode, Object skin) {
         ensureUser(uuid, username);
@@ -182,114 +271,417 @@ final class Store {
     }
 
     // friends
-    boolean addFriendRequest(UUID uuid, UUID friendUuid) {
+    AddResult addFriendRequest(UUID uuid, UUID friendUuid) {
         if (uuid.equals(friendUuid)) {
-            return false;
+            return AddResult.BLOCKED;
         }
         ensureUser(uuid, null);
         ensureUser(friendUuid, null);
-        if (friendsOf(uuid).contains(friendUuid)) {
-            return true; // already friends
+        synchronized (lock) {
+            try {
+                if (areFriends(uuid, friendUuid)) {
+                    return AddResult.ACCEPTED;
+                }
+                if (isBlockedLocked(friendUuid, uuid)) {
+                    return AddResult.BLOCKED;
+                }
+                if (requestExists(friendUuid, uuid)) {
+                    acceptRequestLocked(uuid, friendUuid);
+                    return AddResult.ACCEPTED;
+                }
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "INSERT OR IGNORE INTO friend_requests (from_uuid, to_uuid) VALUES (?,?)")) {
+                    ps.setString(1, uuid.toString());
+                    ps.setString(2, friendUuid.toString());
+                    ps.executeUpdate();
+                }
+                return AddResult.REQUESTED;
+            } catch (SQLException e) {
+                throw fail("addFriendRequest", e);
+            }
         }
-        if (requests.getOrDefault(uuid, Set.of()).contains(friendUuid)) {
-            return acceptRequest(uuid, friendUuid); // they already asked us — accept
-        }
-        requests.computeIfAbsent(friendUuid, k -> ConcurrentHashMap.newKeySet()).add(uuid);
-        markDirty();
-        return false;
     }
 
     boolean acceptRequest(UUID uuid, UUID friendUuid) {
-        clearRequest(uuid, friendUuid);
-        linkFriends(uuid, friendUuid);
-        return true;
+        synchronized (lock) {
+            try {
+                return acceptRequestLocked(uuid, friendUuid);
+            } catch (SQLException e) {
+                throw fail("acceptRequest", e);
+            }
+        }
     }
 
     void declineRequest(UUID uuid, UUID friendUuid) {
-        clearRequest(uuid, friendUuid);
+        synchronized (lock) {
+            try {
+                clearRequestLocked(uuid, friendUuid);
+            } catch (SQLException e) {
+                throw fail("declineRequest", e);
+            }
+        }
     }
 
     void removeFriend(UUID uuid, UUID friendUuid) {
-        boolean changed = false;
-        Set<UUID> a = friends.get(uuid);
-        if (a != null) {
-            changed |= a.remove(friendUuid);
-        }
-        Set<UUID> b = friends.get(friendUuid);
-        if (b != null) {
-            changed |= b.remove(uuid);
-        }
-        if (changed) {
-            markDirty();
+        String[] pair = normalize(uuid, friendUuid);
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "DELETE FROM friends WHERE a=? AND b=?")) {
+                ps.setString(1, pair[0]);
+                ps.setString(2, pair[1]);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("removeFriend", e);
+            }
         }
     }
 
     List<Object> friendRequests(UUID uuid) {
         List<Object> out = new ArrayList<>();
-        for (UUID rid : requests.getOrDefault(uuid, Set.of())) {
-            User u = users.get(rid);
-            if (u != null) {
-                out.add(ordered("uuid", rid.toString(), "username", u.username, "online", "ONLINE".equals(connectivity(rid))));
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT r.from_uuid, u.username FROM friend_requests r "
+                            + "JOIN users u ON u.uuid = r.from_uuid WHERE r.to_uuid = ?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        UUID rid = UUID.fromString(rs.getString(1));
+                        out.add(ordered("uuid", rs.getString(1), "username", rs.getString(2),
+                                "online", "ONLINE".equals(connectivity(rid))));
+                    }
+                }
+            } catch (SQLException e) {
+                throw fail("friendRequests", e);
             }
         }
         return out;
     }
 
-    private void clearRequest(UUID a, UUID b) {
-        boolean changed = false;
-        Set<UUID> ra = requests.get(a);
-        if (ra != null) {
-            changed |= ra.remove(b);
-        }
-        Set<UUID> rb = requests.get(b);
-        if (rb != null) {
-            changed |= rb.remove(a);
-        }
-        if (changed) {
-            markDirty();
-        }
-    }
-
-    private void linkFriends(UUID a, UUID b) {
-        friends.computeIfAbsent(a, k -> ConcurrentHashMap.newKeySet()).add(b);
-        friends.computeIfAbsent(b, k -> ConcurrentHashMap.newKeySet()).add(a);
-        markDirty();
-    }
-
     Set<UUID> friendsOf(UUID uuid) {
-        return friends.getOrDefault(uuid, Set.of());
+        Set<UUID> out = new LinkedHashSet<>();
+        String s = uuid.toString();
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT b FROM friends WHERE a=? UNION SELECT a FROM friends WHERE b=?")) {
+                ps.setString(1, s);
+                ps.setString(2, s);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.add(UUID.fromString(rs.getString(1)));
+                    }
+                }
+            } catch (SQLException e) {
+                throw fail("friendsOf", e);
+            }
+        }
+        return out;
     }
 
     List<Object> friendList(UUID uuid) {
-        List<Object> out = new ArrayList<>();
-        for (UUID fid : friendsOf(uuid)) {
-            User fu = users.get(fid);
-            if (fu == null) {
-                continue;
+        Map<UUID, String> names = new LinkedHashMap<>();
+        Map<UUID, int[]> rel = new HashMap<>();
+        String s = uuid.toString();
+        synchronized (lock) {
+            try {
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "SELECT u.uuid, u.username FROM friends f "
+                                + "JOIN users u ON u.uuid = (CASE WHEN f.a=? THEN f.b ELSE f.a END) "
+                                + "WHERE f.a=? OR f.b=?")) {
+                    ps.setString(1, s);
+                    ps.setString(2, s);
+                    ps.setString(3, s);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            names.put(UUID.fromString(rs.getString(1)), rs.getString(2));
+                        }
+                    }
+                }
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "SELECT target, muted, blocked FROM relationships WHERE uuid=?")) {
+                    ps.setString(1, s);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            rel.put(UUID.fromString(rs.getString(1)), new int[]{rs.getInt(2), rs.getInt(3)});
+                        }
+                    }
+                }
+            } catch (SQLException e) {
+                throw fail("friendList", e);
             }
-            String conn = connectivity(fid);
+        }
+        List<Object> out = new ArrayList<>();
+        for (Map.Entry<UUID, String> e : names.entrySet()) {
+            UUID fid = e.getKey();
+            int[] r = rel.get(fid);
+            boolean muted = r != null && r[0] == 1;
+            boolean blocked = r != null && r[1] == 1;
+            boolean suppress = muted || blocked;
+            String conn = suppress ? "UNKNOWN" : connectivity(fid);
             boolean live = "ONLINE".equals(conn) || "STALE".equals(conn);
             Presence p = presences.get(fid);
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("uuid", fid.toString());
-            m.put("username", fu.username);
+            m.put("username", e.getValue());
             m.put("connectivity", conn);
             m.put("state", live && p != null ? p.state : null);
             m.put("worldName", live && p != null ? p.worldName : null);
-            m.put("joinCode", hostingJoinCode(fid));
+            m.put("joinCode", suppress ? null : hostingJoinCode(fid));
             m.put("skin", p == null ? null : p.skin);
+            m.put("muted", muted);
+            m.put("blocked", blocked);
             out.add(m);
         }
         return out;
     }
 
+    private boolean acceptRequestLocked(UUID uuid, UUID friendUuid) throws SQLException {
+        boolean prevAuto = connection.getAutoCommit();
+        connection.setAutoCommit(false);
+        try {
+            clearRequestLocked(uuid, friendUuid);
+            linkFriendsLocked(uuid, friendUuid);
+            connection.commit();
+            return true;
+        } catch (SQLException e) {
+            connection.rollback();
+            throw e;
+        } finally {
+            connection.setAutoCommit(prevAuto);
+        }
+    }
+
+    private void clearRequestLocked(UUID a, UUID b) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "DELETE FROM friend_requests WHERE (from_uuid=? AND to_uuid=?) "
+                        + "OR (from_uuid=? AND to_uuid=?)")) {
+            ps.setString(1, a.toString());
+            ps.setString(2, b.toString());
+            ps.setString(3, b.toString());
+            ps.setString(4, a.toString());
+            ps.executeUpdate();
+        }
+    }
+
+    private void linkFriendsLocked(UUID a, UUID b) throws SQLException {
+        String[] pair = normalize(a, b);
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT OR IGNORE INTO friends (a, b) VALUES (?,?)")) {
+            ps.setString(1, pair[0]);
+            ps.setString(2, pair[1]);
+            ps.executeUpdate();
+        }
+    }
+
+    private boolean areFriends(UUID a, UUID b) throws SQLException {
+        String[] pair = normalize(a, b);
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT 1 FROM friends WHERE a=? AND b=?")) {
+            ps.setString(1, pair[0]);
+            ps.setString(2, pair[1]);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private boolean requestExists(UUID from, UUID to) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT 1 FROM friend_requests WHERE from_uuid=? AND to_uuid=?")) {
+            ps.setString(1, from.toString());
+            ps.setString(2, to.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    void setMuted(UUID uuid, UUID target, boolean muted) {
+        setRelationFlag(uuid, target, "muted", muted);
+    }
+
+    void setBlocked(UUID uuid, UUID target, boolean blocked) {
+        setRelationFlag(uuid, target, "blocked", blocked);
+    }
+
+    boolean isMutedOrBlocked(UUID uuid, UUID target) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT 1 FROM relationships WHERE uuid=? AND target=? AND (muted=1 OR blocked=1)")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, target.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next();
+                }
+            } catch (SQLException e) {
+                throw fail("isMutedOrBlocked", e);
+            }
+        }
+    }
+
+    boolean isBlocked(UUID uuid, UUID target) {
+        synchronized (lock) {
+            try {
+                return isBlockedLocked(uuid, target);
+            } catch (SQLException e) {
+                throw fail("isBlocked", e);
+            }
+        }
+    }
+
+    private boolean isBlockedLocked(UUID uuid, UUID target) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT 1 FROM relationships WHERE uuid=? AND target=? AND blocked=1")) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, target.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private void setRelationFlag(UUID uuid, UUID target, String col, boolean value) {
+        if (uuid.equals(target)) {
+            return;
+        }
+        synchronized (lock) {
+            try {
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "INSERT OR IGNORE INTO relationships (uuid, target, muted, blocked) VALUES (?,?,0,0)")) {
+                    ps.setString(1, uuid.toString());
+                    ps.setString(2, target.toString());
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "UPDATE relationships SET " + col + "=? WHERE uuid=? AND target=?")) {
+                    ps.setInt(1, value ? 1 : 0);
+                    ps.setString(2, uuid.toString());
+                    ps.setString(3, target.toString());
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "DELETE FROM relationships WHERE uuid=? AND target=? AND muted=0 AND blocked=0")) {
+                    ps.setString(1, uuid.toString());
+                    ps.setString(2, target.toString());
+                    ps.executeUpdate();
+                }
+            } catch (SQLException e) {
+                throw fail("setRelationFlag", e);
+            }
+        }
+    }
+
+    private static final String[] LINK_PLATFORMS =
+            {"discord", "instagram", "twitter", "youtube", "twitch", "tiktok", "paypal", "kofi"};
+
+    boolean isLinkPlatform(String platform) {
+        for (String p : LINK_PLATFORMS) {
+            if (p.equals(platform)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    Map<String, Object> profile(UUID uuid) {
+        synchronized (lock) {
+            try {
+                User u = findUser(uuid);
+                if (u == null) {
+                    return null;
+                }
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("uuid", uuid.toString());
+                m.put("username", u.username);
+                m.put("friendCode", u.friendCode);
+                m.put("pronouns", scalar("SELECT pronouns FROM profile_identity WHERE uuid=?", uuid));
+                m.put("bio", scalar("SELECT text FROM profile_bio WHERE uuid=?", uuid));
+                Map<String, Object> links = new LinkedHashMap<>();
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "SELECT discord, instagram, twitter, youtube, twitch, tiktok, paypal, kofi "
+                                + "FROM profile_links WHERE uuid=?")) {
+                    ps.setString(1, uuid.toString());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            for (int i = 0; i < LINK_PLATFORMS.length; i++) {
+                                links.put(LINK_PLATFORMS[i], rs.getString(i + 1));
+                            }
+                        }
+                    }
+                }
+                m.put("links", links);
+                return m;
+            } catch (SQLException e) {
+                throw fail("profile", e);
+            }
+        }
+    }
+
+    void setBio(UUID uuid, String text) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO profile_bio (uuid, text, updated_at) VALUES (?,?,?) "
+                            + "ON CONFLICT(uuid) DO UPDATE SET text=excluded.text, updated_at=excluded.updated_at")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, text == null ? "" : text);
+                ps.setLong(3, System.currentTimeMillis());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("setBio", e);
+            }
+        }
+    }
+
+    void setPronouns(UUID uuid, String pronouns) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO profile_identity (uuid, pronouns) VALUES (?,?) "
+                            + "ON CONFLICT(uuid) DO UPDATE SET pronouns=excluded.pronouns")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, pronouns);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("setPronouns", e);
+            }
+        }
+    }
+
+    void setLink(UUID uuid, String platform, String value) {
+        if (!isLinkPlatform(platform)) {
+            return;
+        }
+        synchronized (lock) {
+            try {
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "INSERT OR IGNORE INTO profile_links (uuid) VALUES (?)")) {
+                    ps.setString(1, uuid.toString());
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "UPDATE profile_links SET " + platform + "=? WHERE uuid=?")) {
+                    ps.setString(1, (value == null || value.isBlank()) ? null : value);
+                    ps.setString(2, uuid.toString());
+                    ps.executeUpdate();
+                }
+            } catch (SQLException e) {
+                throw fail("setLink", e);
+            }
+        }
+    }
+
+    private String scalar(String sql, UUID uuid) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString(1) : null;
+            }
+        }
+    }
+
+    // invites (in-memory)
     String createInvite(UUID hostUuid, String address, String worldName, boolean gated) {
         long expiresAt = System.currentTimeMillis() + 3_600_000;
         String guestAddress = address;
         if (gated && hostUuid != null) {
-            // Offline/gated host: bind a single-label relay token to the host's domain and hand guests a
-            // token address instead of the host's own domain — the relay validates the token before
-            // routing (the in-world uuid is spoofable in offline-mode, so it can't be the gate).
             String hostDomain = ensureUser(hostUuid, null).domain;
             String token = uniqueGuestToken();
             guestTokens.put(token, new GuestToken(hostDomain, expiresAt));
@@ -302,7 +694,6 @@ final class Store {
         return code;
     }
 
-    /** Resolve a guest invite token to its host's relay domain, or null if unknown/expired. */
     String validateGuestToken(String token) {
         if (token == null || token.isBlank()) {
             return null;
@@ -324,7 +715,7 @@ final class Store {
         return i == null ? null : ordered("address", i.address(), "worldName", i.worldName());
     }
 
-    // relay tickets
+    // relay tickets (in-memory)
     Object[] mintTicketToken(UUID uuid, boolean gated) {
         User u = ensureUser(uuid, null);
         String token = randomHex(32);
@@ -348,92 +739,63 @@ final class Store {
         guestTokens.entrySet().removeIf(e -> now > e.getValue().expiresAt());
     }
 
-    private void markDirty() {
-        dirty = true;
-    }
-
-    synchronized void flush() {
-        if (!dirty || dataFile == null) {
-            return;
-        }
-        try {
-            List<Object> userList = new ArrayList<>();
-            for (User u : users.values()) {
-                userList.add(ordered("uuid", u.uuid.toString(), "username", u.username,
-                        "friendCode", u.friendCode, "domain", u.domain));
-            }
-            String json = Json.write(ordered("users", userList,
-                    "friends", edgesJson(friends), "requests", edgesJson(requests)));
-            if (dataFile.getParent() != null) {
-                Files.createDirectories(dataFile.getParent());
-            }
-            Path tmp = dataFile.resolveSibling(dataFile.getFileName() + ".tmp");
-            Files.writeString(tmp, json, StandardCharsets.UTF_8);
-            Files.move(tmp, dataFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            dirty = false;
-        } catch (IOException e) {
-        }
-    }
-
-    private void load() {
-        if (dataFile == null || !Files.isReadable(dataFile)) {
-            return;
-        }
-        try {
-            Map<String, Object> root = Json.parseObject(Files.readString(dataFile, StandardCharsets.UTF_8));
-            if (root.get("users") instanceof List<?> list) {
-                for (Object o : list) {
-                    if (o instanceof Map<?, ?> m) {
-                        UUID uuid = UUID.fromString((String) m.get("uuid"));
-                        users.put(uuid, new User(uuid, (String) m.get("username"),
-                                (String) m.get("friendCode"), (String) m.get("domain")));
-                    }
-                }
-            }
-            edgesLoad(root.get("friends"), friends);
-            edgesLoad(root.get("requests"), requests);
-        } catch (IOException | RuntimeException e) {
-        }
-    }
-
-    private static Map<String, Object> edgesJson(Map<UUID, Set<UUID>> edges) {
-        Map<String, Object> obj = new LinkedHashMap<>();
-        for (Map.Entry<UUID, Set<UUID>> e : edges.entrySet()) {
-            if (e.getValue().isEmpty()) {
-                continue;
-            }
-            List<Object> ids = new ArrayList<>();
-            for (UUID id : e.getValue()) {
-                ids.add(id.toString());
-            }
-            obj.put(e.getKey().toString(), ids);
-        }
-        return obj;
-    }
-
-    private static void edgesLoad(Object node, Map<UUID, Set<UUID>> into) {
-        if (node instanceof Map<?, ?> m) {
-            for (Map.Entry<?, ?> e : m.entrySet()) {
-                Set<UUID> set = ConcurrentHashMap.newKeySet();
-                if (e.getValue() instanceof List<?> ids) {
-                    for (Object id : ids) {
-                        set.add(UUID.fromString((String) id));
-                    }
-                }
-                into.put(UUID.fromString((String) e.getKey()), set);
-            }
-        }
-    }
-
     // helpers
     private static final String CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ"; // no 0/1 or I/L/O/U
 
-    private String uniqueFriendCode() {
+    private User findUser(UUID uuid) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT username, friend_code, domain FROM users WHERE uuid=?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new User(uuid, rs.getString(1), rs.getString(2), rs.getString(3));
+                }
+                return null;
+            }
+        }
+    }
+
+    // caller holds lock
+    private String uniqueFriendCode() throws SQLException {
         String code;
         do {
             code = "LAN-" + randomFrom(CODE_ALPHABET, 5);
         } while (friendCodeTaken(code));
         return code;
+    }
+
+    private boolean friendCodeTaken(String code) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT 1 FROM users WHERE friend_code=?")) {
+            ps.setString(1, code);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private String uniqueDomain() throws SQLException {
+        String domain;
+        do {
+            domain = WORDS[RNG.nextInt(WORDS.length)] + "-" + WORDS[RNG.nextInt(WORDS.length)] + "." + baseDomain;
+        } while (domainTaken(domain));
+        return domain;
+    }
+
+    private boolean domainTaken(String domain) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT 1 FROM users WHERE domain=?")) {
+            ps.setString(1, domain);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    private static String[] normalize(UUID a, UUID b) {
+        String x = a.toString();
+        String y = b.toString();
+        return x.compareTo(y) <= 0 ? new String[]{x, y} : new String[]{y, x};
     }
 
     private static String randomFrom(String alphabet, int len) {
@@ -444,33 +806,6 @@ final class Store {
         return sb.toString();
     }
 
-    private boolean friendCodeTaken(String code) {
-        for (User u : users.values()) {
-            if (u.friendCode.equals(code)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private String uniqueDomain() {
-        String domain;
-        do {
-            domain = WORDS[RNG.nextInt(WORDS.length)] + "-" + WORDS[RNG.nextInt(WORDS.length)] + "." + baseDomain;
-        } while (domainTaken(domain));
-        return domain;
-    }
-
-    private boolean domainTaken(String domain) {
-        for (User u : users.values()) {
-            if (domain.equals(u.domain)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** A DNS-safe single-label guest token, e.g. "g" + 20 hex chars (starts with a letter for DNS). */
     private String uniqueGuestToken() {
         String token;
         do {
@@ -479,7 +814,6 @@ final class Store {
         return token;
     }
 
-    /** The ":port" tail of a host:port address, or "" when no explicit port (MC then defaults to 25565). */
     private static String portSuffix(String address) {
         if (address == null) {
             return "";
@@ -509,6 +843,11 @@ final class Store {
             sb.append(Character.forDigit((x >> 4) & 0xF, 16)).append(Character.forDigit(x & 0xF, 16));
         }
         return sb.toString();
+    }
+
+    private static RuntimeException fail(String what, SQLException e) {
+        BackendServer.log("SQLite error (" + what + "): " + e.getMessage());
+        return new RuntimeException(e);
     }
 
     private static Map<String, Object> ordered(Object... kv) {
