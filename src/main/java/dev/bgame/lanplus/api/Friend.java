@@ -10,7 +10,9 @@ public record Friend(
         GameplayState state,
         String worldName,
         String joinCode,
-        SkinRef skin
+        SkinRef skin,
+        boolean muted,
+        boolean blocked
 ) {
     public Friend {
         Objects.requireNonNull(uuid, "uuid");

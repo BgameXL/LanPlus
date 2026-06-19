@@ -16,6 +16,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 public final class DefaultFriendsService implements FriendsService, LanPlusNetwork.BackendEventListener {
@@ -123,6 +124,36 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     }
 
     @Override
+    public CompletableFuture<Boolean> mute(UUID targetUuid) {
+        return relation(network::muteFriend, targetUuid);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> unmute(UUID targetUuid) {
+        return relation(network::unmuteFriend, targetUuid);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> block(UUID targetUuid) {
+        return relation(network::blockFriend, targetUuid);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> unblock(UUID targetUuid) {
+        return relation(network::unblockFriend, targetUuid);
+    }
+
+    private CompletableFuture<Boolean> relation(
+            BiFunction<UUID, UUID, CompletableFuture<Boolean>> op, UUID targetUuid) {
+        UUID uuid = localUuid();
+        if (uuid == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return op.apply(uuid, targetUuid).thenCompose(ok ->
+                ok ? refresh().thenApply(ignored -> true) : CompletableFuture.completedFuture(false));
+    }
+
+    @Override
     public void connect() {
         UUID uuid = localUuid();
         if (uuid == null) {
@@ -190,7 +221,9 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
                 update.state(),
                 update.worldName(),
                 update.joinCode(),
-                friend.skin()));
+                friend.skin(),
+                friend.muted(),
+                friend.blocked()));
         if (patched != null) {
             notifyChanged();
         }

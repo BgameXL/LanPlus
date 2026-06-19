@@ -29,7 +29,9 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import org.lwjgl.glfw.GLFW;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -43,6 +45,7 @@ public final class FriendsScreen extends Screen {
     private static final int LEFT_W = 160;
     private static final int CONTENT_TOP = 44;
     private static final int ROW_H = 24;
+    private static final int MENU_ROW_H = 14;
 
     private final Screen parent;
     private Tab tab = Tab.FRIENDS;
@@ -53,6 +56,13 @@ public final class FriendsScreen extends Screen {
     private boolean primed;
     private boolean showAddress;
     private boolean showCode;
+
+    private UUID contextUuid;
+    private int contextX;
+    private int contextY;
+    private List<ContextEntry> contextEntries = List.of();
+
+    private record ContextEntry(Component label, Runnable action, boolean enabled) {}
 
     public FriendsScreen(Screen parent) {
         super(Component.translatable("gui.lanplus.title"));
@@ -66,6 +76,8 @@ public final class FriendsScreen extends Screen {
         addRenderableWidget(tabButton("gui.lanplus.tab.add", Tab.ADD, LEFT_X + 168));
         addRenderableWidget(tabButton("gui.lanplus.tab.details", Tab.DETAILS, LEFT_X + 252));
 
+        addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.profile.mine"), b -> doMyProfile())
+                .bounds(this.width - 296, this.height - 28, 90, 20).build());
         addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.refresh"), b -> doRefresh())
                 .bounds(this.width - 200, this.height - 28, 90, 20).build());
         addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
@@ -87,15 +99,6 @@ public final class FriendsScreen extends Screen {
             addRenderableWidget(joinBox);
             addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.join.button"), b -> doJoinByCode())
                     .bounds(rightX + rightW - 72, CONTENT_TOP + 22, 66, 20).build());
-        } else if (tab == Tab.FRIENDS && selectedFriend() != null) {
-            int by = this.height - 92;
-            Friend selected = selectedFriend();
-            Button join = Button.builder(Component.translatable("gui.lanplus.action.join"), b -> doJoin())
-                    .bounds(rightX + 6, by, 90, 20).build();
-            join.active = selected.state() == GameplayState.HOSTING && selected.joinCode() != null;
-            addRenderableWidget(join);
-            addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.action.remove"), b -> doRemove())
-                    .bounds(rightX + 102, by, 90, 20).build());
         } else if (tab == Tab.DETAILS) {
             HostInfo info = hostInfo();
             if (info != null) {
@@ -146,6 +149,7 @@ public final class FriendsScreen extends Screen {
             g.drawString(this.font, status, LEFT_X, this.height - 34, 0xFFAAAAAA);
         }
         super.render(g, mouseX, mouseY, partialTick);
+        renderContextMenu(g, mouseX, mouseY);
     }
 
     private void renderFriendList(GuiGraphics g, int mouseX, int mouseY, int paneBottom) {
@@ -257,18 +261,25 @@ public final class FriendsScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (contextUuid != null) {
+            if (button == 0 && handleContextClick(mouseX, mouseY)) {
+                return true;
+            }
+            closeContextMenu();
+        }
+        if (tab == Tab.FRIENDS && button == 1) {
+            Friend f = friendAt(mouseX, mouseY);
+            if (f != null) {
+                openContextMenu(f, (int) mouseX, (int) mouseY);
+                return true;
+            }
+        }
         if (tab == Tab.FRIENDS && button == 0) {
-            int y = CONTENT_TOP + 2;
-            for (Friend f : friends()) {
-                if (mouseX >= LEFT_X && mouseX <= LEFT_X + LEFT_W && mouseY >= y && mouseY < y + ROW_H) {
-                    selectedUuid = f.uuid();
-                    rebuildWidgets();
-                    return true;
-                }
-                y += ROW_H;
-                if (y + ROW_H > this.height - 36) {
-                    break;
-                }
+            Friend f = friendAt(mouseX, mouseY);
+            if (f != null) {
+                selectedUuid = f.uuid();
+                rebuildWidgets();
+                return true;
             }
         }
         if (tab == Tab.ADD && button == 0) {
@@ -296,8 +307,123 @@ public final class FriendsScreen extends Screen {
     }
 
     @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (contextUuid != null && keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            closeContextMenu();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
     public void onClose() {
         this.minecraft.setScreen(parent);
+    }
+
+    private void openContextMenu(Friend f, int x, int y) {
+        selectedUuid = f.uuid();
+        contextUuid = f.uuid();
+        contextX = x;
+        contextY = y;
+        List<ContextEntry> entries = new ArrayList<>();
+        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.viewprofile"), this::doViewProfile, true));
+        boolean canJoin = f.state() == GameplayState.HOSTING && f.joinCode() != null;
+        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.join"), this::doJoin, canJoin));
+        entries.add(new ContextEntry(
+                Component.translatable(f.muted() ? "gui.lanplus.action.unmute" : "gui.lanplus.action.mute"),
+                this::doToggleMute, true));
+        entries.add(new ContextEntry(
+                Component.translatable(f.blocked() ? "gui.lanplus.action.unblock" : "gui.lanplus.action.block"),
+                this::doToggleBlock, true));
+        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.remove"), this::doRemove, true));
+        contextEntries = entries;
+    }
+
+    private void closeContextMenu() {
+        contextUuid = null;
+        contextEntries = List.of();
+    }
+
+    private boolean handleContextClick(double mouseX, double mouseY) {
+        if (contextEntries.isEmpty()) {
+            return false;
+        }
+        int x = menuX();
+        int w = menuWidth();
+        if (mouseX < x || mouseX > x + w) {
+            return false;
+        }
+        int ey = menuY() + 2;
+        for (ContextEntry e : contextEntries) {
+            if (mouseY >= ey && mouseY < ey + MENU_ROW_H) {
+                closeContextMenu();
+                if (e.enabled()) {
+                    e.action().run();
+                }
+                return true;
+            }
+            ey += MENU_ROW_H;
+        }
+        return false;
+    }
+
+    private Friend friendAt(double mouseX, double mouseY) {
+        if (mouseX < LEFT_X || mouseX > LEFT_X + LEFT_W) {
+            return null;
+        }
+        int y = CONTENT_TOP + 2;
+        for (Friend f : friends()) {
+            if (mouseY >= y && mouseY < y + ROW_H) {
+                return f;
+            }
+            y += ROW_H;
+            if (y + ROW_H > this.height - 36) {
+                break;
+            }
+        }
+        return null;
+    }
+
+    private int menuWidth() {
+        int w = 0;
+        for (ContextEntry e : contextEntries) {
+            w = Math.max(w, this.font.width(e.label()));
+        }
+        return w + 16;
+    }
+
+    private int menuHeight() {
+        return contextEntries.size() * MENU_ROW_H + 4;
+    }
+
+    private int menuX() {
+        return Math.min(contextX, this.width - menuWidth() - 2);
+    }
+
+    private int menuY() {
+        return Math.min(contextY, this.height - menuHeight() - 2);
+    }
+
+    private void renderContextMenu(GuiGraphics g, int mouseX, int mouseY) {
+        if (contextUuid == null || contextEntries.isEmpty()) {
+            return;
+        }
+        int x = menuX();
+        int y = menuY();
+        int w = menuWidth();
+        int h = menuHeight();
+        g.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xFF3A3A48);
+        g.fill(x, y, x + w, y + h, 0xF0181820);
+        int ey = y + 2;
+        for (ContextEntry e : contextEntries) {
+            boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= ey && mouseY < ey + MENU_ROW_H;
+            if (hover && e.enabled()) {
+                g.fill(x + 1, ey, x + w - 1, ey + MENU_ROW_H, 0x40FFFFFF);
+            }
+            int color = !e.enabled() ? 0xFF6A6E74 : (hover ? 0xFFFFFFFF : 0xFFD0D3D8);
+            g.drawString(this.font, e.label(), x + 6, ey + 3, color);
+            ey += MENU_ROW_H;
+        }
     }
 
     @Override
@@ -382,6 +508,51 @@ public final class FriendsScreen extends Screen {
             selectedUuid = null;
             rebuildWidgets();
         }));
+    }
+
+    private void doToggleMute() {
+        Friend friend = selectedFriend();
+        FriendsService friends = LanPlusClient.friends();
+        if (friend == null || friends == null) {
+            return;
+        }
+        boolean muted = friend.muted();
+        (muted ? friends.unmute(friend.uuid()) : friends.mute(friend.uuid()))
+                .whenComplete((ok, err) -> this.minecraft.execute(() -> {
+                    setStatus(Component.translatable(
+                            muted ? "gui.lanplus.muted.off" : "gui.lanplus.muted.on", friend.username()));
+                    rebuildWidgets();
+                }));
+    }
+
+    private void doToggleBlock() {
+        Friend friend = selectedFriend();
+        FriendsService friends = LanPlusClient.friends();
+        if (friend == null || friends == null) {
+            return;
+        }
+        boolean blocked = friend.blocked();
+        (blocked ? friends.unblock(friend.uuid()) : friends.block(friend.uuid()))
+                .whenComplete((ok, err) -> this.minecraft.execute(() -> {
+                    setStatus(Component.translatable(
+                            blocked ? "gui.lanplus.blocked.off" : "gui.lanplus.blocked.on", friend.username()));
+                    rebuildWidgets();
+                }));
+    }
+
+    private void doViewProfile() {
+        Friend friend = selectedFriend();
+        if (friend != null) {
+            this.minecraft.setScreen(new ProfileScreen(this, friend.uuid()));
+        }
+    }
+
+    private void doMyProfile() {
+        try {
+            UUID id = this.minecraft.getUser().getProfileId();
+            this.minecraft.setScreen(new ProfileScreen(this, id));
+        } catch (RuntimeException ignored) {
+        }
     }
 
     private void doAccept(UUID requesterUuid) {
@@ -497,6 +668,12 @@ public final class FriendsScreen extends Screen {
     }
 
     private Component secondaryText(Friend f) {
+        if (f.blocked()) {
+            return Component.translatable("gui.lanplus.rel.blocked");
+        }
+        if (f.muted()) {
+            return Component.translatable("gui.lanplus.rel.muted");
+        }
         if (f.connectivity() == Connectivity.OFFLINE) {
             return Component.translatable("gui.lanplus.state.offline");
         }

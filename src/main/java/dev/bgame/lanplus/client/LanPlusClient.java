@@ -19,6 +19,8 @@ import dev.bgame.lanplus.network.RelayTunnel;
 import dev.bgame.lanplus.network.TcpRelayTunnel;
 import dev.bgame.lanplus.presence.DefaultPresenceManager;
 import dev.bgame.lanplus.presence.PresenceManager;
+import dev.bgame.lanplus.profiles.DefaultProfilesService;
+import dev.bgame.lanplus.profiles.ProfilesService;
 import dev.bgame.lanplus.skins.DefaultSkinService;
 import dev.bgame.lanplus.skins.SkinService;
 import net.minecraft.client.Minecraft;
@@ -37,6 +39,7 @@ public final class LanPlusClient {
     private static LanPlusNetwork network;
     private static PresenceManager presence;
     private static FriendsService friends;
+    private static ProfilesService profiles;
     private static InviteService invites;
     private static RelayTunnel relayTunnel;
     private static SkinService skins;
@@ -53,6 +56,7 @@ public final class LanPlusClient {
         network = new HttpLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity);
         presence = new DefaultPresenceManager(network);
         friends = new DefaultFriendsService(network, LanPlusClient::localIdentity);
+        profiles = new DefaultProfilesService(network, LanPlusClient::localIdentity);
 
         skinTextures = new SkinTextures();
         skins = new DefaultSkinService(skinTextures);
@@ -83,6 +87,10 @@ public final class LanPlusClient {
 
     public static FriendsService friends() {
         return friends;
+    }
+
+    public static ProfilesService profiles() {
+        return profiles;
     }
 
     public static InviteService invites() {

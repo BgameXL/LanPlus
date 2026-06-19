@@ -1,6 +1,7 @@
 package dev.bgame.lanplus.network;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
@@ -11,6 +12,7 @@ import dev.bgame.lanplus.api.Invite;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.PresenceUpdate;
+import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.UserProfile;
@@ -41,6 +43,8 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new Gson();
+    // serializes nulls so a partial /profile/update can explicitly clear a field (null = clear)
+    private static final Gson GSON_NULLS = new GsonBuilder().serializeNulls().create();
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final long RECONNECT_BASE_MS = 2_000L;
     private static final long RECONNECT_MAX_MS = 60_000L;
@@ -153,6 +157,41 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
+    public CompletableFuture<Boolean> muteFriend(UUID uuid, UUID targetUuid) {
+        return relationEdge("/friends/mute", uuid, targetUuid);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> unmuteFriend(UUID uuid, UUID targetUuid) {
+        return relationEdge("/friends/unmute", uuid, targetUuid);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> blockFriend(UUID uuid, UUID targetUuid) {
+        return relationEdge("/friends/block", uuid, targetUuid);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> unblockFriend(UUID uuid, UUID targetUuid) {
+        return relationEdge("/friends/unblock", uuid, targetUuid);
+    }
+
+    private CompletableFuture<Boolean> relationEdge(String path, UUID uuid, UUID targetUuid) {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return post(path, new Wire.FriendRelation(uuid.toString(), targetUuid.toString()))
+                .thenApply(resp -> {
+                    Wire.Success ok = GSON.fromJson(resp.body(), Wire.Success.class);
+                    return ok != null && ok.success();
+                })
+                .exceptionally(err -> {
+                    onError(err);
+                    return false;
+                });
+    }
+
+    @Override
     public CompletableFuture<List<ResolvedUser>> getFriendRequests(UUID uuid) {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
@@ -207,6 +246,42 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 .exceptionally(err -> {
                     onError(err);
                     return null;
+                });
+    }
+
+    @Override
+    public CompletableFuture<Profile> getProfile(UUID uuid) {
+        if (!configured() || uuid == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return get("/profile?uuid=" + uuid)
+                .thenApply(resp -> {
+                    Wire.ProfileDto dto = GSON.fromJson(resp.body(), Wire.ProfileDto.class);
+                    return dto == null || dto.uuid() == null ? null : dto.toApi();
+                })
+                .exceptionally(err -> {
+                    onError(err);
+                    return null;
+                });
+    }
+
+    @Override
+    public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links) {
+        if (!configured() || uuid == null) {
+            return CompletableFuture.completedFuture("offline");
+        }
+        Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links);
+        return postNulls("/profile/update", body)
+                .thenApply(resp -> {
+                    Wire.UpdateResult r = GSON.fromJson(resp.body(), Wire.UpdateResult.class);
+                    if (r != null && r.success()) {
+                        return (String) null;
+                    }
+                    return r != null && r.error() != null ? r.error() : "error";
+                })
+                .exceptionally(err -> {
+                    onError(err);
+                    return "offline";
                 });
     }
 
@@ -323,6 +398,15 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(body), StandardCharsets.UTF_8))
+                .build();
+        return send(req);
+    }
+
+    private CompletableFuture<HttpResponse<String>> postNulls(String path, Object body) {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(base() + path))
+                .timeout(REQUEST_TIMEOUT)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(GSON_NULLS.toJson(body), StandardCharsets.UTF_8))
                 .build();
         return send(req);
     }

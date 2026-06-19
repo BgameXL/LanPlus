@@ -19,6 +19,10 @@ public interface FriendsService {
     CompletableFuture<Boolean> remove(UUID friendUuid);
     CompletableFuture<Boolean> accept(UUID requesterUuid);
     CompletableFuture<Boolean> decline(UUID requesterUuid);
+    CompletableFuture<Boolean> mute(UUID targetUuid);
+    CompletableFuture<Boolean> unmute(UUID targetUuid);
+    CompletableFuture<Boolean> block(UUID targetUuid);
+    CompletableFuture<Boolean> unblock(UUID targetUuid);
 
     void connect();
     void disconnect();
