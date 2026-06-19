@@ -1,8 +1,11 @@
-// LAN+ backend (stub) — standalone, pure-JDK (no external dependencies, no Minecraft/Forge).
+// LAN+ backend — standalone, no Minecraft/Forge. JDK + org.xerial:sqlite-jdbc for durable
+// persistence (plus slf4j-nop plumbing to silence its transitive slf4j-api); see docs/dev/SQLITE.md.
 // Implements docs/dev/PROTOCOL.md: presence, friends, users, invites, and the relay ticket
-// endpoints, plus the realtime WebSocket. In-memory only (no persistence) — a reference backend.
-// Build:  ./gradlew :backend:jar   -> backend/build/libs/lanplus-backend-<version>.jar
-// Run:    java -jar lanplus-backend-<version>.jar   (zero classpath; JDK only)
+// endpoints, plus the realtime WebSocket. Durable state (users/friends/requests/relationships)
+// lives in SQLite; presence/invites/tickets stay in memory.
+// Build:    ./gradlew :backend:jar   -> backend/build/libs/lanplus-backend-<version>.jar (fat jar)
+// Run:      java -jar lanplus-backend-<version>.jar
+// Migrate:  java -cp lanplus-backend-<version>.jar dev.bgame.lanplus.backend.Migrate lanplus-data.json lanplus.db
 plugins {
     id 'java'
 }
@@ -14,11 +17,30 @@ java {
     toolchain.languageVersion = JavaLanguageVersion.of(17)
 }
 
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.xerial:sqlite-jdbc:3.45.3.0'
+    // sqlite-jdbc pulls slf4j-api transitively; bind it to NOP so the backend's stdout stays clean
+    // (no "Failed to load StaticLoggerBinder" noise). The backend logs via System.out itself.
+    runtimeOnly 'org.slf4j:slf4j-nop:1.7.36'
+}
+
+// Fat jar: bundle sqlite-jdbc (and its native libraries) so `java -jar` stays standalone.
 tasks.named('jar', Jar).configure {
     archiveBaseName = 'lanplus-backend'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {
         attributes('Main-Class': 'dev.bgame.lanplus.backend.BackendServer')
     }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    // Drop module descriptors and any jar signatures from the bundled dependency (keep the JDBC
+    // driver's META-INF/services so DriverManager auto-discovery still works).
+    exclude 'module-info.class', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
 }
 
 tasks.withType(JavaCompile).configureEach {
