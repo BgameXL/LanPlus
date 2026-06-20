@@ -136,7 +136,9 @@ public final class BackendServer {
                 return ok(store.search(req.param("q")));
             }
             if (m.equals("GET") && path.equals("/profile")) {
-                Map<String, Object> p = store.profile(uuid(req.param("uuid")));
+                String viewerParam = req.param("viewer");
+                UUID viewer = (viewerParam == null || viewerParam.isBlank()) ? null : uuid(viewerParam);
+                Map<String, Object> p = store.profile(uuid(req.param("uuid")), viewer);
                 return p == null ? NOT_FOUND : ok(p);
             }
             if (m.equals("POST") && path.equals("/profile/update")) {
@@ -170,12 +172,15 @@ public final class BackendServer {
                 (String) b.get("username"), (String) b.get("state"), (String) b.get("worldName"),
                 (String) b.get("address"), (String) b.get("joinCode"), b.get("skin"));
 
+        // invisible mode masks the real-time push too: friends see the player as offline (the invite
+        // code still works — that is a separate host-access path). See PROFILES_DESIGN.md § Modo invisible.
+        boolean invisible = store.isInvisible(uuid);
         Map<String, Object> data = ordered(
                 "uuid", uuid.toString(),
-                "connectivity", store.connectivity(uuid),
-                "state", b.get("state"),
-                "worldName", b.get("worldName"),
-                "joinCode", b.get("joinCode"));
+                "connectivity", invisible ? "OFFLINE" : store.connectivity(uuid),
+                "state", invisible ? null : b.get("state"),
+                "worldName", invisible ? null : b.get("worldName"),
+                "joinCode", invisible ? null : b.get("joinCode"));
 
         Set<UUID> recipients = new LinkedHashSet<>();
         for (UUID friend : store.friendsOf(uuid)) {
@@ -187,7 +192,7 @@ public final class BackendServer {
         for (UUID friend : recipients) {
             hub.send(friend, presenceUpdate);
         }
-        if (announceHosting) {
+        if (announceHosting && !invisible) {
             Object event = ordered("type", "FRIEND_STARTED_HOSTING", "uuid", uuid.toString(), "joinCode", b.get("joinCode"));
             for (UUID friend : recipients) {
                 hub.send(friend, event);
@@ -281,6 +286,9 @@ public final class BackendServer {
                 }
                 store.setLink(uuid, platform, value);
             }
+        }
+        if (b.get("invisible") instanceof Boolean invisible) {
+            store.setInvisible(uuid, invisible);
         }
         return ok(Map.of("success", true));
     }

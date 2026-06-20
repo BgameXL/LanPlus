@@ -95,14 +95,17 @@ final class Wire {
     }
 
     record ProfileDto(String uuid, String username, String friendCode, String pronouns, String bio,
-                      Map<String, String> links) {
+                      Map<String, String> links, boolean online, Long lastSeen, Boolean invisible) {
         Profile toApi() {
             return new Profile(UUID.fromString(uuid), username, friendCode, pronouns, bio,
-                    links == null ? Map.of() : links);
+                    links == null ? Map.of() : links,
+                    online,
+                    lastSeen == null ? 0L : lastSeen,
+                    Boolean.TRUE.equals(invisible));
         }
     }
 
-    record ProfileUpdate(String uuid, String bio, String pronouns, Map<String, String> links) {}
+    record ProfileUpdate(String uuid, String bio, String pronouns, Map<String, String> links, Boolean invisible) {}
 
     record UpdateResult(boolean success, String error) {}
 }

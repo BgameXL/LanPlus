@@ -29,8 +29,8 @@ public interface LanPlusNetwork {
     CompletableFuture<List<ResolvedUser>> getFriendRequests(UUID uuid);
     CompletableFuture<ResolvedUser> resolveUser(String query);
     CompletableFuture<UserProfile> fetchProfile(UUID uuid);
-    CompletableFuture<Profile> getProfile(UUID uuid);
-    CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links);
+    CompletableFuture<Profile> getProfile(UUID uuid, UUID viewer);
+    CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links, Boolean invisible);
     CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated);
     CompletableFuture<Invite> resolveInvite(String code);
     CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);

@@ -250,11 +250,12 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
-    public CompletableFuture<Profile> getProfile(UUID uuid) {
+    public CompletableFuture<Profile> getProfile(UUID uuid, UUID viewer) {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture(null);
         }
-        return get("/profile?uuid=" + uuid)
+        String path = "/profile?uuid=" + uuid + (viewer != null ? "&viewer=" + viewer : "");
+        return get(path)
                 .thenApply(resp -> {
                     Wire.ProfileDto dto = GSON.fromJson(resp.body(), Wire.ProfileDto.class);
                     return dto == null || dto.uuid() == null ? null : dto.toApi();
@@ -266,11 +267,11 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
-    public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links) {
+    public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links, Boolean invisible) {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture("offline");
         }
-        Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links);
+        Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links, invisible);
         return postNulls("/profile/update", body)
                 .thenApply(resp -> {
                     Wire.UpdateResult r = GSON.fromJson(resp.body(), Wire.UpdateResult.class);

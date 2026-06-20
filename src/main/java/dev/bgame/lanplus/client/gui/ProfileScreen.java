@@ -42,8 +42,10 @@ public final class ProfileScreen extends Screen {
 
     private EditBox bioBox;
     private Button pronounButton;
+    private Button invisibleButton;
     private final EditBox[] linkBoxes = new EditBox[PLATFORMS.length];
     private int pronounIndex;
+    private boolean invisibleToggle;
 
     public ProfileScreen(Screen parent, UUID uuid) {
         super(Component.translatable("gui.lanplus.profile.title"));
@@ -100,6 +102,12 @@ public final class ProfileScreen extends Screen {
             pronounButton.setMessage(pronounLabel());
         }).bounds(MARGIN, CONTENT_TOP + 38, 150, 20).build();
         addRenderableWidget(pronounButton);
+
+        invisibleButton = Button.builder(invisibleLabel(), b -> {
+            invisibleToggle = !invisibleToggle;
+            invisibleButton.setMessage(invisibleLabel());
+        }).bounds(MARGIN + 160, CONTENT_TOP + 38, 170, 20).build();
+        addRenderableWidget(invisibleButton);
 
         int cx = this.width / 2;
         int linksTop = CONTENT_TOP + 78;
@@ -168,6 +176,11 @@ public final class ProfileScreen extends Screen {
         if (pronouns != null) {
             g.drawString(this.font, pronouns, hx, panelTop + 32, 0xFF7AA7FF);
         }
+        if (!editing) {
+            Component presence = presenceLabel();
+            int color = profile.online() ? 0xFF55C46A : 0xFF9AA0A6;
+            g.drawString(this.font, presence, this.width - MARGIN - 6 - this.font.width(presence), panelTop + 8, color);
+        }
 
         g.drawString(this.font, Component.translatable("gui.lanplus.profile.about"), MARGIN, CONTENT_TOP, 0xFFB9BDC2);
         if (editing) {
@@ -214,7 +227,7 @@ public final class ProfileScreen extends Screen {
             links.put(PLATFORMS[i], value.isEmpty() ? null : value);
         }
         setStatus(Component.translatable("gui.lanplus.profile.saving"));
-        svc.save(bio, pronouns, links).whenComplete((error, ex) -> this.minecraft.execute(() -> {
+        svc.save(bio, pronouns, links, invisibleToggle).whenComplete((error, ex) -> this.minecraft.execute(() -> {
             if (ex == null && error == null) {
                 editing = false;
                 loaded = false;
@@ -243,6 +256,7 @@ public final class ProfileScreen extends Screen {
 
     private void primeEdit() {
         pronounIndex = 0;
+        invisibleToggle = profile != null && profile.invisible();
         if (profile != null && profile.pronouns() != null) {
             for (int i = 0; i < PRONOUN_CYCLE.length; i++) {
                 if (profile.pronouns().equals(PRONOUN_CYCLE[i])) {
@@ -291,6 +305,36 @@ public final class ProfileScreen extends Screen {
         String p = PRONOUN_CYCLE[pronounIndex];
         Component value = p == null ? Component.translatable("gui.lanplus.profile.pronouns.none") : Component.literal(p);
         return Component.translatable("gui.lanplus.profile.pronouns", value);
+    }
+
+    private Component invisibleLabel() {
+        Component value = Component.translatable(invisibleToggle
+                ? "gui.lanplus.profile.invisible.on" : "gui.lanplus.profile.invisible.off");
+        return Component.translatable("gui.lanplus.profile.invisible", value);
+    }
+
+    private Component presenceLabel() {
+        if (profile.online()) {
+            return Component.translatable("gui.lanplus.profile.online");
+        }
+        if (profile.lastSeen() <= 0) {
+            return Component.translatable("gui.lanplus.profile.offline");
+        }
+        return Component.translatable("gui.lanplus.profile.lastseen", relativeTime(profile.lastSeen()));
+    }
+
+    private static String relativeTime(long epochMillis) {
+        long seconds = Math.max(0, (System.currentTimeMillis() - epochMillis) / 1000L);
+        if (seconds < 60) {
+            return seconds + "s";
+        }
+        if (seconds < 3600) {
+            return (seconds / 60) + "m";
+        }
+        if (seconds < 86400) {
+            return (seconds / 3600) + "h";
+        }
+        return (seconds / 86400) + "d";
     }
 
     private void setStatus(Component message) {

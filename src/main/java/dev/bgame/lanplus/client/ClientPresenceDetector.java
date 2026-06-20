@@ -18,6 +18,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 import java.util.Objects;
+import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = Lanplus.MODID, value = Dist.CLIENT)
 public final class ClientPresenceDetector {
@@ -63,6 +64,15 @@ public final class ClientPresenceDetector {
         SkinService skins = LanPlusClient.skins();
         if (skins != null) {
             skins.setLocalSkin(ref);
+            // Resolve our own skin into SkinTextures so the UI avatars (ProfileScreen / FriendsScreen)
+            // can show it. SkinTextures is otherwise only populated from friends' presence, so without
+            // this our own profile head falls back to the default skin. In-world self rendering stays
+            // vanilla (the AbstractClientPlayerMixin skips the local player).
+            User user = mc.getUser();
+            UUID self = user == null ? null : user.getProfileId();
+            if (self != null && ref != null) {
+                skins.resolve(self, ref);
+            }
         }
         presence.updateSkin(ref);
     }

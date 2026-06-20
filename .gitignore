@@ -29,3 +29,5 @@ run
 deploy
 docs/dev
 *.sqlite
+lanplus-web
+next-app

@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -61,6 +62,8 @@ final class Store {
         volatile long lastHeartbeat;
         volatile boolean hosting;
         volatile boolean hostingAnnounced;
+        volatile boolean onlinePersisted;   // wrote presence_state.online=1 for the current session
+        volatile boolean disconnectRecorded; // wrote presence_state.online=0 + last_disconnect_at for this gap
     }
 
     record Ticket(UUID uuid, String domain, boolean requireToken, long expiresAt) {}
@@ -101,7 +104,7 @@ final class Store {
                 st.execute("PRAGMA busy_timeout=5000");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS users ("
                         + "uuid TEXT PRIMARY KEY, username TEXT, friend_code TEXT UNIQUE NOT NULL, "
-                        + "domain TEXT UNIQUE NOT NULL, last_seen INTEGER, last_modpack TEXT)");
+                        + "domain TEXT UNIQUE NOT NULL, last_modpack TEXT)");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS friends ("
                         + "a TEXT NOT NULL, b TEXT NOT NULL, PRIMARY KEY (a, b), CHECK (a < b))");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS friend_requests ("
@@ -117,11 +120,34 @@ final class Store {
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_links ("
                         + "uuid TEXT PRIMARY KEY, discord TEXT, instagram TEXT, twitter TEXT, youtube TEXT, "
                         + "twitch TEXT, tiktok TEXT, paypal TEXT, kofi TEXT)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_privacy ("
+                        + "uuid TEXT PRIMARY KEY, invisible_mode INTEGER NOT NULL DEFAULT 0)");
+                // presence_state: persisted last online->offline transition + best-effort online mirror
+                // (the authoritative live state stays in-memory, derived from heartbeat TTL).
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS presence_state ("
+                        + "uuid TEXT PRIMARY KEY, online INTEGER NOT NULL DEFAULT 0, last_disconnect_at INTEGER)");
+                // migrate: drop the now-unused users.last_seen (superseded by presence_state.last_disconnect_at)
+                if (columnExists(st, "users", "last_seen")) {
+                    st.executeUpdate("ALTER TABLE users DROP COLUMN last_seen");
+                }
+                // a fresh process has no live connections yet — reset the persisted online mirror
+                st.executeUpdate("UPDATE presence_state SET online=0");
             }
             return c;
         } catch (ClassNotFoundException | SQLException e) {
             throw new IllegalStateException("LAN+ backend: cannot open SQLite database at " + path, e);
         }
+    }
+
+    private static boolean columnExists(Statement st, String table, String column) throws SQLException {
+        try (ResultSet rs = st.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equals(rs.getString("name"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     void close() {
@@ -235,6 +261,12 @@ final class Store {
         p.skin = skin;
         p.lastHeartbeat = System.currentTimeMillis();
         p.hosting = "HOSTING".equals(state);
+        if (!p.onlinePersisted) {
+            // offline -> online edge (first heartbeat of a session, or a reconnect after a recorded gap)
+            p.onlinePersisted = true;
+            p.disconnectRecorded = false;
+            markOnline(uuid);
+        }
         if (!p.hosting) {
             p.hostingAnnounced = false;
             return false;
@@ -268,6 +300,86 @@ final class Store {
             return p.joinCode;
         }
         return null;
+    }
+
+    private static boolean isLive(String connectivity) {
+        return "ONLINE".equals(connectivity) || "STALE".equals(connectivity);
+    }
+
+    private void markOnline(UUID uuid) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO presence_state (uuid, online) VALUES (?,1) "
+                            + "ON CONFLICT(uuid) DO UPDATE SET online=1")) {
+                ps.setString(1, uuid.toString());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("markOnline", e);
+            }
+        }
+    }
+
+    private void markOffline(UUID uuid, long at) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO presence_state (uuid, online, last_disconnect_at) VALUES (?,0,?) "
+                            + "ON CONFLICT(uuid) DO UPDATE SET online=0, last_disconnect_at=excluded.last_disconnect_at")) {
+                ps.setString(1, uuid.toString());
+                ps.setLong(2, at);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("markOffline", e);
+            }
+        }
+    }
+
+    // profile privacy (invisible mode) — see PROFILES_DESIGN.md § Modo invisible
+    boolean isInvisible(UUID uuid) {
+        synchronized (lock) {
+            return invisibleLocked(uuid);
+        }
+    }
+
+    void setInvisible(UUID uuid, boolean invisible) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO profile_privacy (uuid, invisible_mode) VALUES (?,?) "
+                            + "ON CONFLICT(uuid) DO UPDATE SET invisible_mode=excluded.invisible_mode")) {
+                ps.setString(1, uuid.toString());
+                ps.setInt(2, invisible ? 1 : 0);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("setInvisible", e);
+            }
+        }
+    }
+
+    private boolean invisibleLocked(UUID uuid) {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT invisible_mode FROM profile_privacy WHERE uuid=?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() && rs.getInt(1) != 0;
+            }
+        } catch (SQLException e) {
+            throw fail("isInvisible", e);
+        }
+    }
+
+    private Long lastDisconnectLocked(UUID uuid) {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT last_disconnect_at FROM presence_state WHERE uuid=?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    long v = rs.getLong(1);
+                    return rs.wasNull() ? null : v;
+                }
+                return null;
+            }
+        } catch (SQLException e) {
+            throw fail("lastDisconnectAt", e);
+        }
     }
 
     // friends
@@ -380,6 +492,7 @@ final class Store {
     List<Object> friendList(UUID uuid) {
         Map<UUID, String> names = new LinkedHashMap<>();
         Map<UUID, int[]> rel = new HashMap<>();
+        Set<UUID> invisible = new HashSet<>();
         String s = uuid.toString();
         synchronized (lock) {
             try {
@@ -405,6 +518,14 @@ final class Store {
                         }
                     }
                 }
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "SELECT uuid FROM profile_privacy WHERE invisible_mode != 0")) {
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            invisible.add(UUID.fromString(rs.getString(1)));
+                        }
+                    }
+                }
             } catch (SQLException e) {
                 throw fail("friendList", e);
             }
@@ -416,8 +537,11 @@ final class Store {
             boolean muted = r != null && r[0] == 1;
             boolean blocked = r != null && r[1] == 1;
             boolean suppress = muted || blocked;
-            String conn = suppress ? "UNKNOWN" : connectivity(fid);
-            boolean live = "ONLINE".equals(conn) || "STALE".equals(conn);
+            boolean hidden = invisible.contains(fid);
+            // an invisible friend appears offline to everyone (presence broadcast is masked too); the
+            // invite code stays the real key, so this never blocks an actual join — see PROFILES_DESIGN.md.
+            String conn = suppress ? "UNKNOWN" : (hidden ? "OFFLINE" : connectivity(fid));
+            boolean live = !hidden && ("ONLINE".equals(conn) || "STALE".equals(conn));
             Presence p = presences.get(fid);
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("uuid", fid.toString());
@@ -425,7 +549,7 @@ final class Store {
             m.put("connectivity", conn);
             m.put("state", live && p != null ? p.state : null);
             m.put("worldName", live && p != null ? p.worldName : null);
-            m.put("joinCode", suppress ? null : hostingJoinCode(fid));
+            m.put("joinCode", (suppress || hidden) ? null : hostingJoinCode(fid));
             m.put("skin", p == null ? null : p.skin);
             m.put("muted", muted);
             m.put("blocked", blocked);
@@ -582,7 +706,7 @@ final class Store {
         return false;
     }
 
-    Map<String, Object> profile(UUID uuid) {
+    Map<String, Object> profile(UUID uuid, UUID viewer) {
         synchronized (lock) {
             try {
                 User u = findUser(uuid);
@@ -609,6 +733,19 @@ final class Store {
                     }
                 }
                 m.put("links", links);
+
+                // presence: live online state is derived in-memory; last seen is the persisted transition.
+                boolean self = viewer != null && viewer.equals(uuid);
+                boolean invisible = invisibleLocked(uuid);
+                boolean live = isLive(connectivity(uuid));
+                // others never see an invisible player as online; the owner always sees their real state.
+                m.put("online", live && (self || !invisible));
+                m.put("lastSeen", lastDisconnectLocked(uuid));
+                // only the owner learns their own invisible flag (so the toggle reflects state) — exposing it
+                // to others would defeat the point of hiding.
+                if (self) {
+                    m.put("invisible", invisible);
+                }
                 return m;
             } catch (SQLException e) {
                 throw fail("profile", e);
@@ -737,6 +874,16 @@ final class Store {
         invites.entrySet().removeIf(e -> now > e.getValue().expiresAt());
         tickets.entrySet().removeIf(e -> now > e.getValue().expiresAt());
         guestTokens.entrySet().removeIf(e -> now > e.getValue().expiresAt());
+        // online -> offline edge: a presence past 2*TTL is OFFLINE; record the transition once,
+        // stamping last_disconnect_at with the real last heartbeat (not "now").
+        for (Map.Entry<UUID, Presence> e : presences.entrySet()) {
+            Presence p = e.getValue();
+            if (!p.disconnectRecorded && now - p.lastHeartbeat > 2 * ttlMs) {
+                p.disconnectRecorded = true;
+                p.onlinePersisted = false;
+                markOffline(e.getKey(), p.lastHeartbeat);
+            }
+        }
     }
 
     // helpers

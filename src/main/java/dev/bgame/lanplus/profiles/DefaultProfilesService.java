@@ -24,15 +24,17 @@ public final class DefaultProfilesService implements ProfilesService {
         if (uuid == null) {
             return CompletableFuture.completedFuture(null);
         }
-        return network.getProfile(uuid);
+        PlayerIdentity id = identity.get();
+        UUID viewer = id == null ? null : id.uuid();
+        return network.getProfile(uuid, viewer);
     }
 
     @Override
-    public CompletableFuture<String> save(String bio, String pronouns, Map<String, String> links) {
+    public CompletableFuture<String> save(String bio, String pronouns, Map<String, String> links, boolean invisible) {
         PlayerIdentity id = identity.get();
         if (id == null) {
             return CompletableFuture.completedFuture("offline");
         }
-        return network.updateProfile(id.uuid(), bio, pronouns, links);
+        return network.updateProfile(id.uuid(), bio, pronouns, links, invisible);
     }
 }

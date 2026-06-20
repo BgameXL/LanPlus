@@ -10,5 +10,5 @@ public interface ProfilesService {
 
     CompletableFuture<Profile> get(UUID uuid);
 
-    CompletableFuture<String> save(String bio, String pronouns, Map<String, String> links);
+    CompletableFuture<String> save(String bio, String pronouns, Map<String, String> links, boolean invisible);
 }

@@ -10,7 +10,10 @@ public record Profile(
         String friendCode,
         String pronouns,
         String bio,
-        Map<String, String> links
+        Map<String, String> links,
+        boolean online,
+        long lastSeen,
+        boolean invisible
 ) {
     public Profile {
         Objects.requireNonNull(uuid, "uuid");

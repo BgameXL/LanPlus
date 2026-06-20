@@ -50,7 +50,7 @@ public final class Migrate {
         try (Statement st = c.createStatement()) {
             st.executeUpdate("CREATE TABLE IF NOT EXISTS users ("
                     + "uuid TEXT PRIMARY KEY, username TEXT, friend_code TEXT UNIQUE NOT NULL, "
-                    + "domain TEXT UNIQUE NOT NULL, last_seen INTEGER, last_modpack TEXT)");
+                    + "domain TEXT UNIQUE NOT NULL, last_modpack TEXT)");
             st.executeUpdate("CREATE TABLE IF NOT EXISTS friends ("
                     + "a TEXT NOT NULL, b TEXT NOT NULL, PRIMARY KEY (a, b), CHECK (a < b))");
             st.executeUpdate("CREATE TABLE IF NOT EXISTS friend_requests ("
