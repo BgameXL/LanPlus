@@ -19,8 +19,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Backend state. Durable identity + social graph (users, friends, friend_requests, relationships)
- * lives in SQLite; presence, invites and relay tickets stay in memory because they are ephemeral
+ * Backend state. Durable identity and social graph (users, friends, friend_requests, relationships)
+ * lives in SQLite; presence, invites, and relay tickets stay in memory because they are ephemeral
  * (TTL-bounded) and correct to lose on restart. See docs/dev/SQLITE.md.
  *
  * Concurrency: a single shared JDBC Connection guarded by {@link #lock} (SQLite admits one writer;
@@ -59,6 +59,7 @@ final class Store {
         volatile String address;
         volatile String joinCode;
         volatile Object skin;
+        volatile String modpackId;   // raw self-declared id; resolved against modpack_registry at read time
         volatile long lastHeartbeat;
         volatile boolean hosting;
         volatile boolean hostingAnnounced;
@@ -128,6 +129,22 @@ final class Store {
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_prompts ("
                         + "uuid TEXT NOT NULL, prompt_id TEXT NOT NULL, answer TEXT NOT NULL, "
                         + "updated_at INTEGER NOT NULL, PRIMARY KEY (uuid, prompt_id))");
+                // modpack_registry: the only source of modpack metadata. modpack_id is assigned by the LAN+
+                // author at registration (curated, no public write endpoint); the pack's datapack only
+                // self-declares this id. Unregistered ids are ignored. See PROFILES_DESIGN.md § Modpack.
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS modpack_registry ("
+                        + "modpack_id TEXT PRIMARY KEY, name TEXT NOT NULL, icon_url TEXT, author TEXT, "
+                        + "team TEXT, download_url TEXT, description TEXT)");
+                // profile_settings: manual favorite modpack + per-signal visibility toggles. most_played
+                // is derived from playtime in a later iteration; its toggle column exists now (default on)
+                // but is not surfaced yet. currently_playing_visible is subordinate to invisible_mode (the
+                // master switch). See PROFILES_DESIGN.md § Modpack.
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_settings ("
+                        + "uuid TEXT PRIMARY KEY, favorite_modpack_id TEXT, "
+                        + "favorite_modpack_visible INTEGER NOT NULL DEFAULT 1, "
+                        + "most_played_visible INTEGER NOT NULL DEFAULT 1, "
+                        + "currently_playing_visible INTEGER NOT NULL DEFAULT 1, "
+                        + "updated_at INTEGER NOT NULL)");
                 // presence_state: persisted last online->offline transition + best-effort online mirror
                 // (the authoritative live state stays in-memory, derived from heartbeat TTL).
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS presence_state ("
@@ -257,7 +274,7 @@ final class Store {
 
     // presence (in-memory: ephemeral, derived connectivity)
     boolean upsertPresence(UUID uuid, String username, String state, String worldName,
-                           String address, String joinCode, Object skin) {
+                           String address, String joinCode, Object skin, String modpackId) {
         ensureUser(uuid, username);
         Presence p = presences.computeIfAbsent(uuid, k -> new Presence());
         p.state = state;
@@ -265,6 +282,7 @@ final class Store {
         p.address = address;
         p.joinCode = joinCode;
         p.skin = skin;
+        p.modpackId = modpackId;
         p.lastHeartbeat = System.currentTimeMillis();
         p.hosting = "HOSTING".equals(state);
         if (!p.onlinePersisted) {
@@ -703,6 +721,10 @@ final class Store {
     private static final String[] LINK_PLATFORMS =
             {"discord", "instagram", "twitter", "youtube", "twitch", "tiktok", "paypal", "kofi"};
 
+    // Whitelisted profile_settings toggle columns — guards the dynamic column name in setModpackVisibility.
+    private static final Set<String> VISIBILITY_COLUMNS = Set.of(
+            "favorite_modpack_visible", "currently_playing_visible", "most_played_visible");
+
     boolean isLinkPlatform(String platform) {
         for (String p : LINK_PLATFORMS) {
             if (p.equals(platform)) {
@@ -714,7 +736,6 @@ final class Store {
 
     // Whitelist of valid "Questions about yourself" prompt IDs. Mirror of the client catalog
     // (client.gui.ProfilePromptCatalog); the backend only needs the IDs to reject junk keys, not the
-    // prompt text or choices. See PROFILES_DESIGN.md § Questions about yourself.
     static final int MAX_PROMPTS = 3;
     private static final String[] PROMPT_IDS =
             {"delete_block", "first_night", "build_first", "useless_item",
@@ -773,18 +794,165 @@ final class Store {
                 boolean self = viewer != null && viewer.equals(uuid);
                 boolean invisible = invisibleLocked(uuid);
                 boolean live = isLive(connectivity(uuid));
-                // others never see an invisible player as online; the owner always sees their real state.
                 m.put("online", live && (self || !invisible));
                 m.put("lastSeen", lastDisconnectLocked(uuid));
-                // only the owner learns their own invisible flag (so the toggle reflects state) — exposing it
-                // to others would defeat the point of hiding.
                 if (self) {
                     m.put("invisible", invisible);
+                }
+
+                String favoriteId = null;
+                boolean favoriteVisible = true;
+                boolean currentlyPlayingVisible = true;
+                boolean mostPlayedVisible = true;
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "SELECT favorite_modpack_id, favorite_modpack_visible, currently_playing_visible, "
+                                + "most_played_visible FROM profile_settings WHERE uuid=?")) {
+                    ps.setString(1, uuid.toString());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            favoriteId = rs.getString(1);
+                            favoriteVisible = rs.getInt(2) != 0;
+                            currentlyPlayingVisible = rs.getInt(3) != 0;
+                            mostPlayedVisible = rs.getInt(4) != 0;
+                        }
+                    }
+                }
+
+                Presence pres = presences.get(uuid);
+                String mp = pres == null ? null : pres.modpackId;
+                boolean showPlaying = live && (self || (!invisible && currentlyPlayingVisible));
+                m.put("currentlyPlaying", showPlaying ? resolveModpackLocked(mp) : null);
+                m.put("favorite", (self || favoriteVisible) ? resolveModpackLocked(favoriteId) : null);
+
+                if (self) {
+                    Map<String, Object> settings = new LinkedHashMap<>();
+                    settings.put("favoriteVisible", favoriteVisible);
+                    settings.put("currentlyPlayingVisible", currentlyPlayingVisible);
+                    settings.put("mostPlayedVisible", mostPlayedVisible);
+                    m.put("settings", settings);
                 }
                 return m;
             } catch (SQLException e) {
                 throw fail("profile", e);
             }
+        }
+    }
+
+    String registeredModpackOrNull(String modpackId) {
+        if (modpackId == null || modpackId.isBlank()) {
+            return null;
+        }
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT 1 FROM modpack_registry WHERE modpack_id=?")) {
+                ps.setString(1, modpackId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? modpackId : null;
+                }
+            } catch (SQLException e) {
+                throw fail("registeredModpackOrNull", e);
+            }
+        }
+    }
+
+    private Map<String, Object> resolveModpackLocked(String modpackId) throws SQLException {
+        if (modpackId == null || modpackId.isBlank()) {
+            return null;
+        }
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT name, download_url FROM modpack_registry WHERE modpack_id=?")) {
+            ps.setString(1, modpackId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("modpackId", modpackId);
+                m.put("name", rs.getString(1));
+                m.put("downloadUrl", rs.getString(2));
+                return m;
+            }
+        }
+    }
+
+    List<Map<String, Object>> listModpacks() {
+        synchronized (lock) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT modpack_id, name, download_url FROM modpack_registry ORDER BY name");
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("modpackId", rs.getString(1));
+                    m.put("name", rs.getString(2));
+                    m.put("downloadUrl", rs.getString(3));
+                    out.add(m);
+                }
+                return out;
+            } catch (SQLException e) {
+                throw fail("listModpacks", e);
+            }
+        }
+    }
+
+    boolean currentlyPlayingVisible(UUID uuid) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT currently_playing_visible FROM profile_settings WHERE uuid=?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    return !rs.next() || rs.getInt(1) != 0;
+                }
+            } catch (SQLException e) {
+                throw fail("currentlyPlayingVisible", e);
+            }
+        }
+    }
+
+    void setFavoriteModpack(UUID uuid, String modpackId) {
+        String value = (modpackId == null || modpackId.isBlank()) ? null : modpackId;
+        synchronized (lock) {
+            try {
+                ensureSettingsRowLocked(uuid);
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "UPDATE profile_settings SET favorite_modpack_id=?, updated_at=? WHERE uuid=?")) {
+                    ps.setString(1, value);
+                    ps.setLong(2, System.currentTimeMillis());
+                    ps.setString(3, uuid.toString());
+                    ps.executeUpdate();
+                }
+            } catch (SQLException e) {
+                throw fail("setFavoriteModpack", e);
+            }
+        }
+    }
+
+    void setModpackVisibility(UUID uuid, String column, boolean visible) {
+        if (!VISIBILITY_COLUMNS.contains(column)) {
+            return;
+        }
+        synchronized (lock) {
+            try {
+                ensureSettingsRowLocked(uuid);
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "UPDATE profile_settings SET " + column + "=?, updated_at=? WHERE uuid=?")) {
+                    ps.setInt(1, visible ? 1 : 0);
+                    ps.setLong(2, System.currentTimeMillis());
+                    ps.setString(3, uuid.toString());
+                    ps.executeUpdate();
+                }
+            } catch (SQLException e) {
+                throw fail("setModpackVisibility", e);
+            }
+        }
+    }
+
+    private void ensureSettingsRowLocked(UUID uuid) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT OR IGNORE INTO profile_settings (uuid, updated_at) VALUES (?,?)")) {
+            ps.setString(1, uuid.toString());
+            ps.setLong(2, System.currentTimeMillis());
+            ps.executeUpdate();
         }
     }
 

@@ -144,6 +144,9 @@ public final class BackendServer {
             if (m.equals("POST") && path.equals("/profile/update")) {
                 return profileUpdate(req);
             }
+            if (m.equals("GET") && path.equals("/modpacks")) {
+                return ok(store.listModpacks());
+            }
             if (m.equals("POST") && path.equals("/invite/create")) {
                 return inviteCreate(req);
             }
@@ -170,7 +173,8 @@ public final class BackendServer {
         UUID uuid = uuid((String) b.get("uuid"));
         boolean announceHosting = store.upsertPresence(uuid,
                 (String) b.get("username"), (String) b.get("state"), (String) b.get("worldName"),
-                (String) b.get("address"), (String) b.get("joinCode"), b.get("skin"));
+                (String) b.get("address"), (String) b.get("joinCode"), b.get("skin"),
+                (String) b.get("modpackId"));
 
         boolean invisible = store.isInvisible(uuid);
         Map<String, Object> data = ordered(
@@ -178,7 +182,9 @@ public final class BackendServer {
                 "connectivity", invisible ? "OFFLINE" : store.connectivity(uuid),
                 "state", invisible ? null : b.get("state"),
                 "worldName", invisible ? null : b.get("worldName"),
-                "joinCode", invisible ? null : b.get("joinCode"));
+                "joinCode", invisible ? null : b.get("joinCode"),
+                "modpackId", (invisible || !store.currentlyPlayingVisible(uuid))
+                        ? null : store.registeredModpackOrNull((String) b.get("modpackId")));
 
         Set<UUID> recipients = new LinkedHashSet<>();
         for (UUID friend : store.friendsOf(uuid)) {
@@ -311,6 +317,23 @@ public final class BackendServer {
                 return ok(error("too_many_prompts"));
             }
             store.setPrompts(uuid, answers);
+        }
+        if (b.containsKey("favoriteModpackId")) {
+            Object fav = b.get("favoriteModpackId");
+            String favoriteId = fav == null ? null : String.valueOf(fav);
+            if (favoriteId != null && !favoriteId.isBlank() && store.registeredModpackOrNull(favoriteId) == null) {
+                return ok(error("bad_modpack"));
+            }
+            store.setFavoriteModpack(uuid, favoriteId);
+        }
+        if (b.get("favoriteVisible") instanceof Boolean favVis) {
+            store.setModpackVisibility(uuid, "favorite_modpack_visible", favVis);
+        }
+        if (b.get("currentlyPlayingVisible") instanceof Boolean playVis) {
+            store.setModpackVisibility(uuid, "currently_playing_visible", playVis);
+        }
+        if (b.get("mostPlayedVisible") instanceof Boolean mostVis) {
+            store.setModpackVisibility(uuid, "most_played_visible", mostVis);
         }
         return ok(Map.of("success", true));
     }
