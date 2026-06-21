@@ -172,8 +172,6 @@ public final class BackendServer {
                 (String) b.get("username"), (String) b.get("state"), (String) b.get("worldName"),
                 (String) b.get("address"), (String) b.get("joinCode"), b.get("skin"));
 
-        // invisible mode masks the real-time push too: friends see the player as offline (the invite
-        // code still works — that is a separate host-access path). See PROFILES_DESIGN.md § Modo invisible.
         boolean invisible = store.isInvisible(uuid);
         Map<String, Object> data = ordered(
                 "uuid", uuid.toString(),
@@ -289,6 +287,30 @@ public final class BackendServer {
         }
         if (b.get("invisible") instanceof Boolean invisible) {
             store.setInvisible(uuid, invisible);
+        }
+        if (b.get("prompts") instanceof Map<?, ?> prompts) {
+            Map<String, String> answers = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> e : prompts.entrySet()) {
+                String id = String.valueOf(e.getKey());
+                if (!store.isPromptId(id)) {
+                    return ok(error("bad_prompt"));
+                }
+                String answer = e.getValue() == null ? null : String.valueOf(e.getValue());
+                if (answer == null || answer.isBlank()) {
+                    continue;
+                }
+                if (answer.length() > 140) {
+                    return ok(error("prompt_too_long"));
+                }
+                if (containsObviousLink(answer)) {
+                    return ok(error("prompt_link"));
+                }
+                answers.put(id, answer);
+            }
+            if (answers.size() > Store.MAX_PROMPTS) {
+                return ok(error("too_many_prompts"));
+            }
+            store.setPrompts(uuid, answers);
         }
         return ok(Map.of("success", true));
     }

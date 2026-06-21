@@ -122,6 +122,12 @@ final class Store {
                         + "twitch TEXT, tiktok TEXT, paypal TEXT, kofi TEXT)");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_privacy ("
                         + "uuid TEXT PRIMARY KEY, invisible_mode INTEGER NOT NULL DEFAULT 0)");
+                // profile_prompts: answers to the predefined "Questions about yourself" (<=3 per player).
+                // EAV (narrow) so the prompt catalog can grow without schema migration; answer holds the
+                // free text or the choice token. See PROFILES_DESIGN.md § Questions about yourself.
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_prompts ("
+                        + "uuid TEXT NOT NULL, prompt_id TEXT NOT NULL, answer TEXT NOT NULL, "
+                        + "updated_at INTEGER NOT NULL, PRIMARY KEY (uuid, prompt_id))");
                 // presence_state: persisted last online->offline transition + best-effort online mirror
                 // (the authoritative live state stays in-memory, derived from heartbeat TTL).
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS presence_state ("
@@ -706,6 +712,23 @@ final class Store {
         return false;
     }
 
+    // Whitelist of valid "Questions about yourself" prompt IDs. Mirror of the client catalog
+    // (client.gui.ProfilePromptCatalog); the backend only needs the IDs to reject junk keys, not the
+    // prompt text or choices. See PROFILES_DESIGN.md § Questions about yourself.
+    static final int MAX_PROMPTS = 3;
+    private static final String[] PROMPT_IDS =
+            {"delete_block", "first_night", "build_first", "useless_item",
+             "difficulty", "travel", "armor", "playstyle"};
+
+    boolean isPromptId(String id) {
+        for (String p : PROMPT_IDS) {
+            if (p.equals(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     Map<String, Object> profile(UUID uuid, UUID viewer) {
         synchronized (lock) {
             try {
@@ -733,6 +756,18 @@ final class Store {
                     }
                 }
                 m.put("links", links);
+
+                Map<String, Object> prompts = new LinkedHashMap<>();
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "SELECT prompt_id, answer FROM profile_prompts WHERE uuid=?")) {
+                    ps.setString(1, uuid.toString());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            prompts.put(rs.getString(1), rs.getString(2));
+                        }
+                    }
+                }
+                m.put("prompts", prompts);
 
                 // presence: live online state is derived in-memory; last seen is the persisted transition.
                 boolean self = viewer != null && viewer.equals(uuid);
@@ -801,6 +836,35 @@ final class Store {
                 }
             } catch (SQLException e) {
                 throw fail("setLink", e);
+            }
+        }
+    }
+
+    // Replace the player's whole set of prompt answers (not a patch). Blank/null answers are dropped, so
+    // the resulting set is exactly the non-empty entries passed in. See PROFILES_DESIGN.md.
+    void setPrompts(UUID uuid, Map<String, String> answers) {
+        synchronized (lock) {
+            try (PreparedStatement del = connection.prepareStatement(
+                    "DELETE FROM profile_prompts WHERE uuid=?")) {
+                del.setString(1, uuid.toString());
+                del.executeUpdate();
+                long now = System.currentTimeMillis();
+                try (PreparedStatement ins = connection.prepareStatement(
+                        "INSERT INTO profile_prompts (uuid, prompt_id, answer, updated_at) VALUES (?,?,?,?)")) {
+                    for (Map.Entry<String, String> e : answers.entrySet()) {
+                        String answer = e.getValue();
+                        if (answer == null || answer.isBlank()) {
+                            continue;
+                        }
+                        ins.setString(1, uuid.toString());
+                        ins.setString(2, e.getKey());
+                        ins.setString(3, answer);
+                        ins.setLong(4, now);
+                        ins.executeUpdate();
+                    }
+                }
+            } catch (SQLException e) {
+                throw fail("setPrompts", e);
             }
         }
     }
