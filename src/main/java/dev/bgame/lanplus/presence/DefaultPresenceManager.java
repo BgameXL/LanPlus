@@ -13,12 +13,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Default {@link PresenceManager}: the hub of {@code Minecraft → PresenceManager → LanPlusNetwork →
- * Backend} (CLAUDE.md #2). Side-agnostic (no Minecraft types) — detection feeds it from the client.
+ * Backend}. Side-agnostic (no Minecraft types) — detection feeds it from the client.
  *
  * <p>Assembles the local {@link PresenceSnapshot} from parts contributed by different modules
  * (state/world from detection, join code from invites, skin from skins) and pushes it on every
- * change as well as on each {@link #heartbeat()}. All pushes are fire-and-forget and fail soft
- * (CLAUDE.md #7).
+ * change as well as on each {@link #heartbeat()}. All pushes are fire-and-forget and fail soft.
  */
 public final class DefaultPresenceManager implements PresenceManager {
 
@@ -28,7 +27,7 @@ public final class DefaultPresenceManager implements PresenceManager {
     private final List<PresenceListener> listeners = new CopyOnWriteArrayList<>();
 
     private volatile PresenceSnapshot snapshot =
-            new PresenceSnapshot(GameplayState.MENU, null, null, null, null);
+            new PresenceSnapshot(GameplayState.MENU, null, null, null, null, null);
 
     public DefaultPresenceManager(LanPlusNetwork network) {
         this.network = network;
@@ -42,17 +41,22 @@ public final class DefaultPresenceManager implements PresenceManager {
     @Override
     public synchronized void updateState(GameplayState state, String worldName, String address) {
         Objects.requireNonNull(state, "state");
-        apply(new PresenceSnapshot(state, worldName, address, snapshot.joinCode(), snapshot.skin()));
+        apply(new PresenceSnapshot(state, worldName, address, snapshot.joinCode(), snapshot.skin(), snapshot.modpackId()));
     }
 
     @Override
     public synchronized void setJoinCode(String joinCode) {
-        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), joinCode, snapshot.skin()));
+        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), joinCode, snapshot.skin(), snapshot.modpackId()));
     }
 
     @Override
     public synchronized void updateSkin(SkinRef skin) {
-        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(), skin));
+        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(), skin, snapshot.modpackId()));
+    }
+
+    @Override
+    public synchronized void updateModpack(String modpackId) {
+        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(), snapshot.skin(), modpackId));
     }
 
     @Override

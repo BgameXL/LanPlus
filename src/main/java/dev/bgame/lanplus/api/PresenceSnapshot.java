@@ -7,7 +7,8 @@ public record PresenceSnapshot(
         String worldName,
         String address,
         String joinCode,
-        SkinRef skin
+        SkinRef skin,
+        String modpackId
 ) {
     public PresenceSnapshot {
         Objects.requireNonNull(state, "state");

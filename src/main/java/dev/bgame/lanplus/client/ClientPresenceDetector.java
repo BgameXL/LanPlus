@@ -7,25 +7,38 @@ import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinType;
 import dev.bgame.lanplus.presence.PresenceManager;
 import dev.bgame.lanplus.skins.SkinService;
+import com.google.gson.JsonObject;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.util.GsonHelper;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = Lanplus.MODID, value = Dist.CLIENT)
 public final class ClientPresenceDetector {
 
+    private static final ResourceLocation MODPACK_IDENTITY = new ResourceLocation("lanplus_identity", "modpack.json");
+
     private static int tickCounter = 0;
     private static GameplayState lastState = null;
     private static SkinRef lastSkin = null;
+    private static String lastModpack = null;
+    private static boolean modpackCached = false;
+    private static String cachedModpack = null;
 
     private ClientPresenceDetector() {}
 
@@ -44,6 +57,7 @@ public final class ClientPresenceDetector {
         if (state != lastState) {
             lastState = state;
             publishSkinIfChanged(mc, presence);
+            publishModpackIfChanged(mc, presence);
             presence.updateState(state, detectWorldName(mc, state), detectAddress(mc, state));
         }
 
@@ -51,7 +65,48 @@ public final class ClientPresenceDetector {
         if (++tickCounter >= intervalTicks) {
             tickCounter = 0;
             publishSkinIfChanged(mc, presence);
+            publishModpackIfChanged(mc, presence);
             presence.heartbeat();
+        }
+    }
+
+    private static void publishModpackIfChanged(Minecraft mc, PresenceManager presence) {
+        String id = detectModpackId(mc);
+        if (Objects.equals(id, lastModpack)) {
+            return;
+        }
+        lastModpack = id;
+        presence.updateModpack(id);
+    }
+
+    private static String detectModpackId(Minecraft mc) {
+        if (mc.level == null || !mc.hasSingleplayerServer()) {
+            modpackCached = false;
+            cachedModpack = null;
+            return null;
+        }
+        if (modpackCached) {
+            return cachedModpack;
+        }
+        cachedModpack = readModpackId(mc.getSingleplayerServer());
+        modpackCached = true;
+        return cachedModpack;
+    }
+
+    private static String readModpackId(IntegratedServer server) {
+        if (server == null) {
+            return null;
+        }
+        Optional<Resource> resource = server.getResourceManager().getResource(MODPACK_IDENTITY);
+        if (resource.isEmpty()) {
+            return null;
+        }
+        try (Reader reader = new InputStreamReader(resource.get().open(), StandardCharsets.UTF_8)) {
+            JsonObject obj = GsonHelper.parse(reader);
+            String id = GsonHelper.getAsString(obj, "modpackId", null);
+            return id == null || id.isBlank() ? null : id.trim();
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -64,10 +119,6 @@ public final class ClientPresenceDetector {
         SkinService skins = LanPlusClient.skins();
         if (skins != null) {
             skins.setLocalSkin(ref);
-            // Resolve our own skin into SkinTextures so the UI avatars (ProfileScreen / FriendsScreen)
-            // can show it. SkinTextures is otherwise only populated from friends' presence, so without
-            // this our own profile head falls back to the default skin. In-world self rendering stays
-            // vanilla (the AbstractClientPlayerMixin skips the local player).
             User user = mc.getUser();
             UUID self = user == null ? null : user.getProfileId();
             if (self != null && ref != null) {
@@ -99,6 +150,10 @@ public final class ClientPresenceDetector {
             return;
         }
         lastState = GameplayState.MENU;
+        lastModpack = null;
+        modpackCached = false;
+        cachedModpack = null;
+        presence.updateModpack(null);
         presence.updateState(GameplayState.MENU, null, null);
     }
 

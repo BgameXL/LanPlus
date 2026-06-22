@@ -14,6 +14,8 @@ public interface PresenceManager {
 
     void updateSkin(SkinRef skin);
 
+    void updateModpack(String modpackId);
+
     void heartbeat();
 
     void addListener(PresenceListener listener);

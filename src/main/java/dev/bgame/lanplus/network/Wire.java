@@ -2,6 +2,7 @@ package dev.bgame.lanplus.network;
 
 import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.GameplayState;
+import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
@@ -33,6 +34,7 @@ final class Wire {
             String worldName,
             String address,
             String joinCode,
+            String modpackId,
             Skin skin,
             long timestamp
     ) {}
@@ -95,17 +97,37 @@ final class Wire {
     }
 
     record ProfileDto(String uuid, String username, String friendCode, String pronouns, String bio,
-                      Map<String, String> links, boolean online, Long lastSeen, Boolean invisible) {
+                      Map<String, String> links, Map<String, String> prompts,
+                      boolean online, Long lastSeen, Boolean invisible, ModpackDto currentlyPlaying,
+                      ModpackDto favorite, SettingsDto settings) {
         Profile toApi() {
+            SettingsDto s = settings == null ? new SettingsDto(true, true, true) : settings;
             return new Profile(UUID.fromString(uuid), username, friendCode, pronouns, bio,
                     links == null ? Map.of() : links,
+                    prompts == null ? Map.of() : prompts,
                     online,
                     lastSeen == null ? 0L : lastSeen,
-                    Boolean.TRUE.equals(invisible));
+                    Boolean.TRUE.equals(invisible),
+                    currentlyPlaying == null ? null : currentlyPlaying.toApi(),
+                    favorite == null ? null : favorite.toApi(),
+                    !Boolean.FALSE.equals(s.favoriteVisible()),
+                    !Boolean.FALSE.equals(s.currentlyPlayingVisible()),
+                    !Boolean.FALSE.equals(s.mostPlayedVisible()));
         }
     }
 
-    record ProfileUpdate(String uuid, String bio, String pronouns, Map<String, String> links, Boolean invisible) {}
+    record ModpackDto(String modpackId, String name, String downloadUrl) {
+        ModpackRef toApi() {
+            return new ModpackRef(modpackId, name, downloadUrl);
+        }
+    }
+
+    record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean mostPlayedVisible) {}
+
+    record ProfileUpdate(String uuid, String bio, String pronouns, Map<String, String> links,
+                         Map<String, String> prompts, Boolean invisible,
+                         String favoriteModpackId, Boolean favoriteVisible,
+                         Boolean currentlyPlayingVisible) {}
 
     record UpdateResult(boolean success, String error) {}
 }

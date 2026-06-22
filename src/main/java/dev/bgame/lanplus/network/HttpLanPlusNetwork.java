@@ -9,6 +9,7 @@ import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.Invite;
+import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.PresenceUpdate;
@@ -43,7 +44,6 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new Gson();
-    // serializes nulls so a partial /profile/update can explicitly clear a field (null = clear)
     private static final Gson GSON_NULLS = new GsonBuilder().serializeNulls().create();
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final long RECONNECT_BASE_MS = 2_000L;
@@ -91,6 +91,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 snapshot.worldName(),
                 snapshot.address(),
                 snapshot.joinCode(),
+                snapshot.modpackId(),
                 Wire.Skin.from(snapshot.skin()),
                 System.currentTimeMillis());
         return post("/presence", body)
@@ -267,11 +268,15 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
-    public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links, Boolean invisible) {
+    public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
+                                                   Map<String, String> prompts, Boolean invisible,
+                                                   String favoriteModpackId, Boolean favoriteVisible,
+                                                   Boolean currentlyPlayingVisible) {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture("offline");
         }
-        Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links, invisible);
+        Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links, prompts, invisible,
+                favoriteModpackId, favoriteVisible, currentlyPlayingVisible);
         return postNulls("/profile/update", body)
                 .thenApply(resp -> {
                     Wire.UpdateResult r = GSON.fromJson(resp.body(), Wire.UpdateResult.class);
@@ -283,6 +288,31 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 .exceptionally(err -> {
                     onError(err);
                     return "offline";
+                });
+    }
+
+    @Override
+    public CompletableFuture<List<ModpackRef>> getModpacks() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get("/modpacks")
+                .thenApply(resp -> {
+                    Wire.ModpackDto[] arr = GSON.fromJson(resp.body(), Wire.ModpackDto[].class);
+                    if (arr == null) {
+                        return List.<ModpackRef>of();
+                    }
+                    List<ModpackRef> out = new ArrayList<>(arr.length);
+                    for (Wire.ModpackDto dto : arr) {
+                        if (dto != null && dto.modpackId() != null) {
+                            out.add(dto.toApi());
+                        }
+                    }
+                    return out;
+                })
+                .exceptionally(err -> {
+                    onError(err);
+                    return List.of();
                 });
     }
 

@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Backend state. Durable identity and social graph (users, friends, friend_requests, relationships)
  * lives in SQLite; presence, invites, and relay tickets stay in memory because they are ephemeral
- * (TTL-bounded) and correct to lose on restart. See docs/dev/SQLITE.md.
+ * (TTL-bounded) and correct to lose on restart.
  *
  * Concurrency: a single shared JDBC Connection guarded by {@link #lock} (SQLite admits one writer;
  * WAL allows concurrent readers, but a single Connection is not thread-safe, so all DB access is

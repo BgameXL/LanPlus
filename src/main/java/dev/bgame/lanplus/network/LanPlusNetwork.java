@@ -2,6 +2,7 @@ package dev.bgame.lanplus.network;
 
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.Invite;
+import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.PresenceUpdate;
 import dev.bgame.lanplus.api.Profile;
@@ -30,7 +31,11 @@ public interface LanPlusNetwork {
     CompletableFuture<ResolvedUser> resolveUser(String query);
     CompletableFuture<UserProfile> fetchProfile(UUID uuid);
     CompletableFuture<Profile> getProfile(UUID uuid, UUID viewer);
-    CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links, Boolean invisible);
+    CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
+                                            Map<String, String> prompts, Boolean invisible,
+                                            String favoriteModpackId, Boolean favoriteVisible,
+                                            Boolean currentlyPlayingVisible);
+    CompletableFuture<List<ModpackRef>> getModpacks();
     CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated);
     CompletableFuture<Invite> resolveInvite(String code);
     CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);
