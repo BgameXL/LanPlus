@@ -113,6 +113,7 @@ final class Http {
             case 204 -> "No Content";
             case 400 -> "Bad Request";
             case 401 -> "Unauthorized";
+            case 403 -> "Forbidden";
             case 404 -> "Not Found";
             default -> "OK";
         };

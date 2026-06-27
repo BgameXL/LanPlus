@@ -16,15 +16,22 @@ public record Profile(
         long lastSeen,
         boolean invisible,
         ModpackRef currentlyPlaying,
+        ModpackRef lastPlayed,
         ModpackRef favorite,
+        ModpackRef recentlyPlayed,
         boolean favoriteVisible,
         boolean currentlyPlayingVisible,
-        boolean mostPlayedVisible
+        boolean recentlyPlayedVisible,
+        int tier,
+        int advancements,
+        int xp,
+        Map<String, Integer> xpSources
 ) {
     public Profile {
         Objects.requireNonNull(uuid, "uuid");
         links = links == null ? Map.of() : Map.copyOf(links);
         prompts = prompts == null ? Map.of() : Map.copyOf(prompts);
+        xpSources = xpSources == null ? Map.of() : Map.copyOf(xpSources);
     }
 
     public String link(String platform) {
@@ -33,5 +40,14 @@ public record Profile(
 
     public String prompt(String promptId) {
         return prompts.get(promptId);
+    }
+
+    public boolean hasXp() {
+        return xp >= 0;
+    }
+
+    public int xpFrom(String source) {
+        Integer v = xpSources.get(source);
+        return v == null ? 0 : v;
     }
 }

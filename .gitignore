@@ -28,6 +28,8 @@ run
 /.idea/
 deploy
 docs/dev
+docs
 *.sqlite
 lanplus-web
 next-app
+*.db

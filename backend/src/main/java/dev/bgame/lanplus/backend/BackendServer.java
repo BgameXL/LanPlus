@@ -8,6 +8,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -30,7 +31,8 @@ public final class BackendServer {
 
     private BackendServer(BackendConfig cfg) {
         this.cfg = cfg;
-        this.store = new Store(cfg.heartbeatTtlMs, cfg.baseDomain, cfg.dataFile);
+        this.store = new Store(cfg.heartbeatTtlMs, cfg.baseDomain, cfg.dataFile,
+                cfg.sessionServerUrl, cfg.allowOffline, cfg.sessionTtlMs);
     }
 
     public static void main(String[] args) throws Exception {
@@ -87,46 +89,69 @@ public final class BackendServer {
     private static final Resp OK_EMPTY = new Resp(200, Map.of());
     private static final Resp NOT_FOUND = new Resp(404, null);
     private static final Resp BAD = new Resp(400, null);
+    private static final Resp UNAUTHORIZED = new Resp(401, null);
+    private static final Resp FORBIDDEN = new Resp(403, null);
 
     private Resp route(Http.Request req) {
         String m = req.method();
         String path = req.path();
         try {
+            if (m.equals("POST") && path.equals("/auth/challenge")) {
+                return authChallenge(req);
+            }
+            if (m.equals("POST") && path.equals("/auth/verify")) {
+                return authVerify(req);
+            }
+            if (m.equals("POST") && path.equals("/auth/offline")) {
+                return authOffline(req);
+            }
+            if (m.equals("GET") && path.equals("/relay/validate")) {
+                return relayValidate(req);
+            }
+            if (m.equals("GET") && path.equals("/relay/guest/validate")) {
+                return relayGuestValidate(req);
+            }
+            Store.Session session = store.validateSession(bearer(req));
+            if (session == null) {
+                return UNAUTHORIZED;
+            }
+            UUID self = session.uuid();
+
             if (m.equals("POST") && path.equals("/presence")) {
-                return presence(req);
+                return presence(req, self);
             }
             if (m.equals("POST") && path.equals("/friends/add")) {
-                return friendsAdd(req);
+                return friendsAdd(req, self);
             }
             if (m.equals("POST") && path.equals("/friends/remove")) {
-                return friendsRemove(req);
+                return friendsRemove(req, self);
             }
             if (m.equals("POST") && path.equals("/friends/accept")) {
-                return friendsAccept(req);
+                return friendsAccept(req, self);
             }
             if (m.equals("POST") && path.equals("/friends/decline")) {
-                return friendsDecline(req);
+                return friendsDecline(req, self);
             }
             if (m.equals("POST") && path.equals("/friends/mute")) {
-                return friendsRelation(req, "mute");
+                return friendsRelation(req, self, "mute");
             }
             if (m.equals("POST") && path.equals("/friends/unmute")) {
-                return friendsRelation(req, "unmute");
+                return friendsRelation(req, self, "unmute");
             }
             if (m.equals("POST") && path.equals("/friends/block")) {
-                return friendsRelation(req, "block");
+                return friendsRelation(req, self, "block");
             }
             if (m.equals("POST") && path.equals("/friends/unblock")) {
-                return friendsRelation(req, "unblock");
+                return friendsRelation(req, self, "unblock");
             }
             if (m.equals("GET") && path.equals("/friends/requests")) {
-                return ok(store.friendRequests(uuid(req.param("uuid"))));
+                return ok(store.friendRequests(self));
             }
             if (m.equals("GET") && path.startsWith("/friends/")) {
                 return ok(store.friendList(uuid(path.substring("/friends/".length()))));
             }
             if (m.equals("GET") && path.equals("/users/me")) {
-                return ok(store.me(uuid(req.param("uuid"))));
+                return ok(store.me(self));
             }
             if (m.equals("GET") && path.equals("/users/resolve")) {
                 Map<String, Object> r = store.resolve(req.param("query"));
@@ -136,31 +161,26 @@ public final class BackendServer {
                 return ok(store.search(req.param("q")));
             }
             if (m.equals("GET") && path.equals("/profile")) {
-                String viewerParam = req.param("viewer");
-                UUID viewer = (viewerParam == null || viewerParam.isBlank()) ? null : uuid(viewerParam);
-                Map<String, Object> p = store.profile(uuid(req.param("uuid")), viewer);
+                Map<String, Object> p = store.profile(uuid(req.param("uuid")), self);
                 return p == null ? NOT_FOUND : ok(p);
             }
             if (m.equals("POST") && path.equals("/profile/update")) {
-                return profileUpdate(req);
+                return profileUpdate(req, self);
+            }
+            if (m.equals("POST") && path.equals("/profile/advancement")) {
+                return profileAdvancement(req, self);
             }
             if (m.equals("GET") && path.equals("/modpacks")) {
                 return ok(store.listModpacks());
             }
             if (m.equals("POST") && path.equals("/invite/create")) {
-                return inviteCreate(req);
+                return inviteCreate(req, self);
             }
             if (m.equals("GET") && path.startsWith("/invite/")) {
-                return inviteResolve(req, path.substring("/invite/".length()));
+                return inviteResolve(path.substring("/invite/".length()), self);
             }
             if (m.equals("POST") && path.equals("/relay/ticket")) {
-                return relayTicket(req);
-            }
-            if (m.equals("GET") && path.equals("/relay/validate")) {
-                return relayValidate(req);
-            }
-            if (m.equals("GET") && path.equals("/relay/guest/validate")) {
-                return relayGuestValidate(req);
+                return relayTicket(req, self);
             }
         } catch (RuntimeException e) {
             return BAD;
@@ -168,23 +188,69 @@ public final class BackendServer {
         return NOT_FOUND;
     }
 
-    private Resp presence(Http.Request req) {
+    // auth
+    private static final Pattern USERNAME = Pattern.compile("[A-Za-z0-9_]{1,16}");
+
+    private Resp authChallenge(Http.Request req) {
         Map<String, Object> b = Json.parseObject(req.body());
-        UUID uuid = uuid((String) b.get("uuid"));
+        String username = (String) b.get("username");
+        if (username == null || !USERNAME.matcher(username).matches()) {
+            return BAD;
+        }
+        return ok(Map.of("serverId", store.newChallenge()));
+    }
+
+    private Resp authVerify(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        String username = (String) b.get("username");
+        if (username == null || !USERNAME.matcher(username).matches()) {
+            return UNAUTHORIZED;
+        }
+        Store.AuthResult r = store.authVerify(username, (String) b.get("serverId"));
+        return r == null ? UNAUTHORIZED : ok(authBody(r));
+    }
+
+    private Resp authOffline(Http.Request req) {
+        if (!store.isOfflineAllowed()) {
+            return FORBIDDEN;
+        }
+        Map<String, Object> b = Json.parseObject(req.body());
+        String username = (String) b.get("username");
+        if (username == null || !USERNAME.matcher(username).matches()) {
+            return BAD;
+        }
+        return ok(authBody(store.authOffline(username)));
+    }
+
+    private static Map<String, Object> authBody(Store.AuthResult r) {
+        return ordered("token", r.token(), "uuid", r.uuid().toString(),
+                "verified", r.verified(), "expiresIn", r.expiresInSeconds());
+    }
+
+    private static String bearer(Http.Request req) {
+        String h = req.headers().get("authorization");
+        if (h == null) {
+            return null;
+        }
+        h = h.trim();
+        return h.regionMatches(true, 0, "Bearer ", 0, 7) ? h.substring(7).trim() : null;
+    }
+
+    private Resp presence(Http.Request req, UUID uuid) {
+        Map<String, Object> b = Json.parseObject(req.body());
         boolean announceHosting = store.upsertPresence(uuid,
                 (String) b.get("username"), (String) b.get("state"), (String) b.get("worldName"),
                 (String) b.get("address"), (String) b.get("joinCode"), b.get("skin"),
-                (String) b.get("modpackId"));
+                (String) b.get("modpackId"), (String) b.get("accessMode"),
+                parseUuidSet(b.get("allowedUuids")));
 
         boolean invisible = store.isInvisible(uuid);
-        Map<String, Object> data = ordered(
-                "uuid", uuid.toString(),
-                "connectivity", invisible ? "OFFLINE" : store.connectivity(uuid),
-                "state", invisible ? null : b.get("state"),
-                "worldName", invisible ? null : b.get("worldName"),
-                "joinCode", invisible ? null : b.get("joinCode"),
-                "modpackId", (invisible || !store.currentlyPlayingVisible(uuid))
-                        ? null : store.registeredModpackOrNull((String) b.get("modpackId")));
+        String connectivity = invisible ? "OFFLINE" : store.connectivity(uuid);
+        Object state = invisible ? null : b.get("state");
+        Object worldName = invisible ? null : b.get("worldName");
+        Object modpackId = (invisible || !store.currentlyPlayingVisible(uuid))
+                ? null : store.registeredModpackOrNull((String) b.get("modpackId"));
+        Object joinCode = b.get("joinCode");
 
         Set<UUID> recipients = new LinkedHashSet<>();
         for (UUID friend : store.friendsOf(uuid)) {
@@ -192,22 +258,46 @@ public final class BackendServer {
                 recipients.add(friend);
             }
         }
-        Object presenceUpdate = Map.of("type", "PRESENCE_UPDATE", "data", data);
         for (UUID friend : recipients) {
-            hub.send(friend, presenceUpdate);
+            boolean codeVisible = !invisible && store.joinCodeVisibleTo(uuid, friend);
+            Map<String, Object> data = ordered(
+                    "uuid", uuid.toString(),
+                    "connectivity", connectivity,
+                    "state", state,
+                    "worldName", worldName,
+                    "joinCode", codeVisible ? joinCode : null,
+                    "modpackId", modpackId);
+            hub.send(friend, Map.of("type", "PRESENCE_UPDATE", "data", data));
         }
         if (announceHosting && !invisible) {
-            Object event = ordered("type", "FRIEND_STARTED_HOSTING", "uuid", uuid.toString(), "joinCode", b.get("joinCode"));
             for (UUID friend : recipients) {
-                hub.send(friend, event);
+                if (!store.joinCodeVisibleTo(uuid, friend)) {
+                    continue;
+                }
+                hub.send(friend, ordered("type", "FRIEND_STARTED_HOSTING", "uuid", uuid.toString(), "joinCode", joinCode));
             }
         }
         return OK_EMPTY;
     }
 
-    private Resp friendsAdd(Http.Request req) {
+    private static Set<UUID> parseUuidSet(Object raw) {
+        if (!(raw instanceof List<?> list)) {
+            return Set.of();
+        }
+        Set<UUID> out = new LinkedHashSet<>();
+        for (Object o : list) {
+            if (o instanceof String s && !s.isBlank()) {
+                try {
+                    out.add(UUID.fromString(s.trim()));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+        return out;
+    }
+
+    private Resp friendsAdd(Http.Request req, UUID uuid) {
         Map<String, Object> b = Json.parseObject(req.body());
-        UUID uuid = uuid((String) b.get("uuid"));
         UUID friendUuid = uuid((String) b.get("friendUuid"));
         Store.AddResult result = store.addFriendRequest(uuid, friendUuid);
         if (result == Store.AddResult.REQUESTED) {
@@ -218,9 +308,8 @@ public final class BackendServer {
         return ok(Map.of("success", result != Store.AddResult.BLOCKED));
     }
 
-    private Resp friendsRelation(Http.Request req, String action) {
+    private Resp friendsRelation(Http.Request req, UUID uuid, String action) {
         Map<String, Object> b = Json.parseObject(req.body());
-        UUID uuid = uuid((String) b.get("uuid"));
         UUID target = uuid((String) b.get("targetUuid"));
         switch (action) {
             case "mute" -> store.setMuted(uuid, target, true);
@@ -234,31 +323,41 @@ public final class BackendServer {
         return ok(Map.of("success", true));
     }
 
-    private Resp friendsRemove(Http.Request req) {
+    private Resp friendsRemove(Http.Request req, UUID uuid) {
         Map<String, Object> b = Json.parseObject(req.body());
-        store.removeFriend(uuid((String) b.get("uuid")), uuid((String) b.get("friendUuid")));
+        store.removeFriend(uuid, uuid((String) b.get("friendUuid")));
         return ok(Map.of("success", true));
     }
 
-    private Resp friendsAccept(Http.Request req) {
+    private Resp friendsAccept(Http.Request req, UUID uuid) {
         Map<String, Object> b = Json.parseObject(req.body());
-        store.acceptRequest(uuid((String) b.get("uuid")), uuid((String) b.get("friendUuid")));
+        store.acceptRequest(uuid, uuid((String) b.get("friendUuid")));
         return ok(Map.of("success", true));
     }
 
-    private Resp friendsDecline(Http.Request req) {
+    private Resp friendsDecline(Http.Request req, UUID uuid) {
         Map<String, Object> b = Json.parseObject(req.body());
-        store.declineRequest(uuid((String) b.get("uuid")), uuid((String) b.get("friendUuid")));
+        store.declineRequest(uuid, uuid((String) b.get("friendUuid")));
         return ok(Map.of("success", true));
     }
 
     private static final Set<String> PRONOUN_OPTIONS = Set.of("he/him", "she/her", "they/them");
     private static final Pattern HANDLE = Pattern.compile("[A-Za-z0-9_.]{1,30}");
     private static final Pattern OBVIOUS_DOMAIN = Pattern.compile("(?<![\\w.])[a-z0-9-]+\\.[a-z]{2,24}(?![\\w])");
+    private static final Pattern ADVANCEMENT_ID = Pattern.compile("[a-z0-9_./:-]{1,200}");
 
-    private Resp profileUpdate(Http.Request req) {
+    private Resp profileAdvancement(Http.Request req, UUID uuid) {
         Map<String, Object> b = Json.parseObject(req.body());
-        UUID uuid = uuid((String) b.get("uuid"));
+        String advId = (String) b.get("advancementId");
+        if (advId == null || !ADVANCEMENT_ID.matcher(advId = advId.trim()).matches()) {
+            return ok(Map.of("success", false));
+        }
+        store.recordAdvancement(uuid, advId);
+        return ok(Map.of("success", true));
+    }
+
+    private Resp profileUpdate(Http.Request req, UUID uuid) {
+        Map<String, Object> b = Json.parseObject(req.body());
         store.ensureUser(uuid, null);
         if (b.containsKey("bio")) {
             String bio = b.get("bio") == null ? "" : String.valueOf(b.get("bio"));
@@ -332,8 +431,8 @@ public final class BackendServer {
         if (b.get("currentlyPlayingVisible") instanceof Boolean playVis) {
             store.setModpackVisibility(uuid, "currently_playing_visible", playVis);
         }
-        if (b.get("mostPlayedVisible") instanceof Boolean mostVis) {
-            store.setModpackVisibility(uuid, "most_played_visible", mostVis);
+        if (b.get("recentlyPlayedVisible") instanceof Boolean recentVis) {
+            store.setModpackVisibility(uuid, "recently_played_visible", recentVis);
         }
         return ok(Map.of("success", true));
     }
@@ -350,9 +449,8 @@ public final class BackendServer {
         return OBVIOUS_DOMAIN.matcher(t).find();
     }
 
-    private Resp inviteCreate(Http.Request req) {
+    private Resp inviteCreate(Http.Request req, UUID hostUuid) {
         Map<String, Object> b = Json.parseObject(req.body());
-        UUID hostUuid = b.get("hostUuid") != null ? uuid((String) b.get("hostUuid")) : null;
         boolean gated = Boolean.TRUE.equals(b.get("gated"));
         String code = store.createInvite(hostUuid, (String) b.get("address"), (String) b.get("worldName"), gated);
         Store.Invite inv = store.invite(code);
@@ -360,28 +458,24 @@ public final class BackendServer {
         return ok(ordered("code", code, "address", address, "expiresIn", 3600));
     }
 
-    private Resp inviteResolve(Http.Request req, String code) {
+    private Resp inviteResolve(String code, UUID guestUuid) {
         Map<String, Object> r = store.resolveInvite(code);
         if (r == null) {
             return NOT_FOUND;
         }
-        String guest = req.param("uuid");
-        if (guest != null && !guest.isBlank()) {
-            Store.Invite invite = store.invite(code);
-            if (invite != null && invite.hostUuid() != null) {
-                UUID guestUuid = uuid(guest);
-                hub.send(invite.hostUuid(), ordered("type", "INVITE_REDEEMED",
-                        "guestUuid", guestUuid.toString(), "code", code));
-                log("invite " + code + " redeemed by " + guestUuid + " -> host " + invite.hostUuid());
-            }
+        Store.Invite invite = store.invite(code);
+        if (invite != null && invite.hostUuid() != null) {
+            hub.send(invite.hostUuid(), ordered("type", "INVITE_REDEEMED",
+                    "guestUuid", guestUuid.toString(), "code", code));
+            log("invite " + code + " redeemed by " + guestUuid + " -> host " + invite.hostUuid());
         }
         return ok(r);
     }
 
-    private Resp relayTicket(Http.Request req) {
+    private Resp relayTicket(Http.Request req, UUID uuid) {
         Map<String, Object> b = Json.parseObject(req.body());
         boolean gated = Boolean.TRUE.equals(b.get("gated"));
-        Object[] minted = store.mintTicketToken(uuid((String) b.get("uuid")), gated);
+        Object[] minted = store.mintTicketToken(uuid, gated);
         String token = (String) minted[0];
         Store.Ticket ticket = (Store.Ticket) minted[1];
         log("relay ticket issued for " + ticket.uuid() + " -> " + ticket.domain() + (gated ? " (gated)" : ""));
@@ -419,9 +513,12 @@ public final class BackendServer {
             while ((message = ws.readText()) != null) {
                 Map<String, Object> m = Json.parseObject(message);
                 if ("AUTH".equals(m.get("type"))) {
-                    UUID uuid = uuid((String) m.get("uuid"));
-                    hub.register(uuid, ws);
-                    log("ws auth " + uuid);
+                    Store.Session session = store.validateSession((String) m.get("token"));
+                    if (session == null) {
+                        break;
+                    }
+                    hub.register(session.uuid(), ws);
+                    log("ws auth " + session.uuid());
                 }
             }
         } catch (IOException | RuntimeException e) {

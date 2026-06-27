@@ -62,7 +62,7 @@ public final class DefaultInviteService implements InviteService, PresenceManage
             mintIfNeeded(snapshot);
         } else if (activeCode != null) {
             activeCode = null;
-            presence.setJoinCode(null);
+            presence.setJoinCode(null, null, java.util.Set.of());
         }
     }
 
@@ -80,7 +80,7 @@ public final class DefaultInviteService implements InviteService, PresenceManage
             minting.set(false);
             if (invite != null && presence.current().state() == GameplayState.HOSTING) {
                 activeCode = invite.code();
-                presence.setJoinCode(invite.code());
+                presence.setJoinCode(invite.code(), HostAccessControl.mode(), HostAccessControl.allowedSnapshot());
                 LOGGER.info("LAN+ invite created: {}", invite.code());
             }
         });

@@ -33,9 +33,11 @@ public interface LanPlusNetwork {
     CompletableFuture<Profile> getProfile(UUID uuid, UUID viewer);
     CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
                                             Map<String, String> prompts, Boolean invisible,
-                                            String favoriteModpackId, Boolean favoriteVisible,
-                                            Boolean currentlyPlayingVisible);
+                                            Boolean favoriteVisible, Boolean currentlyPlayingVisible,
+                                            Boolean recentlyPlayedVisible);
+    CompletableFuture<String> setFavoriteModpack(UUID uuid, String modpackId);
     CompletableFuture<List<ModpackRef>> getModpacks();
+    CompletableFuture<Void> reportAdvancement(UUID uuid, String advancementId);
     CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated);
     CompletableFuture<Invite> resolveInvite(String code);
     CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);

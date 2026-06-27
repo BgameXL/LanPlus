@@ -63,6 +63,10 @@ public final class HostAccessControl {
         return mode;
     }
 
+    public static Set<UUID> allowedSnapshot() {
+        return active ? Set.copyOf(allowed) : Set.of();
+    }
+
     /** Whether {@code uuid} may join the currently hosted world. */
     public static boolean isAllowed(UUID uuid) {
         if (!active || mode == HostAccessMode.EVERYONE) {

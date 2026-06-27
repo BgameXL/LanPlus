@@ -10,15 +10,22 @@ final class BackendConfig {
     final int relayPort;
     final int heartbeatTtlMs;
     final String dataFile;
+    final String sessionServerUrl;
+    final boolean allowOffline;
+    final long sessionTtlMs;
 
     private BackendConfig(InetSocketAddress bind, String baseDomain, String relayHost, int relayPort,
-                          int heartbeatTtlMs, String dataFile) {
+                          int heartbeatTtlMs, String dataFile, String sessionServerUrl, boolean allowOffline,
+                          long sessionTtlMs) {
         this.bind = bind;
         this.baseDomain = baseDomain;
         this.relayHost = relayHost;
         this.relayPort = relayPort;
         this.heartbeatTtlMs = heartbeatTtlMs;
         this.dataFile = dataFile;
+        this.sessionServerUrl = sessionServerUrl;
+        this.allowOffline = allowOffline;
+        this.sessionTtlMs = sessionTtlMs;
     }
 
     static BackendConfig fromEnv() {
@@ -28,7 +35,10 @@ final class BackendConfig {
                 env("LANPLUS_BACKEND_RELAY_HOST", "relay.lanplus.dev"),
                 intEnv("LANPLUS_BACKEND_RELAY_PORT", 8443),
                 intEnv("LANPLUS_BACKEND_HEARTBEAT_TTL_SECONDS", 45) * 1000,
-                env("LANPLUS_BACKEND_DATA_FILE", "lanplus.db"));
+                env("LANPLUS_BACKEND_DATA_FILE", "lanplus.db"),
+                stripTrailingSlash(env("LANPLUS_BACKEND_SESSION_SERVER", "https://sessionserver.mojang.com")),
+                bool("LANPLUS_BACKEND_ALLOW_OFFLINE", true),
+                (long) intEnv("LANPLUS_BACKEND_SESSION_TTL_SECONDS", 30 * 24 * 3600) * 1000);
     }
 
     private static InetSocketAddress addr(String s) {
@@ -52,5 +62,17 @@ final class BackendConfig {
         } catch (NumberFormatException e) {
             return def;
         }
+    }
+
+    private static boolean bool(String key, boolean def) {
+        String v = System.getenv(key);
+        return v == null || v.isBlank() ? def : v.equalsIgnoreCase("true") || v.equals("1");
+    }
+
+    private static String stripTrailingSlash(String s) {
+        while (s.endsWith("/")) {
+            s = s.substring(0, s.length() - 1);
+        }
+        return s;
     }
 }

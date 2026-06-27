@@ -10,6 +10,7 @@ import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinType;
 import dev.bgame.lanplus.api.UserProfile;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -35,6 +36,8 @@ final class Wire {
             String address,
             String joinCode,
             String modpackId,
+            String accessMode,
+            List<String> allowedUuids,
             Skin skin,
             long timestamp
     ) {}
@@ -48,7 +51,8 @@ final class Wire {
             String joinCode,
             Skin skin,
             boolean muted,
-            boolean blocked
+            boolean blocked,
+            int tier
     ) {
         dev.bgame.lanplus.api.Friend toApi() {
             return new dev.bgame.lanplus.api.Friend(
@@ -60,7 +64,8 @@ final class Wire {
                     joinCode,
                     skin == null ? null : skin.toApi(),
                     muted,
-                    blocked);
+                    blocked,
+                    tier);
         }
     }
 
@@ -99,9 +104,11 @@ final class Wire {
     record ProfileDto(String uuid, String username, String friendCode, String pronouns, String bio,
                       Map<String, String> links, Map<String, String> prompts,
                       boolean online, Long lastSeen, Boolean invisible, ModpackDto currentlyPlaying,
-                      ModpackDto favorite, SettingsDto settings) {
+                      ModpackDto lastPlayed, ModpackDto favorite, ModpackDto recentlyPlayed,
+                      SettingsDto settings, ProgressionDto progression) {
         Profile toApi() {
             SettingsDto s = settings == null ? new SettingsDto(true, true, true) : settings;
+            ProgressionDto p = progression == null ? new ProgressionDto(0, 0, null, null) : progression;
             return new Profile(UUID.fromString(uuid), username, friendCode, pronouns, bio,
                     links == null ? Map.of() : links,
                     prompts == null ? Map.of() : prompts,
@@ -109,12 +116,20 @@ final class Wire {
                     lastSeen == null ? 0L : lastSeen,
                     Boolean.TRUE.equals(invisible),
                     currentlyPlaying == null ? null : currentlyPlaying.toApi(),
+                    lastPlayed == null ? null : lastPlayed.toApi(),
                     favorite == null ? null : favorite.toApi(),
+                    recentlyPlayed == null ? null : recentlyPlayed.toApi(),
                     !Boolean.FALSE.equals(s.favoriteVisible()),
                     !Boolean.FALSE.equals(s.currentlyPlayingVisible()),
-                    !Boolean.FALSE.equals(s.mostPlayedVisible()));
+                    !Boolean.FALSE.equals(s.recentlyPlayedVisible()),
+                    p.tier() == null ? 0 : p.tier(),
+                    p.advancements() == null ? 0 : p.advancements(),
+                    p.xp() == null ? -1 : p.xp(),
+                    p.sources() == null ? Map.of() : p.sources());
         }
     }
+
+    record ProgressionDto(Integer tier, Integer advancements, Integer xp, Map<String, Integer> sources) {}
 
     record ModpackDto(String modpackId, String name, String downloadUrl) {
         ModpackRef toApi() {
@@ -122,12 +137,20 @@ final class Wire {
         }
     }
 
-    record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean mostPlayedVisible) {}
+    record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {}
 
     record ProfileUpdate(String uuid, String bio, String pronouns, Map<String, String> links,
                          Map<String, String> prompts, Boolean invisible,
-                         String favoriteModpackId, Boolean favoriteVisible,
-                         Boolean currentlyPlayingVisible) {}
+                         Boolean favoriteVisible,
+                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {}
+
+    record FavoriteUpdate(String uuid, String favoriteModpackId) {}
 
     record UpdateResult(boolean success, String error) {}
+
+    record AdvancementReport(String uuid, String advancementId) {}
+
+    record ChallengeResponse(String serverId) {}
+
+    record AuthResponse(String token, String uuid, boolean verified, long expiresIn) {}
 }

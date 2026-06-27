@@ -2,6 +2,7 @@ package dev.bgame.lanplus.presence;
 
 import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.api.GameplayState;
+import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.network.LanPlusNetwork;
@@ -9,6 +10,8 @@ import org.slf4j.Logger;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -27,7 +30,7 @@ public final class DefaultPresenceManager implements PresenceManager {
     private final List<PresenceListener> listeners = new CopyOnWriteArrayList<>();
 
     private volatile PresenceSnapshot snapshot =
-            new PresenceSnapshot(GameplayState.MENU, null, null, null, null, null);
+            new PresenceSnapshot(GameplayState.MENU, null, null, null, null, null, null, Set.of());
 
     public DefaultPresenceManager(LanPlusNetwork network) {
         this.network = network;
@@ -41,22 +44,26 @@ public final class DefaultPresenceManager implements PresenceManager {
     @Override
     public synchronized void updateState(GameplayState state, String worldName, String address) {
         Objects.requireNonNull(state, "state");
-        apply(new PresenceSnapshot(state, worldName, address, snapshot.joinCode(), snapshot.skin(), snapshot.modpackId()));
+        apply(new PresenceSnapshot(state, worldName, address, snapshot.joinCode(), snapshot.skin(),
+                snapshot.modpackId(), snapshot.accessMode(), snapshot.allowedUuids()));
     }
 
     @Override
-    public synchronized void setJoinCode(String joinCode) {
-        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), joinCode, snapshot.skin(), snapshot.modpackId()));
+    public synchronized void setJoinCode(String joinCode, HostAccessMode accessMode, Set<UUID> allowedUuids) {
+        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), joinCode,
+                snapshot.skin(), snapshot.modpackId(), accessMode, allowedUuids));
     }
 
     @Override
     public synchronized void updateSkin(SkinRef skin) {
-        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(), skin, snapshot.modpackId()));
+        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(),
+                skin, snapshot.modpackId(), snapshot.accessMode(), snapshot.allowedUuids()));
     }
 
     @Override
     public synchronized void updateModpack(String modpackId) {
-        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(), snapshot.skin(), modpackId));
+        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(),
+                snapshot.skin(), modpackId, snapshot.accessMode(), snapshot.allowedUuids()));
     }
 
     @Override

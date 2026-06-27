@@ -12,7 +12,8 @@ public record Friend(
         String joinCode,
         SkinRef skin,
         boolean muted,
-        boolean blocked
+        boolean blocked,
+        int tier
 ) {
     public Friend {
         Objects.requireNonNull(uuid, "uuid");

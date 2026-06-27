@@ -34,18 +34,36 @@ public final class DefaultProfilesService implements ProfilesService {
     @Override
     public CompletableFuture<String> save(String bio, String pronouns, Map<String, String> links,
                                           Map<String, String> prompts, boolean invisible,
-                                          String favoriteModpackId, boolean favoriteVisible,
-                                          boolean currentlyPlayingVisible) {
+                                          boolean favoriteVisible, boolean currentlyPlayingVisible,
+                                          boolean recentlyPlayedVisible) {
         PlayerIdentity id = identity.get();
         if (id == null) {
             return CompletableFuture.completedFuture("offline");
         }
         return network.updateProfile(id.uuid(), bio, pronouns, links, prompts, invisible,
-                favoriteModpackId, favoriteVisible, currentlyPlayingVisible);
+                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible);
+    }
+
+    @Override
+    public CompletableFuture<String> setFavoriteModpack(String modpackId) {
+        PlayerIdentity id = identity.get();
+        if (id == null) {
+            return CompletableFuture.completedFuture("offline");
+        }
+        return network.setFavoriteModpack(id.uuid(), modpackId);
     }
 
     @Override
     public CompletableFuture<List<ModpackRef>> modpacks() {
         return network.getModpacks();
+    }
+
+    @Override
+    public CompletableFuture<Void> reportAdvancement(String advancementId) {
+        PlayerIdentity id = identity.get();
+        if (id == null || advancementId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return network.reportAdvancement(id.uuid(), advancementId);
     }
 }

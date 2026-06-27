@@ -53,7 +53,8 @@ public final class LanPlusClient {
         if (presence != null) {
             return;
         }
-        network = new HttpLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity);
+        network = new HttpLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity,
+                new ClientMinecraftAuth());
         presence = new DefaultPresenceManager(network);
         friends = new DefaultFriendsService(network, LanPlusClient::localIdentity);
         profiles = new DefaultProfilesService(network, LanPlusClient::localIdentity);

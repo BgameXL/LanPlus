@@ -12,26 +12,25 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.server.IntegratedServer;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.util.GsonHelper;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.loading.FMLPaths;
 
-import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = Lanplus.MODID, value = Dist.CLIENT)
 public final class ClientPresenceDetector {
 
-    private static final ResourceLocation MODPACK_IDENTITY = new ResourceLocation("lanplus_identity", "modpack.json");
+    private static final String MODPACK_CONFIG_FILE = "lanplus-modpack.json";
 
     private static int tickCounter = 0;
     private static GameplayState lastState = null;
@@ -88,20 +87,17 @@ public final class ClientPresenceDetector {
         if (modpackCached) {
             return cachedModpack;
         }
-        cachedModpack = readModpackId(mc.getSingleplayerServer());
+        cachedModpack = readModpackId();
         modpackCached = true;
         return cachedModpack;
     }
 
-    private static String readModpackId(IntegratedServer server) {
-        if (server == null) {
+    private static String readModpackId() {
+        Path file = FMLPaths.CONFIGDIR.get().resolve(MODPACK_CONFIG_FILE);
+        if (!Files.isRegularFile(file)) {
             return null;
         }
-        Optional<Resource> resource = server.getResourceManager().getResource(MODPACK_IDENTITY);
-        if (resource.isEmpty()) {
-            return null;
-        }
-        try (Reader reader = new InputStreamReader(resource.get().open(), StandardCharsets.UTF_8)) {
+        try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             JsonObject obj = GsonHelper.parse(reader);
             String id = GsonHelper.getAsString(obj, "modpackId", null);
             return id == null || id.isBlank() ? null : id.trim();

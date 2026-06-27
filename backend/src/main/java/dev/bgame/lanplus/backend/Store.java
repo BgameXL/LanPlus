@@ -1,5 +1,12 @@
 package dev.bgame.lanplus.backend;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -7,6 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -59,25 +67,33 @@ final class Store {
         volatile String address;
         volatile String joinCode;
         volatile Object skin;
-        volatile String modpackId;   // raw self-declared id; resolved against modpack_registry at read time
+        volatile String modpackId;
+        volatile String accessMode;
+        volatile Set<UUID> allowedUuids = Set.of();
         volatile long lastHeartbeat;
         volatile boolean hosting;
         volatile boolean hostingAnnounced;
-        volatile boolean onlinePersisted;   // wrote presence_state.online=1 for the current session
-        volatile boolean disconnectRecorded; // wrote presence_state.online=0 + last_disconnect_at for this gap
+        volatile boolean onlinePersisted;
+        volatile boolean disconnectRecorded;
     }
 
     record Ticket(UUID uuid, String domain, boolean requireToken, long expiresAt) {}
-
     record Invite(UUID hostUuid, String address, String worldName, long expiresAt) {}
-
     record GuestToken(String hostDomain, long expiresAt) {}
-
-    /** Outcome of a friend-add: became friends, a request was queued, or it was refused (self/blocked). */
+    record Session(UUID uuid, boolean verified) {}
+    record AuthResult(String token, UUID uuid, boolean verified, long expiresInSeconds) {}
     enum AddResult { ACCEPTED, REQUESTED, BLOCKED }
+
+    private static final long CHALLENGE_TTL_MS = 60_000;
 
     private final long ttlMs;
     private final String baseDomain;
+    private final String sessionServerUrl;
+    private final boolean allowOffline;
+    private final long sessionTtlMs;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
 
     private final Object lock = new Object();
     private final Connection connection;
@@ -86,10 +102,15 @@ final class Store {
     private final Map<String, Invite> invites = new ConcurrentHashMap<>();
     private final Map<String, Ticket> tickets = new ConcurrentHashMap<>();
     private final Map<String, GuestToken> guestTokens = new ConcurrentHashMap<>();
+    private final Map<String, Long> challenges = new ConcurrentHashMap<>(); // serverId -> expiresAt
 
-    Store(long ttlMs, String baseDomain, String dataFile) {
+    Store(long ttlMs, String baseDomain, String dataFile,
+          String sessionServerUrl, boolean allowOffline, long sessionTtlMs) {
         this.ttlMs = ttlMs;
         this.baseDomain = baseDomain;
+        this.sessionServerUrl = sessionServerUrl;
+        this.allowOffline = allowOffline;
+        this.sessionTtlMs = sessionTtlMs;
         String path = (dataFile == null || dataFile.isBlank()) ? ":memory:" : dataFile;
         this.connection = openDb(path);
     }
@@ -113,7 +134,6 @@ final class Store {
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS relationships ("
                         + "uuid TEXT NOT NULL, target TEXT NOT NULL, muted INTEGER NOT NULL DEFAULT 0, "
                         + "blocked INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (uuid, target))");
-                // profiles (opt-in social identity; see docs/dev/PROFILES_DESIGN.md)
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_bio ("
                         + "uuid TEXT PRIMARY KEY, text TEXT NOT NULL DEFAULT '', updated_at INTEGER NOT NULL)");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_identity ("
@@ -123,37 +143,46 @@ final class Store {
                         + "twitch TEXT, tiktok TEXT, paypal TEXT, kofi TEXT)");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_privacy ("
                         + "uuid TEXT PRIMARY KEY, invisible_mode INTEGER NOT NULL DEFAULT 0)");
-                // profile_prompts: answers to the predefined "Questions about yourself" (<=3 per player).
-                // EAV (narrow) so the prompt catalog can grow without schema migration; answer holds the
-                // free text or the choice token. See PROFILES_DESIGN.md § Questions about yourself.
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_prompts ("
                         + "uuid TEXT NOT NULL, prompt_id TEXT NOT NULL, answer TEXT NOT NULL, "
                         + "updated_at INTEGER NOT NULL, PRIMARY KEY (uuid, prompt_id))");
-                // modpack_registry: the only source of modpack metadata. modpack_id is assigned by the LAN+
-                // author at registration (curated, no public write endpoint); the pack's datapack only
-                // self-declares this id. Unregistered ids are ignored. See PROFILES_DESIGN.md § Modpack.
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS modpack_registry ("
                         + "modpack_id TEXT PRIMARY KEY, name TEXT NOT NULL, icon_url TEXT, author TEXT, "
                         + "team TEXT, download_url TEXT, description TEXT)");
-                // profile_settings: manual favorite modpack + per-signal visibility toggles. most_played
-                // is derived from playtime in a later iteration; its toggle column exists now (default on)
-                // but is not surfaced yet. currently_playing_visible is subordinate to invisible_mode (the
-                // master switch). See PROFILES_DESIGN.md § Modpack.
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_settings ("
                         + "uuid TEXT PRIMARY KEY, favorite_modpack_id TEXT, "
                         + "favorite_modpack_visible INTEGER NOT NULL DEFAULT 1, "
-                        + "most_played_visible INTEGER NOT NULL DEFAULT 1, "
+                        + "recently_played_visible INTEGER NOT NULL DEFAULT 1, "
                         + "currently_playing_visible INTEGER NOT NULL DEFAULT 1, "
                         + "updated_at INTEGER NOT NULL)");
-                // presence_state: persisted last online->offline transition + best-effort online mirror
-                // (the authoritative live state stays in-memory, derived from heartbeat TTL).
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS presence_state ("
                         + "uuid TEXT PRIMARY KEY, online INTEGER NOT NULL DEFAULT 0, last_disconnect_at INTEGER)");
-                // migrate: drop the now-unused users.last_seen (superseded by presence_state.last_disconnect_at)
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS xp_events ("
+                        + "id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL, source TEXT NOT NULL, "
+                        + "amount INTEGER NOT NULL, detail TEXT, created_at INTEGER NOT NULL)");
+                st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_xp_events_uuid ON xp_events(uuid)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS advancements ("
+                        + "uuid TEXT NOT NULL, advancement_id TEXT NOT NULL, earned_at INTEGER NOT NULL, "
+                        + "PRIMARY KEY (uuid, advancement_id))");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS advancement_xp_window ("
+                        + "uuid TEXT NOT NULL, window_start INTEGER NOT NULL, count INTEGER NOT NULL DEFAULT 0, "
+                        + "PRIMARY KEY (uuid, window_start))");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS playtime ("
+                        + "uuid TEXT NOT NULL, modpack_id TEXT NOT NULL, seconds INTEGER NOT NULL DEFAULT 0, "
+                        + "updated_at INTEGER NOT NULL, PRIMARY KEY (uuid, modpack_id))");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS social_time ("
+                        + "uuid TEXT PRIMARY KEY, seconds INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS sessions ("
+                        + "token_hash TEXT PRIMARY KEY, uuid TEXT NOT NULL, verified INTEGER NOT NULL DEFAULT 0, "
+                        + "created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)");
+                st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_sessions_uuid ON sessions(uuid)");
                 if (columnExists(st, "users", "last_seen")) {
                     st.executeUpdate("ALTER TABLE users DROP COLUMN last_seen");
                 }
-                // a fresh process has no live connections yet — reset the persisted online mirror
+                if (columnExists(st, "profile_settings", "most_played_visible")) {
+                    st.executeUpdate("ALTER TABLE profile_settings "
+                            + "RENAME COLUMN most_played_visible TO recently_played_visible");
+                }
                 st.executeUpdate("UPDATE presence_state SET online=0");
             }
             return c;
@@ -274,22 +303,43 @@ final class Store {
 
     // presence (in-memory: ephemeral, derived connectivity)
     boolean upsertPresence(UUID uuid, String username, String state, String worldName,
-                           String address, String joinCode, Object skin, String modpackId) {
+                           String address, String joinCode, Object skin, String modpackId,
+                           String accessMode, Set<UUID> allowedUuids) {
         ensureUser(uuid, username);
         Presence p = presences.computeIfAbsent(uuid, k -> new Presence());
+        long now = System.currentTimeMillis();
+        long prevHeartbeat = p.lastHeartbeat;
+        String prevModpackId = p.modpackId;
+        boolean wasOnline = p.onlinePersisted;
         p.state = state;
         p.worldName = worldName;
         p.address = address;
         p.joinCode = joinCode;
         p.skin = skin;
         p.modpackId = modpackId;
-        p.lastHeartbeat = System.currentTimeMillis();
+        p.accessMode = accessMode;
+        p.allowedUuids = allowedUuids == null ? Set.of() : allowedUuids;
+        p.lastHeartbeat = now;
         p.hosting = "HOSTING".equals(state);
         if (!p.onlinePersisted) {
-            // offline -> online edge (first heartbeat of a session, or a reconnect after a recorded gap)
             p.onlinePersisted = true;
             p.disconnectRecorded = false;
             markOnline(uuid);
+        }
+        if (wasOnline && prevHeartbeat > 0) {
+            long delta = now - prevHeartbeat;
+            if (delta > 0 && delta <= 2 * ttlMs) {
+                long elapsedSeconds = Math.round(delta / 1000.0);
+                if (prevModpackId != null) {
+                    addPlaytime(uuid, prevModpackId, elapsedSeconds);
+                }
+                if (anyFriendOnline(uuid)) {
+                    addSocialTime(uuid, elapsedSeconds);
+                }
+            }
+        }
+        if (modpackId != null && !modpackId.isBlank() && !modpackId.equals(prevModpackId)) {
+            setLastModpack(uuid, modpackId);
         }
         if (!p.hosting) {
             p.hostingAnnounced = false;
@@ -326,6 +376,14 @@ final class Store {
         return null;
     }
 
+    boolean joinCodeVisibleTo(UUID host, UUID viewer) {
+        Presence p = presences.get(host);
+        if (p == null || !"INVITED".equals(p.accessMode)) {
+            return true;
+        }
+        return viewer != null && p.allowedUuids.contains(viewer);
+    }
+
     private static boolean isLive(String connectivity) {
         return "ONLINE".equals(connectivity) || "STALE".equals(connectivity);
     }
@@ -357,7 +415,7 @@ final class Store {
         }
     }
 
-    // profile privacy (invisible mode) — see PROFILES_DESIGN.md § Modo invisible
+    // profile privacy
     boolean isInvisible(UUID uuid) {
         synchronized (lock) {
             return invisibleLocked(uuid);
@@ -516,6 +574,7 @@ final class Store {
     List<Object> friendList(UUID uuid) {
         Map<UUID, String> names = new LinkedHashMap<>();
         Map<UUID, int[]> rel = new HashMap<>();
+        Map<UUID, Integer> tiers = new HashMap<>();
         Set<UUID> invisible = new HashSet<>();
         String s = uuid.toString();
         synchronized (lock) {
@@ -532,6 +591,9 @@ final class Store {
                             names.put(UUID.fromString(rs.getString(1)), rs.getString(2));
                         }
                     }
+                }
+                for (UUID fid : names.keySet()) {
+                    tiers.put(fid, tierFor(totalXpLocked(fid)));
                 }
                 try (PreparedStatement ps = connection.prepareStatement(
                         "SELECT target, muted, blocked FROM relationships WHERE uuid=?")) {
@@ -562,8 +624,6 @@ final class Store {
             boolean blocked = r != null && r[1] == 1;
             boolean suppress = muted || blocked;
             boolean hidden = invisible.contains(fid);
-            // an invisible friend appears offline to everyone (presence broadcast is masked too); the
-            // invite code stays the real key, so this never blocks an actual join — see PROFILES_DESIGN.md.
             String conn = suppress ? "UNKNOWN" : (hidden ? "OFFLINE" : connectivity(fid));
             boolean live = !hidden && ("ONLINE".equals(conn) || "STALE".equals(conn));
             Presence p = presences.get(fid);
@@ -573,10 +633,11 @@ final class Store {
             m.put("connectivity", conn);
             m.put("state", live && p != null ? p.state : null);
             m.put("worldName", live && p != null ? p.worldName : null);
-            m.put("joinCode", (suppress || hidden) ? null : hostingJoinCode(fid));
+            m.put("joinCode", (suppress || hidden || !joinCodeVisibleTo(fid, uuid)) ? null : hostingJoinCode(fid));
             m.put("skin", p == null ? null : p.skin);
             m.put("muted", muted);
             m.put("blocked", blocked);
+            m.put("tier", tiers.getOrDefault(fid, 0));
             out.add(m);
         }
         return out;
@@ -721,9 +782,8 @@ final class Store {
     private static final String[] LINK_PLATFORMS =
             {"discord", "instagram", "twitter", "youtube", "twitch", "tiktok", "paypal", "kofi"};
 
-    // Whitelisted profile_settings toggle columns — guards the dynamic column name in setModpackVisibility.
     private static final Set<String> VISIBILITY_COLUMNS = Set.of(
-            "favorite_modpack_visible", "currently_playing_visible", "most_played_visible");
+            "favorite_modpack_visible", "currently_playing_visible", "recently_played_visible");
 
     boolean isLinkPlatform(String platform) {
         for (String p : LINK_PLATFORMS) {
@@ -734,8 +794,6 @@ final class Store {
         return false;
     }
 
-    // Whitelist of valid "Questions about yourself" prompt IDs. Mirror of the client catalog
-    // (client.gui.ProfilePromptCatalog); the backend only needs the IDs to reject junk keys, not the
     static final int MAX_PROMPTS = 3;
     private static final String[] PROMPT_IDS =
             {"delete_block", "first_night", "build_first", "useless_item",
@@ -748,6 +806,142 @@ final class Store {
             }
         }
         return false;
+    }
+
+    // progression
+    private static final long[] TIER_THRESHOLDS = {150, 450, 1000, 2000};
+    private static final int XP_PER_ADVANCEMENT = 1;
+    private static final long XP_WINDOW_MS = 5 * 60 * 1000L;
+    private static final int XP_WINDOW_MAX = 10;
+    private static final long SECONDS_PER_PLAYTIME_XP = 600;
+    private static final long SECONDS_PER_SOCIAL_XP = 300;
+
+    static int tierFor(long xp) {
+        int tier = 0;
+        for (long threshold : TIER_THRESHOLDS) {
+            if (xp >= threshold) {
+                tier++;
+            }
+        }
+        return tier;
+    }
+
+    boolean recordAdvancement(UUID uuid, String advancementId) {
+        synchronized (lock) {
+            try {
+                long now = System.currentTimeMillis();
+                int changed;
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "INSERT OR IGNORE INTO advancements (uuid, advancement_id, earned_at) VALUES (?,?,?)")) {
+                    ps.setString(1, uuid.toString());
+                    ps.setString(2, advancementId);
+                    ps.setLong(3, now);
+                    changed = ps.executeUpdate();
+                }
+                if (changed == 0) {
+                    return false;
+                }
+                long windowStart = now - (now % XP_WINDOW_MS);
+                int count;
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "SELECT count FROM advancement_xp_window WHERE uuid=? AND window_start=?")) {
+                    ps.setString(1, uuid.toString());
+                    ps.setLong(2, windowStart);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        count = rs.next() ? rs.getInt(1) : 0;
+                    }
+                }
+                if (count >= XP_WINDOW_MAX) {
+                    return false;
+                }
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "INSERT INTO advancement_xp_window (uuid, window_start, count) VALUES (?,?,1) "
+                                + "ON CONFLICT(uuid, window_start) DO UPDATE SET count=count+1")) {
+                    ps.setString(1, uuid.toString());
+                    ps.setLong(2, windowStart);
+                    ps.executeUpdate();
+                }
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "INSERT INTO xp_events (uuid, source, amount, detail, created_at) VALUES (?,?,?,?,?)")) {
+                    ps.setString(1, uuid.toString());
+                    ps.setString(2, "advancement");
+                    ps.setInt(3, XP_PER_ADVANCEMENT);
+                    ps.setString(4, advancementId);
+                    ps.setLong(5, now);
+                    ps.executeUpdate();
+                }
+                return true;
+            } catch (SQLException e) {
+                throw fail("recordAdvancement", e);
+            }
+        }
+    }
+
+    private void creditCumulativeXpLocked(UUID uuid, String source, long totalUnits, long unitsPerXp, long now)
+            throws SQLException {
+        long target = totalUnits / unitsPerXp;
+        if (target <= 0) {
+            return;
+        }
+        long awarded;
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT COALESCE(SUM(amount), 0) FROM xp_events WHERE uuid=? AND source=?")) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, source);
+            try (ResultSet rs = ps.executeQuery()) {
+                awarded = rs.next() ? rs.getLong(1) : 0;
+            }
+        }
+        long delta = target - awarded;
+        if (delta <= 0) {
+            return;
+        }
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO xp_events (uuid, source, amount, detail, created_at) VALUES (?,?,?,?,?)")) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, source);
+            ps.setLong(3, delta);
+            ps.setString(4, null);
+            ps.setLong(5, now);
+            ps.executeUpdate();
+        }
+    }
+
+    private long totalXpLocked(UUID uuid) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT COALESCE(SUM(amount), 0) FROM xp_events WHERE uuid=?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
+        }
+    }
+
+    private int advancementCountLocked(UUID uuid) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT COUNT(*) FROM advancements WHERE uuid=?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    private Map<String, Object> xpBySourceLocked(UUID uuid) throws SQLException {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("advancement", 0);
+        m.put("playtime", 0);
+        m.put("social", 0);
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT source, COALESCE(SUM(amount), 0) FROM xp_events WHERE uuid=? GROUP BY source")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    m.put(rs.getString(1), rs.getInt(2));
+                }
+            }
+        }
+        return m;
     }
 
     Map<String, Object> profile(UUID uuid, UUID viewer) {
@@ -803,17 +997,17 @@ final class Store {
                 String favoriteId = null;
                 boolean favoriteVisible = true;
                 boolean currentlyPlayingVisible = true;
-                boolean mostPlayedVisible = true;
+                boolean recentlyPlayedVisible = true;
                 try (PreparedStatement ps = connection.prepareStatement(
                         "SELECT favorite_modpack_id, favorite_modpack_visible, currently_playing_visible, "
-                                + "most_played_visible FROM profile_settings WHERE uuid=?")) {
+                                + "recently_played_visible FROM profile_settings WHERE uuid=?")) {
                     ps.setString(1, uuid.toString());
                     try (ResultSet rs = ps.executeQuery()) {
                         if (rs.next()) {
                             favoriteId = rs.getString(1);
                             favoriteVisible = rs.getInt(2) != 0;
                             currentlyPlayingVisible = rs.getInt(3) != 0;
-                            mostPlayedVisible = rs.getInt(4) != 0;
+                            recentlyPlayedVisible = rs.getInt(4) != 0;
                         }
                     }
                 }
@@ -822,15 +1016,28 @@ final class Store {
                 String mp = pres == null ? null : pres.modpackId;
                 boolean showPlaying = live && (self || (!invisible && currentlyPlayingVisible));
                 m.put("currentlyPlaying", showPlaying ? resolveModpackLocked(mp) : null);
+                boolean showLastPlayed = self || (!invisible && currentlyPlayingVisible);
+                m.put("lastPlayed", showLastPlayed ? resolveModpackLocked(lastModpackLocked(uuid)) : null);
                 m.put("favorite", (self || favoriteVisible) ? resolveModpackLocked(favoriteId) : null);
+                m.put("recentlyPlayed", (self || recentlyPlayedVisible) ? recentlyPlayedLocked(uuid) : null);
 
                 if (self) {
                     Map<String, Object> settings = new LinkedHashMap<>();
                     settings.put("favoriteVisible", favoriteVisible);
                     settings.put("currentlyPlayingVisible", currentlyPlayingVisible);
-                    settings.put("mostPlayedVisible", mostPlayedVisible);
+                    settings.put("recentlyPlayedVisible", recentlyPlayedVisible);
                     m.put("settings", settings);
                 }
+
+                long xp = totalXpLocked(uuid);
+                Map<String, Object> progression = new LinkedHashMap<>();
+                progression.put("tier", tierFor(xp));
+                progression.put("advancements", advancementCountLocked(uuid));
+                if (self) {
+                    progression.put("xp", xp);
+                    progression.put("sources", xpBySourceLocked(uuid));
+                }
+                m.put("progression", progression);
                 return m;
             } catch (SQLException e) {
                 throw fail("profile", e);
@@ -870,6 +1077,124 @@ final class Store {
                 m.put("modpackId", modpackId);
                 m.put("name", rs.getString(1));
                 m.put("downloadUrl", rs.getString(2));
+                return m;
+            }
+        }
+    }
+
+    void addPlaytime(UUID uuid, String modpackId, long seconds) {
+        if (modpackId == null || modpackId.isBlank() || seconds <= 0) {
+            return;
+        }
+        synchronized (lock) {
+            try {
+                long now = System.currentTimeMillis();
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "INSERT INTO playtime (uuid, modpack_id, seconds, updated_at) "
+                                + "SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM modpack_registry WHERE modpack_id=?) "
+                                + "ON CONFLICT(uuid, modpack_id) DO UPDATE SET "
+                                + "seconds=seconds+excluded.seconds, updated_at=excluded.updated_at")) {
+                    ps.setString(1, uuid.toString());
+                    ps.setString(2, modpackId);
+                    ps.setLong(3, seconds);
+                    ps.setLong(4, now);
+                    ps.setString(5, modpackId);
+                    ps.executeUpdate();
+                }
+                long totalPlay = scalarLongLocked(
+                        "SELECT COALESCE(SUM(seconds), 0) FROM playtime WHERE uuid=?", uuid);
+                creditCumulativeXpLocked(uuid, "playtime", totalPlay, SECONDS_PER_PLAYTIME_XP, now);
+            } catch (SQLException e) {
+                throw fail("addPlaytime", e);
+            }
+        }
+    }
+
+    void setLastModpack(UUID uuid, String modpackId) {
+        if (modpackId == null || modpackId.isBlank()) {
+            return;
+        }
+        String value = modpackId.length() > 100 ? modpackId.substring(0, 100) : modpackId;
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "UPDATE users SET last_modpack=? WHERE uuid=?")) {
+                ps.setString(1, value);
+                ps.setString(2, uuid.toString());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("setLastModpack", e);
+            }
+        }
+    }
+
+    void addSocialTime(UUID uuid, long seconds) {
+        if (seconds <= 0) {
+            return;
+        }
+        synchronized (lock) {
+            try {
+                long now = System.currentTimeMillis();
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "INSERT INTO social_time (uuid, seconds, updated_at) VALUES (?,?,?) "
+                                + "ON CONFLICT(uuid) DO UPDATE SET "
+                                + "seconds=seconds+excluded.seconds, updated_at=excluded.updated_at")) {
+                    ps.setString(1, uuid.toString());
+                    ps.setLong(2, seconds);
+                    ps.setLong(3, now);
+                    ps.executeUpdate();
+                }
+                long totalSocial = scalarLongLocked(
+                        "SELECT COALESCE(seconds, 0) FROM social_time WHERE uuid=?", uuid);
+                creditCumulativeXpLocked(uuid, "social", totalSocial, SECONDS_PER_SOCIAL_XP, now);
+            } catch (SQLException e) {
+                throw fail("addSocialTime", e);
+            }
+        }
+    }
+
+    private String lastModpackLocked(UUID uuid) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT last_modpack FROM users WHERE uuid=?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString(1) : null;
+            }
+        }
+    }
+
+    private long scalarLongLocked(String sql, UUID uuid) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
+        }
+    }
+
+    private boolean anyFriendOnline(UUID uuid) {
+        for (UUID fid : friendsOf(uuid)) {
+            String c = connectivity(fid);
+            if ("ONLINE".equals(c) || "STALE".equals(c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Map<String, Object> recentlyPlayedLocked(UUID uuid) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT r.modpack_id, r.name, r.download_url FROM playtime p "
+                        + "JOIN modpack_registry r ON r.modpack_id = p.modpack_id "
+                        + "WHERE p.uuid=? ORDER BY p.updated_at DESC LIMIT 1")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("modpackId", rs.getString(1));
+                m.put("name", rs.getString(2));
+                m.put("downloadUrl", rs.getString(3));
                 return m;
             }
         }
@@ -1008,8 +1333,7 @@ final class Store {
         }
     }
 
-    // Replace the player's whole set of prompt answers (not a patch). Blank/null answers are dropped, so
-    // the resulting set is exactly the non-empty entries passed in. See PROFILES_DESIGN.md.
+    // Replace the player's whole set of prompt answers (not a patch). Blank/null answers are dropped.
     void setPrompts(UUID uuid, Map<String, String> answers) {
         synchronized (lock) {
             try (PreparedStatement del = connection.prepareStatement(
@@ -1101,19 +1425,156 @@ final class Store {
         return t;
     }
 
+    // auth / sessions
+    boolean isOfflineAllowed() {
+        return allowOffline;
+    }
+
+    String newChallenge() {
+        String serverId = randomHex(20);
+        challenges.put(serverId, System.currentTimeMillis() + CHALLENGE_TTL_MS);
+        return serverId;
+    }
+
+    AuthResult authVerify(String username, String serverId) {
+        if (serverId == null || serverId.isBlank()) {
+            return null;
+        }
+        Long expiry = challenges.remove(serverId);
+        if (expiry == null || System.currentTimeMillis() > expiry) {
+            return null;
+        }
+        UUID uuid = mojangHasJoined(username, serverId);
+        if (uuid == null) {
+            return null;
+        }
+        ensureUser(uuid, username);
+        return issueSession(uuid, true);
+    }
+
+    AuthResult authOffline(String username) {
+        UUID uuid = offlineUuid(username);
+        ensureUser(uuid, username);
+        return issueSession(uuid, false);
+    }
+
+    static UUID offlineUuid(String username) {
+        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(StandardCharsets.UTF_8));
+    }
+
+    Session validateSession(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        String hash = sha256Hex(token);
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT uuid, verified, expires_at FROM sessions WHERE token_hash=?")) {
+                ps.setString(1, hash);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next() || System.currentTimeMillis() > rs.getLong(3)) {
+                        return null;
+                    }
+                    return new Session(UUID.fromString(rs.getString(1)), rs.getInt(2) != 0);
+                }
+            } catch (SQLException e) {
+                throw fail("validateSession", e);
+            }
+        }
+    }
+
+    private AuthResult issueSession(UUID uuid, boolean verified) {
+        String token = randomHex(32);
+        long now = System.currentTimeMillis();
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO sessions (token_hash, uuid, verified, created_at, expires_at) VALUES (?,?,?,?,?)")) {
+                ps.setString(1, sha256Hex(token));
+                ps.setString(2, uuid.toString());
+                ps.setInt(3, verified ? 1 : 0);
+                ps.setLong(4, now);
+                ps.setLong(5, now + sessionTtlMs);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("issueSession", e);
+            }
+        }
+        return new AuthResult(token, uuid, verified, sessionTtlMs / 1000);
+    }
+
+    private UUID mojangHasJoined(String username, String serverId) {
+        if (username == null || username.isBlank()) {
+            return null;
+        }
+        try {
+            String url = sessionServerUrl + "/session/minecraft/hasJoined?username="
+                    + URLEncoder.encode(username, StandardCharsets.UTF_8)
+                    + "&serverId=" + URLEncoder.encode(serverId, StandardCharsets.UTF_8);
+            HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(Duration.ofSeconds(5))
+                    .GET()
+                    .build();
+            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() != 200) {
+                return null;
+            }
+            Object id = Json.parseObject(resp.body()).get("id");
+            return id instanceof String s ? uuidFromUndashed(s) : null;
+        } catch (Exception e) {
+            BackendServer.log("hasJoined check failed: " + e);
+            return null;
+        }
+    }
+
+    private static UUID uuidFromUndashed(String s) {
+        if (s == null || s.length() != 32) {
+            return null;
+        }
+        try {
+            return UUID.fromString(s.substring(0, 8) + "-" + s.substring(8, 12) + "-" + s.substring(12, 16)
+                    + "-" + s.substring(16, 20) + "-" + s.substring(20, 32));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static String sha256Hex(String s) {
+        try {
+            byte[] d = MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(d.length * 2);
+            for (byte b : d) {
+                sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     void sweep() {
         long now = System.currentTimeMillis();
         invites.entrySet().removeIf(e -> now > e.getValue().expiresAt());
         tickets.entrySet().removeIf(e -> now > e.getValue().expiresAt());
         guestTokens.entrySet().removeIf(e -> now > e.getValue().expiresAt());
-        // online -> offline edge: a presence past 2*TTL is OFFLINE; record the transition once,
-        // stamping last_disconnect_at with the real last heartbeat (not "now").
+        challenges.entrySet().removeIf(e -> now > e.getValue());
+        sweepSessions(now);
         for (Map.Entry<UUID, Presence> e : presences.entrySet()) {
             Presence p = e.getValue();
             if (!p.disconnectRecorded && now - p.lastHeartbeat > 2 * ttlMs) {
                 p.disconnectRecorded = true;
                 p.onlinePersisted = false;
                 markOffline(e.getKey(), p.lastHeartbeat);
+            }
+        }
+    }
+
+    private void sweepSessions(long now) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement("DELETE FROM sessions WHERE expires_at < ?")) {
+                ps.setLong(1, now);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                BackendServer.log("SQLite error (sweepSessions): " + e.getMessage());
             }
         }
     }

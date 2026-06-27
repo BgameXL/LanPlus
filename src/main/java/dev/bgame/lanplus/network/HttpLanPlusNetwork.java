@@ -33,11 +33,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 public final class HttpLanPlusNetwork implements LanPlusNetwork {
@@ -51,8 +53,13 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
 
     private final Supplier<String> baseUrl;
     private final Supplier<PlayerIdentity> identity;
+    private final MinecraftAuth auth;
     private final HttpClient http;
     private final ScheduledExecutorService scheduler;
+    private final ExecutorService authExecutor;
+
+    private final AtomicReference<String> bearer = new AtomicReference<>();
+    private final AtomicReference<CompletableFuture<String>> authInFlight = new AtomicReference<>();
 
     private volatile boolean reachable = false;
     private volatile WebSocket webSocket;
@@ -65,14 +72,20 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     private final AtomicBoolean reconnectPending = new AtomicBoolean(false);
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
 
-    public HttpLanPlusNetwork(Supplier<String> baseUrl, Supplier<PlayerIdentity> identity) {
+    public HttpLanPlusNetwork(Supplier<String> baseUrl, Supplier<PlayerIdentity> identity, MinecraftAuth auth) {
         this.baseUrl = baseUrl;
         this.identity = identity;
+        this.auth = auth;
         this.http = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
                 .build();
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread thread = new Thread(r, "lanplus-ws-reconnect");
+            thread.setDaemon(true);
+            return thread;
+        });
+        this.authExecutor = Executors.newSingleThreadExecutor(r -> {
+            Thread thread = new Thread(r, "lanplus-auth");
             thread.setDaemon(true);
             return thread;
         });
@@ -92,6 +105,8 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 snapshot.address(),
                 snapshot.joinCode(),
                 snapshot.modpackId(),
+                snapshot.accessMode() == null ? null : snapshot.accessMode().name(),
+                snapshot.allowedUuids().stream().map(UUID::toString).toList(),
                 Wire.Skin.from(snapshot.skin()),
                 System.currentTimeMillis());
         return post("/presence", body)
@@ -270,25 +285,41 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     @Override
     public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
                                                    Map<String, String> prompts, Boolean invisible,
-                                                   String favoriteModpackId, Boolean favoriteVisible,
-                                                   Boolean currentlyPlayingVisible) {
+                                                   Boolean favoriteVisible, Boolean currentlyPlayingVisible,
+                                                   Boolean recentlyPlayedVisible) {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture("offline");
         }
         Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links, prompts, invisible,
-                favoriteModpackId, favoriteVisible, currentlyPlayingVisible);
+                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible);
         return postNulls("/profile/update", body)
-                .thenApply(resp -> {
-                    Wire.UpdateResult r = GSON.fromJson(resp.body(), Wire.UpdateResult.class);
-                    if (r != null && r.success()) {
-                        return (String) null;
-                    }
-                    return r != null && r.error() != null ? r.error() : "error";
-                })
+                .thenApply(this::parseUpdateResult)
                 .exceptionally(err -> {
                     onError(err);
                     return "offline";
                 });
+    }
+
+    @Override
+    public CompletableFuture<String> setFavoriteModpack(UUID uuid, String modpackId) {
+        if (!configured() || uuid == null) {
+            return CompletableFuture.completedFuture("offline");
+        }
+        String value = (modpackId == null || modpackId.isBlank()) ? null : modpackId;
+        return postNulls("/profile/update", new Wire.FavoriteUpdate(uuid.toString(), value))
+                .thenApply(this::parseUpdateResult)
+                .exceptionally(err -> {
+                    onError(err);
+                    return "offline";
+                });
+    }
+
+    private String parseUpdateResult(HttpResponse<String> resp) {
+        Wire.UpdateResult r = GSON.fromJson(resp.body(), Wire.UpdateResult.class);
+        if (r != null && r.success()) {
+            return null;
+        }
+        return r != null && r.error() != null ? r.error() : "error";
     }
 
     @Override
@@ -314,6 +345,16 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                     onError(err);
                     return List.of();
                 });
+    }
+
+    @Override
+    public CompletableFuture<Void> reportAdvancement(UUID uuid, String advancementId) {
+        if (!configured() || uuid == null || advancementId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return post("/profile/advancement", new Wire.AdvancementReport(uuid.toString(), advancementId))
+                .thenAccept(resp -> { })
+                .exceptionally(this::onErrorVoid);
     }
 
     @Override
@@ -416,35 +457,124 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     private CompletableFuture<HttpResponse<String>> get(String path) {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(base() + path))
+        return authorizedSend(HttpRequest.newBuilder(URI.create(base() + path))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Accept", "application/json")
-                .GET()
-                .build();
-        return send(req);
+                .GET());
     }
 
     private CompletableFuture<HttpResponse<String>> post(String path, Object body) {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(base() + path))
+        return authorizedSend(HttpRequest.newBuilder(URI.create(base() + path))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(body), StandardCharsets.UTF_8))
-                .build();
-        return send(req);
+                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(body), StandardCharsets.UTF_8)));
     }
 
     private CompletableFuture<HttpResponse<String>> postNulls(String path, Object body) {
+        return authorizedSend(HttpRequest.newBuilder(URI.create(base() + path))
+                .timeout(REQUEST_TIMEOUT)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(GSON_NULLS.toJson(body), StandardCharsets.UTF_8)));
+    }
+
+    private CompletableFuture<HttpResponse<String>> authorizedSend(HttpRequest.Builder builder) {
+        return ensureAuth().thenCompose(token -> dispatch(builder, token).thenCompose(resp -> {
+            if (resp.statusCode() == 401) {
+                bearer.set(null);
+                return ensureAuth().thenCompose(t2 -> dispatch(builder, t2));
+            }
+            return CompletableFuture.completedFuture(resp);
+        }));
+    }
+
+    private CompletableFuture<HttpResponse<String>> dispatch(HttpRequest.Builder builder, String token) {
+        HttpRequest req = builder.copy().header("Authorization", "Bearer " + token).build();
+        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                .whenComplete((resp, err) -> reachable = err == null && resp != null);
+    }
+
+    private CompletableFuture<String> ensureAuth() {
+        String t = bearer.get();
+        if (t != null) {
+            return CompletableFuture.completedFuture(t);
+        }
+        CompletableFuture<String> existing = authInFlight.get();
+        if (existing != null) {
+            return existing;
+        }
+        CompletableFuture<String> fresh = new CompletableFuture<>();
+        if (!authInFlight.compareAndSet(null, fresh)) {
+            return authInFlight.get();
+        }
+        authExecutor.execute(() -> {
+            try {
+                String token = authenticate();
+                bearer.set(token);
+                fresh.complete(token);
+            } catch (Exception e) {
+                LOGGER.debug("LAN+ authentication failed (local-only): {}", e.toString());
+                fresh.completeExceptionally(e);
+            } finally {
+                authInFlight.set(null);
+            }
+        });
+        return fresh;
+    }
+
+    private String authenticate() throws Exception {
+        String username = auth == null ? null : auth.username();
+        if (username == null || username.isBlank()) {
+            throw new IllegalStateException("no Minecraft user");
+        }
+        if (auth.isPremium()) {
+            try {
+                return authenticatePremium(username);
+            } catch (Exception e) {
+                LOGGER.warn("LAN+ premium auth failed, falling back to offline: {}", e.toString());
+            }
+        }
+        return authenticateOffline(username);
+    }
+
+    private String authenticatePremium(String username) throws Exception {
+        String challenge = postSync("/auth/challenge", GSON.toJson(Map.of("username", username)));
+        Wire.ChallengeResponse c = GSON.fromJson(challenge, Wire.ChallengeResponse.class);
+        if (c == null || c.serverId() == null || c.serverId().isBlank()) {
+            throw new IllegalStateException("no serverId in challenge");
+        }
+        auth.joinServer(c.serverId());
+        String body = postSync("/auth/verify",
+                GSON.toJson(Map.of("username", username, "serverId", c.serverId())));
+        Wire.AuthResponse r = GSON.fromJson(body, Wire.AuthResponse.class);
+        if (r == null || r.token() == null) {
+            throw new IllegalStateException("verify rejected");
+        }
+        LOGGER.info("LAN+ authenticated (premium) as {}", username);
+        return r.token();
+    }
+
+    private String authenticateOffline(String username) throws Exception {
+        Wire.AuthResponse r = GSON.fromJson(
+                postSync("/auth/offline", GSON.toJson(Map.of("username", username))), Wire.AuthResponse.class);
+        if (r == null || r.token() == null) {
+            throw new IllegalStateException("offline auth rejected");
+        }
+        LOGGER.info("LAN+ authenticated (offline) as {}", username);
+        return r.token();
+    }
+
+    private String postSync(String path, String json) throws Exception {
         HttpRequest req = HttpRequest.newBuilder(URI.create(base() + path))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(GSON_NULLS.toJson(body), StandardCharsets.UTF_8))
+                .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8))
                 .build();
-        return send(req);
-    }
-
-    private CompletableFuture<HttpResponse<String>> send(HttpRequest req) {
-        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-                .whenComplete((resp, err) -> reachable = err == null && resp != null);
+        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() != 200) {
+            throw new IllegalStateException("auth " + path + " -> " + resp.statusCode());
+        }
+        reachable = true;
+        return resp.body();
     }
 
     private void onError(Throwable err) {
@@ -457,7 +587,6 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         return null;
     }
 
-    /** Opens the realtime WebSocket. Single-flight (no overlapping attempts) and re-entrant-safe. */
     private void openSocket() {
         if (!eventsEnabled || !configured() || webSocket != null) {
             return;
@@ -465,23 +594,29 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!connecting.compareAndSet(false, true)) {
             return;
         }
-        URI uri = URI.create(toWebSocketUrl(base()) + "/events");
-        http.newWebSocketBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .buildAsync(uri, new EventSocketListener(eventsUuid, eventsListener))
-                .whenComplete((ws, err) -> {
-                    connecting.set(false);
-                    if (err != null) {
-                        LOGGER.warn("LAN+ WebSocket connect failed: {}", err.toString());
-                        scheduleReconnect();
-                    } else {
-                        this.webSocket = ws;
-                        reconnectAttempts.set(0);
-                    }
-                });
+        ensureAuth().whenComplete((token, authErr) -> {
+            if (authErr != null || token == null) {
+                connecting.set(false);
+                scheduleReconnect();
+                return;
+            }
+            URI uri = URI.create(toWebSocketUrl(base()) + "/events");
+            http.newWebSocketBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .buildAsync(uri, new EventSocketListener(token, eventsListener))
+                    .whenComplete((ws, err) -> {
+                        connecting.set(false);
+                        if (err != null) {
+                            LOGGER.warn("LAN+ WebSocket connect failed: {}", err.toString());
+                            scheduleReconnect();
+                        } else {
+                            this.webSocket = ws;
+                            reconnectAttempts.set(0);
+                        }
+                    });
+        });
     }
 
-    /** Schedules a single backoff reconnect, unless one is already pending or reconnection is disabled. */
     private void scheduleReconnect() {
         if (!eventsEnabled || !configured()) {
             return;
@@ -497,7 +632,6 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         }, delay, TimeUnit.MILLISECONDS);
     }
 
-    /** Exponential backoff (2s, 4s, 8s … capped at 60s) with ±20% jitter to avoid thundering herds. */
     private static long backoffMillis(int attempt) {
         long delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS << Math.min(attempt, 5));
         return (long) (delay * (0.8 + Math.random() * 0.4));
@@ -515,19 +649,19 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
 
     private final class EventSocketListener implements WebSocket.Listener {
 
-        private final UUID uuid;
+        private final String token;
         private final BackendEventListener listener;
         private final StringBuilder buffer = new StringBuilder();
 
-        EventSocketListener(UUID uuid, BackendEventListener listener) {
-            this.uuid = uuid;
+        EventSocketListener(String token, BackendEventListener listener) {
+            this.token = token;
             this.listener = listener;
         }
 
         @Override
         public void onOpen(WebSocket webSocket) {
             reachable = true;
-            webSocket.sendText(GSON.toJson(Map.of("type", "AUTH", "uuid", uuid.toString())), true);
+            webSocket.sendText(GSON.toJson(Map.of("type", "AUTH", "token", token)), true);
             webSocket.request(1);
             listener.onConnected();
         }
