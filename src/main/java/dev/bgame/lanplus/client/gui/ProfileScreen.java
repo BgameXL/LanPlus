@@ -1223,7 +1223,15 @@ public final class ProfileScreen extends Screen {
     }
 
     private Component friendStatus(Friend f) {
-        if (f.connectivity() == Connectivity.OFFLINE) {
+        if (f.blocked()) {
+            return Component.translatable("gui.lanplus.rel.blocked");
+        }
+        if (f.muted()) {
+            return Component.translatable("gui.lanplus.rel.muted");
+        }
+        if (!isLive(f)) {
+            // only ONLINE/STALE are "live"; OFFLINE and UNKNOWN (no presence record) both read as offline,
+            // matching the "X/Y online" count which uses the same isLive() gate.
             return Component.translatable("gui.lanplus.state.offline");
         }
         GameplayState state = f.state();

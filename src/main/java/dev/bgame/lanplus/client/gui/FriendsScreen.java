@@ -699,7 +699,8 @@ public final class FriendsScreen extends Screen {
         if (f.muted()) {
             return Component.translatable("gui.lanplus.rel.muted");
         }
-        if (f.connectivity() == Connectivity.OFFLINE) {
+        if (f.connectivity() != Connectivity.ONLINE && f.connectivity() != Connectivity.STALE) {
+            // OFFLINE and UNKNOWN (no presence record) both read as offline; only ONLINE/STALE are live.
             return Component.translatable("gui.lanplus.state.offline");
         }
         GameplayState state = f.state();
