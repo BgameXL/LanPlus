@@ -154,6 +154,7 @@ final class Store {
                         + "favorite_modpack_visible INTEGER NOT NULL DEFAULT 1, "
                         + "recently_played_visible INTEGER NOT NULL DEFAULT 1, "
                         + "currently_playing_visible INTEGER NOT NULL DEFAULT 1, "
+                        + "bg_style TEXT, bg_color INTEGER, bg_opacity INTEGER, "
                         + "updated_at INTEGER NOT NULL)");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS presence_state ("
                         + "uuid TEXT PRIMARY KEY, online INTEGER NOT NULL DEFAULT 0, last_disconnect_at INTEGER)");
@@ -182,6 +183,11 @@ final class Store {
                 if (columnExists(st, "profile_settings", "most_played_visible")) {
                     st.executeUpdate("ALTER TABLE profile_settings "
                             + "RENAME COLUMN most_played_visible TO recently_played_visible");
+                }
+                if (!columnExists(st, "profile_settings", "bg_style")) {
+                    st.executeUpdate("ALTER TABLE profile_settings ADD COLUMN bg_style TEXT");
+                    st.executeUpdate("ALTER TABLE profile_settings ADD COLUMN bg_color INTEGER");
+                    st.executeUpdate("ALTER TABLE profile_settings ADD COLUMN bg_opacity INTEGER");
                 }
                 st.executeUpdate("UPDATE presence_state SET online=0");
             }
@@ -785,6 +791,15 @@ final class Store {
     private static final Set<String> VISIBILITY_COLUMNS = Set.of(
             "favorite_modpack_visible", "currently_playing_visible", "recently_played_visible");
 
+    private static final Set<String> BACKGROUND_STYLES = Set.of("DARK", "SOLID", "MINECRAFT");
+    static final String DEFAULT_BG_STYLE = "DARK";
+    static final int DEFAULT_BG_COLOR = 0x0A0C10;
+    static final int DEFAULT_BG_OPACITY = 92;
+
+    boolean isBackgroundStyle(String style) {
+        return style != null && BACKGROUND_STYLES.contains(style);
+    }
+
     boolean isLinkPlatform(String platform) {
         for (String p : LINK_PLATFORMS) {
             if (p.equals(platform)) {
@@ -998,9 +1013,13 @@ final class Store {
                 boolean favoriteVisible = true;
                 boolean currentlyPlayingVisible = true;
                 boolean recentlyPlayedVisible = true;
+                String bgStyle = DEFAULT_BG_STYLE;
+                int bgColor = DEFAULT_BG_COLOR;
+                int bgOpacity = DEFAULT_BG_OPACITY;
                 try (PreparedStatement ps = connection.prepareStatement(
                         "SELECT favorite_modpack_id, favorite_modpack_visible, currently_playing_visible, "
-                                + "recently_played_visible FROM profile_settings WHERE uuid=?")) {
+                                + "recently_played_visible, bg_style, bg_color, bg_opacity "
+                                + "FROM profile_settings WHERE uuid=?")) {
                     ps.setString(1, uuid.toString());
                     try (ResultSet rs = ps.executeQuery()) {
                         if (rs.next()) {
@@ -1008,6 +1027,18 @@ final class Store {
                             favoriteVisible = rs.getInt(2) != 0;
                             currentlyPlayingVisible = rs.getInt(3) != 0;
                             recentlyPlayedVisible = rs.getInt(4) != 0;
+                            String style = rs.getString(5);
+                            if (isBackgroundStyle(style)) {
+                                bgStyle = style;
+                            }
+                            int color = rs.getInt(6);
+                            if (!rs.wasNull()) {
+                                bgColor = color & 0xFFFFFF;
+                            }
+                            int opacity = rs.getInt(7);
+                            if (!rs.wasNull()) {
+                                bgOpacity = Math.max(0, Math.min(100, opacity));
+                            }
                         }
                     }
                 }
@@ -1020,6 +1051,12 @@ final class Store {
                 m.put("lastPlayed", showLastPlayed ? resolveModpackLocked(lastModpackLocked(uuid)) : null);
                 m.put("favorite", (self || favoriteVisible) ? resolveModpackLocked(favoriteId) : null);
                 m.put("recentlyPlayed", (self || recentlyPlayedVisible) ? recentlyPlayedLocked(uuid) : null);
+
+                Map<String, Object> background = new LinkedHashMap<>();
+                background.put("style", bgStyle);
+                background.put("color", bgColor);
+                background.put("opacity", bgOpacity);
+                m.put("background", background);
 
                 if (self) {
                     Map<String, Object> settings = new LinkedHashMap<>();
@@ -1268,6 +1305,29 @@ final class Store {
                 }
             } catch (SQLException e) {
                 throw fail("setModpackVisibility", e);
+            }
+        }
+    }
+
+    void setBackground(UUID uuid, String style, int color, int opacity) {
+        String s = isBackgroundStyle(style) ? style : DEFAULT_BG_STYLE;
+        int c = color & 0xFFFFFF;
+        int o = Math.max(0, Math.min(100, opacity));
+        synchronized (lock) {
+            try {
+                ensureSettingsRowLocked(uuid);
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "UPDATE profile_settings SET bg_style=?, bg_color=?, bg_opacity=?, updated_at=? "
+                                + "WHERE uuid=?")) {
+                    ps.setString(1, s);
+                    ps.setInt(2, c);
+                    ps.setInt(3, o);
+                    ps.setLong(4, System.currentTimeMillis());
+                    ps.setString(5, uuid.toString());
+                    ps.executeUpdate();
+                }
+            } catch (SQLException e) {
+                throw fail("setBackground", e);
             }
         }
     }

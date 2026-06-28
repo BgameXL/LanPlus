@@ -25,13 +25,15 @@ public record Profile(
         int tier,
         int advancements,
         int xp,
-        Map<String, Integer> xpSources
+        Map<String, Integer> xpSources,
+        ProfileBackground background
 ) {
     public Profile {
         Objects.requireNonNull(uuid, "uuid");
         links = links == null ? Map.of() : Map.copyOf(links);
         prompts = prompts == null ? Map.of() : Map.copyOf(prompts);
         xpSources = xpSources == null ? Map.of() : Map.copyOf(xpSources);
+        background = background == null ? ProfileBackground.DEFAULT : background;
     }
 
     public String link(String platform) {

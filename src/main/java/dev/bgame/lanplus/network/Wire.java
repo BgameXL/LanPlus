@@ -4,6 +4,7 @@ import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.Profile;
+import dev.bgame.lanplus.api.ProfileBackground;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.SkinRef;
@@ -105,7 +106,7 @@ final class Wire {
                       Map<String, String> links, Map<String, String> prompts,
                       boolean online, Long lastSeen, Boolean invisible, ModpackDto currentlyPlaying,
                       ModpackDto lastPlayed, ModpackDto favorite, ModpackDto recentlyPlayed,
-                      SettingsDto settings, ProgressionDto progression) {
+                      BackgroundDto background, SettingsDto settings, ProgressionDto progression) {
         Profile toApi() {
             SettingsDto s = settings == null ? new SettingsDto(true, true, true) : settings;
             ProgressionDto p = progression == null ? new ProgressionDto(0, 0, null, null) : progression;
@@ -125,7 +126,8 @@ final class Wire {
                     p.tier() == null ? 0 : p.tier(),
                     p.advancements() == null ? 0 : p.advancements(),
                     p.xp() == null ? -1 : p.xp(),
-                    p.sources() == null ? Map.of() : p.sources());
+                    p.sources() == null ? Map.of() : p.sources(),
+                    background == null ? ProfileBackground.DEFAULT : background.toApi());
         }
     }
 
@@ -136,6 +138,17 @@ final class Wire {
             return new ModpackRef(modpackId, name, downloadUrl);
         }
     }
+
+    record BackgroundDto(String style, Integer color, Integer opacity) {
+        ProfileBackground toApi() {
+            return new ProfileBackground(
+                    style,
+                    color == null ? ProfileBackground.DEFAULT.color() : color,
+                    opacity == null ? ProfileBackground.DEFAULT.opacity() : opacity);
+        }
+    }
+
+    record BackgroundUpdate(String uuid, BackgroundDto background) {}
 
     record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {}
 

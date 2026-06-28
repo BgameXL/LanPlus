@@ -54,6 +54,15 @@ public final class DefaultProfilesService implements ProfilesService {
     }
 
     @Override
+    public CompletableFuture<String> setBackground(String style, int color, int opacity) {
+        PlayerIdentity id = identity.get();
+        if (id == null) {
+            return CompletableFuture.completedFuture("offline");
+        }
+        return network.setBackground(id.uuid(), style, color, opacity);
+    }
+
+    @Override
     public CompletableFuture<List<ModpackRef>> modpacks() {
         return network.getModpacks();
     }

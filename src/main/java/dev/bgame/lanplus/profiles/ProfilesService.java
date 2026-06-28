@@ -19,6 +19,8 @@ public interface ProfilesService {
 
     CompletableFuture<String> setFavoriteModpack(String modpackId);
 
+    CompletableFuture<String> setBackground(String style, int color, int opacity);
+
     CompletableFuture<List<ModpackRef>> modpacks();
 
     CompletableFuture<Void> reportAdvancement(String advancementId);

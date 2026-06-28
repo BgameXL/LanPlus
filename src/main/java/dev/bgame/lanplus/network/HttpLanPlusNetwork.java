@@ -314,6 +314,20 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 });
     }
 
+    @Override
+    public CompletableFuture<String> setBackground(UUID uuid, String style, int color, int opacity) {
+        if (!configured() || uuid == null) {
+            return CompletableFuture.completedFuture("offline");
+        }
+        Wire.BackgroundDto bg = new Wire.BackgroundDto(style, color, opacity);
+        return postNulls("/profile/update", new Wire.BackgroundUpdate(uuid.toString(), bg))
+                .thenApply(this::parseUpdateResult)
+                .exceptionally(err -> {
+                    onError(err);
+                    return "offline";
+                });
+    }
+
     private String parseUpdateResult(HttpResponse<String> resp) {
         Wire.UpdateResult r = GSON.fromJson(resp.body(), Wire.UpdateResult.class);
         if (r != null && r.success()) {

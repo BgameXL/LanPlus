@@ -5,6 +5,7 @@ import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.Profile;
+import dev.bgame.lanplus.api.ProfileBackground;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
 import dev.bgame.lanplus.client.gui.ProfilePromptCatalog.Prompt;
@@ -18,6 +19,7 @@ import com.mojang.math.Axis;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
@@ -75,9 +77,12 @@ public final class ProfileScreen extends Screen {
     private static final int BG_DARK = 0;
     private static final int BG_SOLID = 1;
     private static final int BG_MINECRAFT = 2;
+    private static final int[] BG_PALETTE =
+            {0x5865F2, 0x1E1F22, 0x2B2D31, 0x3BA55D, 0xE74C3C, 0x9B59B6, 0xF1A33C, 0x0A0C10};
     private int bgStyle = BG_DARK;
     private int bgColor = 0x0A0C10;
     private int bgOpacity = 92;
+    private boolean bgDirty;
 
     private final Screen parent;
     private final UUID uuid;
@@ -106,6 +111,8 @@ public final class ProfileScreen extends Screen {
     private EditBox bioBox;
     private Button pronounButton;
     private Button invisibleButton;
+    private Button bgStyleButton;
+    private Button bgColorButton;
     private int pronounIndex;
     private boolean invisibleToggle;
 
@@ -121,7 +128,7 @@ public final class ProfileScreen extends Screen {
 
     private int eL, eW, eR;
     private int aAboutHdrY, aBioY, aIdentityY, aLinksHdrY, aLinksRowsY, aAddLinkY,
-            aQHdrY, aQRowsY, aMpHdrY, aMpRowY;
+            aQHdrY, aQRowsY, aMpHdrY, aMpRowY, aBgHdrY, aBgRowY;
 
     // edit: question slots
     private final String[] slotPromptId = new String[MAX_SLOTS];
@@ -177,6 +184,7 @@ public final class ProfileScreen extends Screen {
                 + 12 + 16 + n * 24 + (addRow ? 20 : 0)
                 + 12 + 16 + MAX_SLOTS * 24
                 + 12 + 16 + 18
+                + 12 + 16 + 20
                 + 8;
     }
 
@@ -204,7 +212,9 @@ public final class ProfileScreen extends Screen {
         aQHdrY = y;           y += 16;
         aQRowsY = y;          y += MAX_SLOTS * 24 + 12;
         aMpHdrY = y;          y += 16;
-        aMpRowY = y;
+        aMpRowY = y;          y += 18 + 12;
+        aBgHdrY = y;          y += 16;
+        aBgRowY = y;
     }
 
     @Override
@@ -265,6 +275,69 @@ public final class ProfileScreen extends Screen {
 
         buildLinkWidgets();
         buildSlotWidgets();
+        buildBackgroundWidgets();
+    }
+
+    private void buildBackgroundWidgets() {
+        int w = (eW - 12) / 3;
+        bgStyleButton = Button.builder(bgStyleLabel(), b -> cycleBgStyle())
+                .bounds(eL, aBgRowY, w, 20).build();
+        addRenderableWidget(bgStyleButton);
+
+        bgColorButton = Button.builder(Component.translatable("gui.lanplus.profile.bg.color"), b -> cycleBgColor())
+                .bounds(eL + w + 6, aBgRowY, w, 20).build();
+        bgColorButton.active = bgStyle == BG_SOLID;
+        addRenderableWidget(bgColorButton);
+
+        BgOpacitySlider slider = new BgOpacitySlider(eL + 2 * w + 12, aBgRowY, eW - 2 * w - 12, 20);
+        slider.active = bgStyle != BG_MINECRAFT;
+        addRenderableWidget(slider);
+    }
+
+    private void cycleBgStyle() {
+        bgStyle = (bgStyle + 1) % 3;
+        persistBackground();
+        rebuildWidgets();
+    }
+
+    private void cycleBgColor() {
+        int current = bgColor & 0xFFFFFF;
+        int idx = -1;
+        for (int i = 0; i < BG_PALETTE.length; i++) {
+            if (BG_PALETTE[i] == current) {
+                idx = i;
+                break;
+            }
+        }
+        bgColor = BG_PALETTE[(idx + 1) % BG_PALETTE.length];
+        persistBackground();
+    }
+
+    private Component bgStyleLabel() {
+        String key = switch (bgStyle) {
+            case BG_SOLID -> "gui.lanplus.profile.bg.solid";
+            case BG_MINECRAFT -> "gui.lanplus.profile.bg.minecraft";
+            default -> "gui.lanplus.profile.bg.dark";
+        };
+        return Component.translatable("gui.lanplus.profile.bg.style", Component.translatable(key));
+    }
+
+    private final class BgOpacitySlider extends AbstractSliderButton {
+        BgOpacitySlider(int x, int y, int w, int h) {
+            super(x, y, w, h, Component.empty(), bgOpacity / 100.0);
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(Component.translatable("gui.lanplus.profile.bg.opacity", (int) Math.round(value * 100)));
+        }
+
+        @Override
+        protected void applyValue() {
+            bgOpacity = (int) Math.round(value * 100);
+            bgDirty = true;
+        }
     }
 
     private void buildLinkWidgets() {
@@ -549,6 +622,7 @@ public final class ProfileScreen extends Screen {
         editHeader(g, Component.translatable("gui.lanplus.profile.links"), aLinksHdrY);
         editHeader(g, Component.translatable("gui.lanplus.profile.questions"), aQHdrY);
         editHeader(g, Component.translatable("gui.lanplus.profile.modpack"), aMpHdrY);
+        editHeader(g, Component.translatable("gui.lanplus.profile.bg.header"), aBgHdrY);
 
         int gap = 6;
         int chipW = (eW - 2 * gap) / 3;
@@ -955,7 +1029,16 @@ public final class ProfileScreen extends Screen {
             g.fill(sx, sy, sx + 2, sy + slotH, BLURPLE);
             g.drawString(this.font, Component.translatable("gui.lanplus.profile.cosmetics." + COSMETIC_SLOTS[i]),
                     sx + 7, sy + 5, 0xFFE0E3E8);
-            g.drawString(this.font, soon, sx + 7, sy + 15, FAINT);
+            Component sub = soon;
+            if (COSMETIC_SLOTS[i].equals("background")) {
+                String styleKey = switch (bgStyle) {
+                    case BG_SOLID -> "gui.lanplus.profile.bg.solid";
+                    case BG_MINECRAFT -> "gui.lanplus.profile.bg.minecraft";
+                    default -> "gui.lanplus.profile.bg.dark";
+                };
+                sub = Component.translatable(styleKey);
+            }
+            g.drawString(this.font, sub, sx + 7, sy + 15, FAINT);
         }
         int slotsH = COSMETIC_SLOTS.length * (slotH + slotGap) - slotGap;
         return y + Math.max(renderH, slotsH);
@@ -1053,7 +1136,12 @@ public final class ProfileScreen extends Screen {
             draggingModel = false;
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        boolean handled = super.mouseReleased(mouseX, mouseY, button);
+        if (button == 0 && bgDirty) {
+            bgDirty = false;
+            persistBackground();
+        }
+        return handled;
     }
 
     private boolean inCmBox(double mx, double my) {
@@ -1129,11 +1217,42 @@ public final class ProfileScreen extends Screen {
         }
         svc.get(uuid).whenComplete((p, ex) -> this.minecraft.execute(() -> {
             this.profile = p;
+            if (p != null) {
+                applyBackground(p.background());
+            }
             this.loaded = true;
             if (this.minecraft.screen == this) {
                 rebuildWidgets();
             }
         }));
+    }
+
+    private void applyBackground(ProfileBackground bg) {
+        if (bg == null) {
+            return;
+        }
+        bgStyle = switch (bg.style()) {
+            case "SOLID" -> BG_SOLID;
+            case "MINECRAFT" -> BG_MINECRAFT;
+            default -> BG_DARK;
+        };
+        bgColor = bg.color() & 0xFFFFFF;
+        bgOpacity = Math.max(0, Math.min(100, bg.opacity()));
+    }
+
+    private String bgStyleName() {
+        return switch (bgStyle) {
+            case BG_SOLID -> "SOLID";
+            case BG_MINECRAFT -> "MINECRAFT";
+            default -> "DARK";
+        };
+    }
+
+    private void persistBackground() {
+        ProfilesService svc = LanPlusClient.profiles();
+        if (svc != null) {
+            svc.setBackground(bgStyleName(), bgColor, bgOpacity);
+        }
     }
 
     private boolean hasAnyLink() {
@@ -1302,6 +1421,7 @@ public final class ProfileScreen extends Screen {
             case "prompt_link" -> "gui.lanplus.profile.err.prompt_link";
             case "too_many_prompts" -> "gui.lanplus.profile.err.too_many_prompts";
             case "bad_modpack" -> "gui.lanplus.profile.err.bad_modpack";
+            case "bad_background" -> "gui.lanplus.profile.err.bad_background";
             case "offline" -> "gui.lanplus.profile.err.offline";
             default -> "gui.lanplus.profile.err.generic";
         };

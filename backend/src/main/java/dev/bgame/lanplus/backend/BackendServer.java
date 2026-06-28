@@ -434,6 +434,16 @@ public final class BackendServer {
         if (b.get("recentlyPlayedVisible") instanceof Boolean recentVis) {
             store.setModpackVisibility(uuid, "recently_played_visible", recentVis);
         }
+        if (b.get("background") instanceof Map<?, ?> bg) {
+            Object styleObj = bg.get("style");
+            String style = styleObj == null ? null : String.valueOf(styleObj);
+            if (style != null && !store.isBackgroundStyle(style)) {
+                return ok(error("bad_background"));
+            }
+            int color = bg.get("color") instanceof Number cn ? cn.intValue() : Store.DEFAULT_BG_COLOR;
+            int opacity = bg.get("opacity") instanceof Number on ? on.intValue() : Store.DEFAULT_BG_OPACITY;
+            store.setBackground(uuid, style == null ? Store.DEFAULT_BG_STYLE : style, color, opacity);
+        }
         return ok(Map.of("success", true));
     }
 

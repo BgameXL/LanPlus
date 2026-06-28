@@ -36,6 +36,7 @@ public interface LanPlusNetwork {
                                             Boolean favoriteVisible, Boolean currentlyPlayingVisible,
                                             Boolean recentlyPlayedVisible);
     CompletableFuture<String> setFavoriteModpack(UUID uuid, String modpackId);
+    CompletableFuture<String> setBackground(UUID uuid, String style, int color, int opacity);
     CompletableFuture<List<ModpackRef>> getModpacks();
     CompletableFuture<Void> reportAdvancement(UUID uuid, String advancementId);
     CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated);
