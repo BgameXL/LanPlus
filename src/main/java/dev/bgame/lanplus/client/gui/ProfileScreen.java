@@ -865,14 +865,16 @@ public final class ProfileScreen extends Screen {
             String key = headlineLive ? "gui.lanplus.profile.playing" : "gui.lanplus.profile.lastplayed.label";
             y = renderSidebarModpack(g, left, y, key, headline, own, isFav(favId, headline));
         }
-        boolean recentDup = headline != null && recent != null && recent.modpackId().equals(headline.modpackId());
+        boolean favIsHeadline = headline != null && isFav(favId, headline);
+        boolean favOwnRow = favorite != null && favorite.name() != null && !favIsHeadline;
+        if (favOwnRow) {
+            y = renderSidebarModpack(g, left, y, "gui.lanplus.profile.favorite.label", favorite, own, true);
+        }
+        boolean recentDup = recent != null
+                && ((headline != null && recent.modpackId().equals(headline.modpackId()))
+                        || (favOwnRow && isFav(favId, recent)));
         if (recent != null && recent.name() != null && !recentDup) {
             y = renderSidebarModpack(g, left, y, "gui.lanplus.profile.recentplayed.label", recent, own, isFav(favId, recent));
-        }
-        boolean favShownAbove = (headline != null && isFav(favId, headline))
-                || (recent != null && !recentDup && isFav(favId, recent));
-        if (favorite != null && favorite.name() != null && !favShownAbove) {
-            y = renderSidebarModpack(g, left, y, "gui.lanplus.profile.favorite.label", favorite, own, true);
         }
 
         y = renderSidebarLinks(g, l, r, y);
@@ -1152,7 +1154,7 @@ public final class ProfileScreen extends Screen {
         return y + 17;
     }
 
-    private static final String[] COSMETIC_SLOTS = {"background", "badge", "banner", "effect"};
+    private static final String[] COSMETIC_SLOTS = {"background", "head", "left_hand", "back"};
 
     private int renderCosmeticsShowcase(GuiGraphics g, int x, int y, int textW) {
         int renderW = 104;

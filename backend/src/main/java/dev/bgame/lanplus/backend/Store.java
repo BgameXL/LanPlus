@@ -1156,7 +1156,7 @@ final class Store {
                 String mp = pres == null ? null : pres.modpackId;
                 boolean showPlaying = live && (self || (!invisible && currentlyPlayingVisible));
                 m.put("currentlyPlaying", showPlaying ? resolveModpackLocked(mp) : null);
-                boolean showLastPlayed = self || (!invisible && currentlyPlayingVisible);
+                boolean showLastPlayed = self || (!invisible && recentlyPlayedVisible);
                 m.put("lastPlayed", showLastPlayed ? resolveModpackLocked(lastModpackLocked(uuid)) : null);
                 m.put("favorite", (self || favoriteVisible) ? resolveModpackLocked(favoriteId) : null);
                 m.put("recentlyPlayed", (self || recentlyPlayedVisible) ? recentlyPlayedLocked(uuid) : null);

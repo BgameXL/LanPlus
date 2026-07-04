@@ -175,9 +175,9 @@
   "gui.lanplus.profile.bg.opacity": "Opacity: %s%%",
   "gui.lanplus.profile.cosmetics": "Cosmetics",
   "gui.lanplus.profile.cosmetics.background": "Background",
-  "gui.lanplus.profile.cosmetics.badge": "Badge",
-  "gui.lanplus.profile.cosmetics.banner": "Banner",
-  "gui.lanplus.profile.cosmetics.effect": "Effect",
+  "gui.lanplus.profile.cosmetics.head": "Head",
+  "gui.lanplus.profile.cosmetics.left_hand": "Left Hand",
+  "gui.lanplus.profile.cosmetics.back": "Back",
   "gui.lanplus.profile.cosmetics.soon": "Coming soon",
   "gui.lanplus.profile.cosmetics.rotate": "Drag to rotate",
 
