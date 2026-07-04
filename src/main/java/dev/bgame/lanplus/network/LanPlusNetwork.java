@@ -8,6 +8,7 @@ import dev.bgame.lanplus.api.PresenceUpdate;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
+import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.api.UserProfile;
 
 import java.util.List;
@@ -39,6 +40,8 @@ public interface LanPlusNetwork {
     CompletableFuture<String> setBackground(UUID uuid, String style, int color, int opacity);
     CompletableFuture<List<ModpackRef>> getModpacks();
     CompletableFuture<Void> reportAdvancement(UUID uuid, String advancementId);
+    CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, String model);
+    CompletableFuture<Boolean> deleteSkin();
     CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated);
     CompletableFuture<Invite> resolveInvite(String code);
     CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);
@@ -46,6 +49,8 @@ public interface LanPlusNetwork {
     void connectEvents(UUID uuid, BackendEventListener listener);
     void disconnect();
     boolean isConnected();
+
+    UUID sessionUuid();
     interface BackendEventListener {
 
         void onPresenceUpdate(PresenceUpdate update);

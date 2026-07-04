@@ -115,28 +115,25 @@ public final class ClientPresenceDetector {
         SkinService skins = LanPlusClient.skins();
         if (skins != null) {
             skins.setLocalSkin(ref);
-            User user = mc.getUser();
-            UUID self = user == null ? null : user.getProfileId();
+            UUID self = LanPlusClient.selfUuid();
             if (self != null && ref != null) {
                 skins.resolve(self, ref);
+                User user = mc.getUser();
+                UUID launcher = user == null ? null : user.getProfileId();
+                if (launcher != null && !launcher.equals(self)) {
+                    skins.resolve(launcher, ref);
+                }
             }
         }
         presence.updateSkin(ref);
     }
 
     private static SkinRef detectSkin(Minecraft mc) {
-        if (!Config.skinUrl.isBlank()) {
+        if (Config.skinCustomActive && !Config.skinUrl.isBlank()) {
             return new SkinRef(SkinType.CUSTOM, Config.skinUrl, null, Config.skinSlim ? "slim" : null);
         }
-        User user = mc.getUser();
-        if (user == null) {
-            return null;
-        }
-        try {
-            return new SkinRef(SkinType.MOJANG, user.getProfileId().toString(), null, null);
-        } catch (RuntimeException e) {
-            return null;
-        }
+        UUID self = LanPlusClient.selfUuid();
+        return self == null ? null : new SkinRef(SkinType.MOJANG, self.toString(), null, null);
     }
 
     @SubscribeEvent

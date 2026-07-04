@@ -6,6 +6,10 @@ import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.ProfileBackground;
+import dev.bgame.lanplus.api.SkinRef;
+import dev.bgame.lanplus.api.SkinType;
+import dev.bgame.lanplus.api.SkinUploadResult;
+import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
 import dev.bgame.lanplus.client.gui.ProfilePromptCatalog.Prompt;
@@ -38,7 +42,12 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.LivingEntity;
 import org.joml.Matrix4f;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -113,6 +122,10 @@ public final class ProfileScreen extends Screen {
     private Button invisibleButton;
     private Button bgStyleButton;
     private Button bgColorButton;
+    private Button skinSlimButton;
+    private Button skinRemoveButton;
+    private Button skinSourceButton;
+    private boolean skinSlimToggle;
     private int pronounIndex;
     private boolean invisibleToggle;
 
@@ -128,7 +141,7 @@ public final class ProfileScreen extends Screen {
 
     private int eL, eW, eR;
     private int aAboutHdrY, aBioY, aIdentityY, aLinksHdrY, aLinksRowsY, aAddLinkY,
-            aQHdrY, aQRowsY, aMpHdrY, aMpRowY, aBgHdrY, aBgRowY;
+            aQHdrY, aQRowsY, aMpHdrY, aMpRowY, aBgHdrY, aBgRowY, aSkinHdrY, aSkinRowY;
 
     // edit: question slots
     private final String[] slotPromptId = new String[MAX_SLOTS];
@@ -150,11 +163,7 @@ public final class ProfileScreen extends Screen {
     }
 
     private static boolean isOwn(UUID uuid) {
-        try {
-            return uuid != null && uuid.equals(Minecraft.getInstance().getUser().getProfileId());
-        } catch (RuntimeException e) {
-            return false;
-        }
+        return uuid != null && uuid.equals(LanPlusClient.selfUuid());
     }
 
     private record Hit(int x, int y, int w, int h, Runnable action) {
@@ -185,6 +194,7 @@ public final class ProfileScreen extends Screen {
                 + 12 + 16 + MAX_SLOTS * 24
                 + 12 + 16 + 18
                 + 12 + 16 + 20
+                + 12 + 16 + 20 + 4 + 20 + 14
                 + 8;
     }
 
@@ -214,7 +224,9 @@ public final class ProfileScreen extends Screen {
         aMpHdrY = y;          y += 16;
         aMpRowY = y;          y += 18 + 12;
         aBgHdrY = y;          y += 16;
-        aBgRowY = y;
+        aBgRowY = y;          y += 20 + 12;
+        aSkinHdrY = y;        y += 16;
+        aSkinRowY = y;
     }
 
     @Override
@@ -276,6 +288,144 @@ public final class ProfileScreen extends Screen {
         buildLinkWidgets();
         buildSlotWidgets();
         buildBackgroundWidgets();
+        buildSkinWidgets();
+    }
+
+    private void buildSkinWidgets() {
+        int half = (eW - 6) / 2;
+        skinSourceButton = Button.builder(skinSourceLabel(), b -> toggleSkinSource())
+                .bounds(eL, aSkinRowY, half, 20).build();
+        skinSourceButton.active = !Config.skinUrl.isBlank();
+        addRenderableWidget(skinSourceButton);
+
+        skinSlimButton = Button.builder(skinSlimLabel(), b -> toggleSkinSlim())
+                .bounds(eL + half + 6, aSkinRowY, eW - half - 6, 20).build();
+        addRenderableWidget(skinSlimButton);
+
+        skinRemoveButton = Button.builder(Component.translatable("gui.lanplus.profile.skin.remove"),
+                        b -> removeHostedSkin())
+                .bounds(eL, aSkinRowY + 24, half, 20).build();
+        skinRemoveButton.active = !Config.skinUrl.isBlank();
+        addRenderableWidget(skinRemoveButton);
+    }
+
+    private Component skinSourceLabel() {
+        boolean custom = Config.skinCustomActive && !Config.skinUrl.isBlank();
+        return Component.translatable(custom
+                ? "gui.lanplus.profile.skin.source.custom" : "gui.lanplus.profile.skin.source.mojang");
+    }
+
+    private void toggleSkinSource() {
+        Config.setSkinCustomActive(!Config.skinCustomActive);
+        skinSourceButton.setMessage(skinSourceLabel());
+        applyLocalSkin();
+    }
+
+    private Component skinSlimLabel() {
+        return Component.translatable(skinSlimToggle
+                ? "gui.lanplus.profile.skin.slim" : "gui.lanplus.profile.skin.classic");
+    }
+
+    private void toggleSkinSlim() {
+        skinSlimToggle = !skinSlimToggle;
+        skinSlimButton.setMessage(skinSlimLabel());
+        if (!Config.skinUrl.isBlank()) {
+            Config.setSkin(Config.skinUrl, skinSlimToggle);
+            applyLocalSkin();
+        }
+    }
+
+    private void removeHostedSkin() {
+        if (LanPlusClient.skins() == null) {
+            return;
+        }
+        setStatus(Component.translatable("gui.lanplus.profile.skin.removing"));
+        LanPlusClient.skins().deleteSkin().whenComplete((deleted, ex) -> {
+            if (ex != null || !Boolean.TRUE.equals(deleted)) {
+                this.minecraft.execute(() ->
+                        setStatus(Component.translatable("gui.lanplus.profile.err.offline")));
+                return;
+            }
+            Config.setSkin("", skinSlimToggle);
+            this.minecraft.execute(() -> {
+                applyLocalSkin();
+                setStatus(Component.translatable("gui.lanplus.profile.skin.removed"));
+                if (skinRemoveButton != null) {
+                    skinRemoveButton.active = false;
+                }
+                if (skinSourceButton != null) {
+                    skinSourceButton.setMessage(skinSourceLabel());
+                    skinSourceButton.active = false;
+                }
+            });
+        });
+    }
+
+    private void applyLocalSkin() {
+        UUID self = LanPlusClient.selfUuid();
+        if (self == null || LanPlusClient.skins() == null) {
+            return;
+        }
+        boolean custom = Config.skinCustomActive && !Config.skinUrl.isBlank();
+        if (!custom && LanPlusClient.skinTextures() != null) {
+            LanPlusClient.skinTextures().remove(self);
+        }
+        SkinRef ref = custom
+                ? new SkinRef(SkinType.CUSTOM, Config.skinUrl, null, Config.skinSlim ? "slim" : null)
+                : new SkinRef(SkinType.MOJANG, self.toString(), null, null);
+        LanPlusClient.skins().resolve(self, ref);
+    }
+
+    @Override
+    public void onFilesDrop(List<Path> paths) {
+        if (!editing || !own || paths == null || LanPlusClient.skins() == null) {
+            return;
+        }
+        Path png = paths.stream()
+                .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".png"))
+                .findFirst().orElse(null);
+        if (png == null) {
+            setStatus(Component.translatable("gui.lanplus.profile.skin.err.bad_png"));
+            return;
+        }
+        setStatus(Component.translatable("gui.lanplus.profile.skin.uploading"));
+        boolean slim = skinSlimToggle;
+        CompletableFuture
+                .supplyAsync(() -> {
+                    try {
+                        return Files.size(png) > 32 * 1024 ? null : Files.readAllBytes(png);
+                    } catch (IOException e) {
+                        throw new CompletionException(e);
+                    }
+                }, Util.ioPool())
+                .thenCompose(bytes -> bytes == null
+                        ? CompletableFuture.completedFuture(new SkinUploadResult(null, null, "too_large"))
+                        : LanPlusClient.skins().uploadSkin(bytes, slim))
+                .whenComplete((result, ex) -> {
+                    boolean uploaded = ex == null && result != null && result.success();
+                    if (uploaded) {
+                        Config.setSkin(result.url(), slim);
+                    }
+                    this.minecraft.execute(() -> {
+                        if (ex != null) {
+                            setStatus(Component.translatable("gui.lanplus.profile.skin.err.read"));
+                            return;
+                        }
+                        if (!uploaded) {
+                            setStatus(Component.translatable(errorKey(result == null ? null : result.error())));
+                            return;
+                        }
+                        applyLocalSkin();
+                        if (skinRemoveButton != null) {
+                            skinRemoveButton.active = true;
+                        }
+                        if (skinSourceButton != null) {
+                            skinSourceButton.setMessage(skinSourceLabel());
+                            skinSourceButton.active = true;
+                        }
+                        setStatus(Component.translatable("gui.lanplus.profile.skin.uploaded"));
+                    });
+                });
     }
 
     private void buildBackgroundWidgets() {
@@ -519,6 +669,7 @@ public final class ProfileScreen extends Screen {
     private void primeEdit() {
         pronounIndex = 0;
         invisibleToggle = profile.invisible();
+        skinSlimToggle = Config.skinSlim;
         linkRows.clear();
         for (int p = 0; p < PLATFORMS.length; p++) {
             String v = profile.link(PLATFORMS[p]);
@@ -623,6 +774,9 @@ public final class ProfileScreen extends Screen {
         editHeader(g, Component.translatable("gui.lanplus.profile.questions"), aQHdrY);
         editHeader(g, Component.translatable("gui.lanplus.profile.modpack"), aMpHdrY);
         editHeader(g, Component.translatable("gui.lanplus.profile.bg.header"), aBgHdrY);
+        editHeader(g, Component.translatable("gui.lanplus.profile.skin.header"), aSkinHdrY);
+        g.drawString(this.font, Component.translatable("gui.lanplus.profile.skin.hint"),
+                eL, aSkinRowY + 48, 0xFF8A8F98, false);
 
         int gap = 6;
         int chipW = (eW - 2 * gap) / 3;
@@ -1219,6 +1373,9 @@ public final class ProfileScreen extends Screen {
             this.profile = p;
             if (p != null) {
                 applyBackground(p.background());
+                if (p.skin() != null && LanPlusClient.skins() != null) {
+                    LanPlusClient.skins().resolve(p.uuid(), p.skin());
+                }
             }
             this.loaded = true;
             if (this.minecraft.screen == this) {
@@ -1422,6 +1579,9 @@ public final class ProfileScreen extends Screen {
             case "too_many_prompts" -> "gui.lanplus.profile.err.too_many_prompts";
             case "bad_modpack" -> "gui.lanplus.profile.err.bad_modpack";
             case "bad_background" -> "gui.lanplus.profile.err.bad_background";
+            case "bad_png" -> "gui.lanplus.profile.skin.err.bad_png";
+            case "too_large" -> "gui.lanplus.profile.skin.err.too_large";
+            case "bad_dimensions" -> "gui.lanplus.profile.skin.err.bad_dimensions";
             case "offline" -> "gui.lanplus.profile.err.offline";
             default -> "gui.lanplus.profile.err.generic";
         };

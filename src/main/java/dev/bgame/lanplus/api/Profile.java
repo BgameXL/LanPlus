@@ -8,6 +8,7 @@ public record Profile(
         UUID uuid,
         String username,
         String friendCode,
+        SkinRef skin,
         String pronouns,
         String bio,
         Map<String, String> links,

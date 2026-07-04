@@ -16,6 +16,7 @@ import dev.bgame.lanplus.api.PresenceUpdate;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
+import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.api.UserProfile;
 import org.slf4j.Logger;
 
@@ -28,6 +29,7 @@ import java.net.http.WebSocket;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -59,6 +61,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     private final ExecutorService authExecutor;
 
     private final AtomicReference<String> bearer = new AtomicReference<>();
+    private final AtomicReference<UUID> sessionUuid = new AtomicReference<>();
     private final AtomicReference<CompletableFuture<String>> authInFlight = new AtomicReference<>();
 
     private volatile boolean reachable = false;
@@ -328,6 +331,48 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 });
     }
 
+    @Override
+    public CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, String model) {
+        if (!configured() || png == null || png.length == 0) {
+            return CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"));
+        }
+        String b64 = Base64.getEncoder().encodeToString(png);
+        return post("/skin", new Wire.SkinUpload(b64, model))
+                .thenApply(resp -> {
+                    Wire.SkinUploadResponse r = GSON.fromJson(resp.body(), Wire.SkinUploadResponse.class);
+                    if (r != null && r.url() != null) {
+                        // the per-uuid URL is stable across replacements, so version it by content
+                        // hash: URL-keyed caches (ours and friends') re-download on change
+                        String hash = r.hash() == null ? "" : r.hash();
+                        String version = hash.isEmpty() ? ""
+                                : "?v=" + hash.substring(0, Math.min(16, hash.length()));
+                        return new SkinUploadResult(base() + r.url() + version, r.hash(), null);
+                    }
+                    String error = r != null && r.error() != null ? r.error() : "error";
+                    return new SkinUploadResult(null, null, error);
+                })
+                .exceptionally(err -> {
+                    onError(err);
+                    return new SkinUploadResult(null, null, "offline");
+                });
+    }
+
+    @Override
+    public CompletableFuture<Boolean> deleteSkin() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return post("/skin/delete", Map.of())
+                .thenApply(resp -> {
+                    Wire.Success s = GSON.fromJson(resp.body(), Wire.Success.class);
+                    return s != null && s.success();
+                })
+                .exceptionally(err -> {
+                    onError(err);
+                    return false;
+                });
+    }
+
     private String parseUpdateResult(HttpResponse<String> resp) {
         Wire.UpdateResult r = GSON.fromJson(resp.body(), Wire.UpdateResult.class);
         if (r != null && r.success()) {
@@ -563,6 +608,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (r == null || r.token() == null) {
             throw new IllegalStateException("verify rejected");
         }
+        adoptSessionUuid(r.uuid());
         LOGGER.info("LAN+ authenticated (premium) as {}", username);
         return r.token();
     }
@@ -573,8 +619,22 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (r == null || r.token() == null) {
             throw new IllegalStateException("offline auth rejected");
         }
+        adoptSessionUuid(r.uuid());
         LOGGER.info("LAN+ authenticated (offline) as {}", username);
         return r.token();
+    }
+
+    private void adoptSessionUuid(String uuid) {
+        try {
+            sessionUuid.set(uuid == null ? null : UUID.fromString(uuid));
+        } catch (IllegalArgumentException e) {
+            sessionUuid.set(null);
+        }
+    }
+
+    @Override
+    public UUID sessionUuid() {
+        return sessionUuid.get();
     }
 
     private String postSync(String path, String json) throws Exception {

@@ -102,7 +102,7 @@ final class Wire {
         }
     }
 
-    record ProfileDto(String uuid, String username, String friendCode, String pronouns, String bio,
+    record ProfileDto(String uuid, String username, String friendCode, Skin skin, String pronouns, String bio,
                       Map<String, String> links, Map<String, String> prompts,
                       boolean online, Long lastSeen, Boolean invisible, ModpackDto currentlyPlaying,
                       ModpackDto lastPlayed, ModpackDto favorite, ModpackDto recentlyPlayed,
@@ -110,7 +110,8 @@ final class Wire {
         Profile toApi() {
             SettingsDto s = settings == null ? new SettingsDto(true, true, true) : settings;
             ProgressionDto p = progression == null ? new ProgressionDto(0, 0, null, null) : progression;
-            return new Profile(UUID.fromString(uuid), username, friendCode, pronouns, bio,
+            return new Profile(UUID.fromString(uuid), username, friendCode,
+                    skin == null ? null : skin.toApi(), pronouns, bio,
                     links == null ? Map.of() : links,
                     prompts == null ? Map.of() : prompts,
                     online,
@@ -162,6 +163,10 @@ final class Wire {
     record UpdateResult(boolean success, String error) {}
 
     record AdvancementReport(String uuid, String advancementId) {}
+
+    record SkinUpload(String png, String model) {}
+
+    record SkinUploadResponse(String error, String url, String hash) {}
 
     record ChallengeResponse(String serverId) {}
 

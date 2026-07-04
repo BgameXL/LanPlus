@@ -28,6 +28,10 @@ public final class SkinTextures implements SkinTextureSink {
         return byPlayer.get(player);
     }
 
+    public void remove(UUID player) {
+        byPlayer.remove(player);
+    }
+
     @Override
     public void accept(UUID player, String key, byte[] png, String model) {
         boolean slim = "slim".equalsIgnoreCase(model);

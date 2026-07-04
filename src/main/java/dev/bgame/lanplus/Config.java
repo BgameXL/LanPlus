@@ -51,6 +51,12 @@ public final class Config {
                     "Ignored when skinUrl is empty (Mojang reports its own model).")
             .define("skinSlim", false);
 
+    private static final ForgeConfigSpec.BooleanValue SKIN_CUSTOM_ACTIVE = BUILDER
+            .comment("Whether the custom 'skinUrl' skin is the one shown on LAN+. Set false to show",
+                    "your Mojang skin (or the default, if non-premium) without deleting the custom",
+                    "one — the profile Skin section toggles this. Ignored when skinUrl is empty.")
+            .define("skinCustomActive", true);
+
     private static final ForgeConfigSpec.BooleanValue DISCORD_ENABLED = BUILDER
             .comment("Show your LAN+ status in Discord via Rich Presence. Needs 'discordAppId' set and",
                     "the Discord desktop app running; otherwise this does nothing.")
@@ -72,10 +78,31 @@ public final class Config {
     public static boolean relayDevPlaintext = false;
     public static String skinUrl = "";
     public static boolean skinSlim = false;
+    public static boolean skinCustomActive = true;
     public static boolean discordEnabled = true;
     public static String discordAppId = "";
 
     private Config() {}
+
+    /**
+     * Persist a new custom skin URL + model to the config file (used after uploading a hosted
+     * skin, so the choice survives restarts). Empty url = back to the Mojang skin. The cached
+     * statics are updated immediately so the next heartbeat's recompute-and-diff publishes it.
+     */
+    public static void setSkin(String url, boolean slim) {
+        SKIN_URL.set(url == null ? "" : url);
+        SKIN_SLIM.set(slim);
+        SKIN_CUSTOM_ACTIVE.set(true);
+        skinUrl = SKIN_URL.get();
+        skinSlim = SKIN_SLIM.get();
+        skinCustomActive = true;
+    }
+
+    /** Switch between the custom skin and the Mojang/default one without deleting the custom URL. */
+    public static void setSkinCustomActive(boolean active) {
+        SKIN_CUSTOM_ACTIVE.set(active);
+        skinCustomActive = active;
+    }
 
     @SubscribeEvent
     static void onLoad(final ModConfigEvent event) {
@@ -90,6 +117,7 @@ public final class Config {
         relayDevPlaintext = RELAY_DEV_PLAINTEXT.get();
         skinUrl = SKIN_URL.get();
         skinSlim = SKIN_SLIM.get();
+        skinCustomActive = SKIN_CUSTOM_ACTIVE.get();
         discordEnabled = DISCORD_ENABLED.get();
         discordAppId = DISCORD_APP_ID.get();
     }

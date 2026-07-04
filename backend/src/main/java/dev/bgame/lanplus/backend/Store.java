@@ -67,6 +67,7 @@ final class Store {
         volatile String address;
         volatile String joinCode;
         volatile Object skin;
+        volatile Object persistedSkin;
         volatile String modpackId;
         volatile String accessMode;
         volatile Set<UUID> allowedUuids = Set.of();
@@ -173,6 +174,11 @@ final class Store {
                         + "updated_at INTEGER NOT NULL, PRIMARY KEY (uuid, modpack_id))");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS social_time ("
                         + "uuid TEXT PRIMARY KEY, seconds INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS user_skin ("
+                        + "uuid TEXT PRIMARY KEY, skin_json TEXT NOT NULL, updated_at INTEGER NOT NULL)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS skin_data ("
+                        + "uuid TEXT PRIMARY KEY, png BLOB NOT NULL, hash TEXT NOT NULL, model TEXT, "
+                        + "updated_at INTEGER NOT NULL)");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS sessions ("
                         + "token_hash TEXT PRIMARY KEY, uuid TEXT NOT NULL, verified INTEGER NOT NULL DEFAULT 0, "
                         + "created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)");
@@ -347,6 +353,10 @@ final class Store {
         if (modpackId != null && !modpackId.isBlank() && !modpackId.equals(prevModpackId)) {
             setLastModpack(uuid, modpackId);
         }
+        if (skin != null && !skin.equals(p.persistedSkin)) {
+            p.persistedSkin = skin;
+            saveSkinRef(uuid, Json.write(skin), now);
+        }
         if (!p.hosting) {
             p.hostingAnnounced = false;
             return false;
@@ -392,6 +402,77 @@ final class Store {
 
     private static boolean isLive(String connectivity) {
         return "ONLINE".equals(connectivity) || "STALE".equals(connectivity);
+    }
+
+    private void saveSkinRef(UUID uuid, String skinJson, long now) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO user_skin (uuid, skin_json, updated_at) VALUES (?,?,?) "
+                            + "ON CONFLICT(uuid) DO UPDATE SET skin_json=excluded.skin_json, "
+                            + "updated_at=excluded.updated_at")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, skinJson);
+                ps.setLong(3, now);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("saveSkinRef", e);
+            }
+        }
+    }
+
+    private Object persistedSkinLocked(UUID uuid) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT skin_json FROM user_skin WHERE uuid=?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Json.parse(rs.getString(1)) : null;
+            }
+        }
+    }
+
+    // hosted skins: the one deliberate content exception — a user-uploaded, validated, capped PNG.
+    void putHostedSkin(UUID uuid, byte[] png, String hash, String model) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "INSERT INTO skin_data (uuid, png, hash, model, updated_at) VALUES (?,?,?,?,?) "
+                            + "ON CONFLICT(uuid) DO UPDATE SET png=excluded.png, hash=excluded.hash, "
+                            + "model=excluded.model, updated_at=excluded.updated_at")) {
+                ps.setString(1, uuid.toString());
+                ps.setBytes(2, png);
+                ps.setString(3, hash);
+                ps.setString(4, model);
+                ps.setLong(5, System.currentTimeMillis());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("putHostedSkin", e);
+            }
+        }
+    }
+
+    void deleteHostedSkin(UUID uuid) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "DELETE FROM skin_data WHERE uuid=?")) {
+                ps.setString(1, uuid.toString());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("deleteHostedSkin", e);
+            }
+        }
+    }
+
+    byte[] hostedSkinPng(UUID uuid) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT png FROM skin_data WHERE uuid=?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getBytes(1) : null;
+                }
+            } catch (SQLException e) {
+                throw fail("hostedSkinPng", e);
+            }
+        }
     }
 
     private void markOnline(UUID uuid) {
@@ -581,6 +662,7 @@ final class Store {
         Map<UUID, String> names = new LinkedHashMap<>();
         Map<UUID, int[]> rel = new HashMap<>();
         Map<UUID, Integer> tiers = new HashMap<>();
+        Map<UUID, Object> persistedSkins = new HashMap<>();
         Set<UUID> invisible = new HashSet<>();
         String s = uuid.toString();
         synchronized (lock) {
@@ -618,6 +700,30 @@ final class Store {
                         }
                     }
                 }
+                List<UUID> needPersisted = new ArrayList<>();
+                for (UUID fid : names.keySet()) {
+                    Presence p = presences.get(fid);
+                    if (p == null || p.skin == null) {
+                        needPersisted.add(fid);
+                    }
+                }
+                if (!needPersisted.isEmpty()) {
+                    String placeholders = String.join(",", java.util.Collections.nCopies(needPersisted.size(), "?"));
+                    try (PreparedStatement ps = connection.prepareStatement(
+                            "SELECT uuid, skin_json FROM user_skin WHERE uuid IN (" + placeholders + ")")) {
+                        for (int i = 0; i < needPersisted.size(); i++) {
+                            ps.setString(i + 1, needPersisted.get(i).toString());
+                        }
+                        try (ResultSet rs = ps.executeQuery()) {
+                            while (rs.next()) {
+                                Object persisted = Json.parse(rs.getString(2));
+                                if (persisted != null) {
+                                    persistedSkins.put(UUID.fromString(rs.getString(1)), persisted);
+                                }
+                            }
+                        }
+                    }
+                }
             } catch (SQLException e) {
                 throw fail("friendList", e);
             }
@@ -640,7 +746,7 @@ final class Store {
             m.put("state", live && p != null ? p.state : null);
             m.put("worldName", live && p != null ? p.worldName : null);
             m.put("joinCode", (suppress || hidden || !joinCodeVisibleTo(fid, uuid)) ? null : hostingJoinCode(fid));
-            m.put("skin", p == null ? null : p.skin);
+            m.put("skin", p != null && p.skin != null ? p.skin : persistedSkins.get(fid));
             m.put("muted", muted);
             m.put("blocked", blocked);
             m.put("tier", tiers.getOrDefault(fid, 0));
@@ -970,6 +1076,9 @@ final class Store {
                 m.put("uuid", uuid.toString());
                 m.put("username", u.username);
                 m.put("friendCode", u.friendCode);
+                Presence skinPres = presences.get(uuid);
+                m.put("skin", skinPres != null && skinPres.skin != null
+                        ? skinPres.skin : persistedSkinLocked(uuid));
                 m.put("pronouns", scalar("SELECT pronouns FROM profile_identity WHERE uuid=?", uuid));
                 m.put("bio", scalar("SELECT text FROM profile_bio WHERE uuid=?", uuid));
                 Map<String, Object> links = new LinkedHashMap<>();
@@ -1599,8 +1708,12 @@ final class Store {
     }
 
     private static String sha256Hex(String s) {
+        return sha256Hex(s.getBytes(StandardCharsets.UTF_8));
+    }
+
+    static String sha256Hex(byte[] data) {
         try {
-            byte[] d = MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8));
+            byte[] d = MessageDigest.getInstance("SHA-256").digest(data);
             StringBuilder sb = new StringBuilder(d.length * 2);
             for (byte b : d) {
                 sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));

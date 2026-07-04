@@ -75,6 +75,21 @@ final class Http {
         return new Request(method, path, query, headers, body);
     }
 
+    static void writeBytes(OutputStream out, int status, String contentType, byte[] payload,
+                           String cacheControl) throws IOException {
+        StringBuilder head = new StringBuilder();
+        head.append("HTTP/1.1 ").append(status).append(' ').append(reason(status)).append("\r\n");
+        head.append("Content-Type: ").append(contentType).append("\r\n");
+        head.append("Content-Length: ").append(payload.length).append("\r\n");
+        if (cacheControl != null) {
+            head.append("Cache-Control: ").append(cacheControl).append("\r\n");
+        }
+        head.append("Connection: close\r\n\r\n");
+        out.write(head.toString().getBytes(StandardCharsets.UTF_8));
+        out.write(payload);
+        out.flush();
+    }
+
     static void writeJson(OutputStream out, int status, Object body) throws IOException {
         byte[] payload = (body == null ? "" : Json.write(body)).getBytes(StandardCharsets.UTF_8);
         StringBuilder head = new StringBuilder();

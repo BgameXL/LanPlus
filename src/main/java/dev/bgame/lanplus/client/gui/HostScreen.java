@@ -19,25 +19,47 @@ import java.util.Set;
  * "Host a World" — pick one of your singleplayer worlds, choose who can join, and open it to LAN+
  * (Essential-style). Opened from the small button next to Singleplayer on the title screen.
  * Inviting specific friends is done from the friends overlay (O); this screen only picks the mode.
+ * Laid out as a compact centered card in the shared LAN+ style (see {@link LanPlusUi}).
  */
-public final class
-HostScreen extends Screen {
+public final class HostScreen extends Screen {
 
-    private static final int PANEL_BG = 0xC0101018;
-    private static final int MARGIN = 20;
-    private static final int CONTENT_TOP = 40;
+    private static final int CARD_W = 320;
     private static final int ROW_H = 24;
+    private static final int PAD = 10;
 
     private final Screen parent;
     private List<LevelSummary> worlds = List.of();
     private boolean loading = true;
     private int selected = -1;
+    private int listScroll;
     private HostAccessMode accessMode = HostAccessMode.FRIENDS;
     private boolean allowNonPremium = false;
+
+    private int cardX, cardY, cardW, cardH;
+    private int listTop, listBottom;
+    private int chipsY, premiumY, buttonsY;
 
     public HostScreen(Screen parent) {
         super(Component.translatable("gui.lanplus.host.title"));
         this.parent = parent;
+    }
+
+    private void layout() {
+        cardW = Math.min(this.width - 40, CARD_W);
+        int listRows = Math.max(3, Math.min(visibleRowsWanted(), (this.height - 190) / ROW_H));
+        int listH = listRows * ROW_H + 4;
+        cardH = 24 + listH + 10 + 16 + 20 + 8 + 20 + 10 + 20 + 2 * PAD;
+        cardX = (this.width - cardW) / 2;
+        cardY = Math.max(16, (this.height - cardH) / 2);
+        listTop = cardY + PAD + 24;
+        listBottom = listTop + listH;
+        chipsY = listBottom + 10 + 16;
+        premiumY = chipsY + 20 + 8;
+        buttonsY = premiumY + 20 + 10;
+    }
+
+    private int visibleRowsWanted() {
+        return loading || worlds.isEmpty() ? 4 : Math.min(worlds.size(), 6);
     }
 
     @Override
@@ -45,73 +67,139 @@ HostScreen extends Screen {
         if (loading) {
             loadWorlds();
         }
-        int modeY = this.height - 78;
-        int x = MARGIN;
-        addRenderableWidget(modeButton("gui.lanplus.host.access.everyone", HostAccessMode.EVERYONE, x, modeY));
-        addRenderableWidget(modeButton("gui.lanplus.host.access.friends", HostAccessMode.FRIENDS, x + 118, modeY));
-        addRenderableWidget(modeButton("gui.lanplus.host.access.invited", HostAccessMode.INVITED, x + 236, modeY));
-        addRenderableWidget(nonPremiumButton(x, this.height - 52));
+        layout();
 
         Button hostButton = Button.builder(Component.translatable("gui.lanplus.host.start"), b -> doHost())
-                .bounds(this.width - MARGIN - 200, this.height - 28, 96, 20).build();
+                .bounds(cardX + PAD, buttonsY, (cardW - 2 * PAD - 6) / 2 + 30, 20).build();
         hostButton.active = selected >= 0;
         addRenderableWidget(hostButton);
+        int cancelW = cardW - 2 * PAD - 6 - ((cardW - 2 * PAD - 6) / 2 + 30);
         addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose())
-                .bounds(this.width - MARGIN - 100, this.height - 28, 96, 20).build());
+                .bounds(cardX + cardW - PAD - cancelW, buttonsY, cancelW, 20).build());
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         renderBackground(g);
-        g.drawString(this.font, this.title, MARGIN, 14, 0xFFFFFFFF);
+        LanPlusUi.backdrop(g, this.width, this.height);
+        layout();
 
-        int listBottom = this.height - 86;
-        g.fill(MARGIN, CONTENT_TOP, this.width - MARGIN, listBottom, PANEL_BG);
+        LanPlusUi.panel(g, cardX, cardY, cardX + cardW, cardY + cardH);
+        LanPlusUi.header(g, this.font, this.title, cardX + PAD, cardY + PAD, cardW - 2 * PAD);
 
+        g.fill(cardX + PAD, listTop, cardX + cardW - PAD, listBottom, LanPlusUi.SURFACE_RAISED);
+        LanPlusUi.border(g, cardX + PAD, listTop, cardX + cardW - PAD, listBottom);
         if (loading) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.host.loading"),
-                    this.width / 2, CONTENT_TOP + 30, 0xFF888888);
+                    cardX + cardW / 2, listTop + 24, LanPlusUi.FAINT);
         } else if (worlds.isEmpty()) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.host.noworlds"),
-                    this.width / 2, CONTENT_TOP + 30, 0xFF888888);
+                    cardX + cardW / 2, listTop + 24, LanPlusUi.FAINT);
         } else {
-            renderWorldList(g, mouseX, mouseY, listBottom);
+            renderWorldList(g, mouseX, mouseY);
         }
 
-        g.drawString(this.font, Component.translatable("gui.lanplus.host.access"), MARGIN, this.height - 92, 0xFF9AA0A6);
+        g.drawString(this.font, Component.translatable("gui.lanplus.host.access"),
+                cardX + PAD, chipsY - 14, LanPlusUi.MUTED, false);
+        int chipW = (cardW - 2 * PAD - 2 * 6) / 3;
+        renderModeChip(g, mouseX, mouseY, HostAccessMode.EVERYONE, "gui.lanplus.host.access.everyone",
+                cardX + PAD, chipW);
+        renderModeChip(g, mouseX, mouseY, HostAccessMode.FRIENDS, "gui.lanplus.host.access.friends",
+                cardX + PAD + chipW + 6, chipW);
+        renderModeChip(g, mouseX, mouseY, HostAccessMode.INVITED, "gui.lanplus.host.access.invited",
+                cardX + PAD + 2 * (chipW + 6), cardW - 2 * PAD - 2 * (chipW + 6));
+
+        Component premium = Component.translatable("gui.lanplus.host.nonpremium", Component.translatable(
+                allowNonPremium ? "gui.lanplus.host.nonpremium.on" : "gui.lanplus.host.nonpremium.off"));
+        boolean hover = in(mouseX, mouseY, cardX + PAD, premiumY, cardW - 2 * PAD, 20);
+        LanPlusUi.chip(g, this.font, premium, cardX + PAD, premiumY, cardW - 2 * PAD, 20,
+                allowNonPremium, true, hover);
+        if (hover) {
+            g.renderTooltip(this.font, Component.translatable("gui.lanplus.host.nonpremium.tip"), mouseX, mouseY);
+        }
+
         super.render(g, mouseX, mouseY, partialTick);
     }
 
-    private void renderWorldList(GuiGraphics g, int mouseX, int mouseY, int listBottom) {
-        int y = CONTENT_TOP + 2;
+    private void renderModeChip(GuiGraphics g, int mouseX, int mouseY, HostAccessMode mode, String key,
+                                int x, int w) {
+        boolean enabled = !allowNonPremium;
+        boolean hover = enabled && in(mouseX, mouseY, x, chipsY, w, 20);
+        LanPlusUi.chip(g, this.font, Component.translatable(key), x, chipsY, w, 20,
+                accessMode == mode, enabled, hover);
+    }
+
+    private void renderWorldList(GuiGraphics g, int mouseX, int mouseY) {
+        int x0 = cardX + PAD;
+        int x1 = cardX + cardW - PAD;
+        int y = listTop + 2 - listScroll;
         for (int i = 0; i < worlds.size(); i++) {
-            if (y + ROW_H > listBottom) {
-                break;
+            if (y + ROW_H > listTop && y < listBottom) {
+                boolean sel = i == selected;
+                boolean hover = in(mouseX, mouseY, x0, Math.max(y, listTop), x1 - x0,
+                        Math.min(y + ROW_H, listBottom) - Math.max(y, listTop));
+                if (sel || hover) {
+                    g.fill(x0 + 1, Math.max(y, listTop), x1 - 1, Math.min(y + ROW_H, listBottom),
+                            sel ? LanPlusUi.BLURPLE_TINT : 0x14FFFFFF);
+                }
+                if (sel) {
+                    g.fill(x0 + 1, Math.max(y, listTop), x0 + 3, Math.min(y + ROW_H, listBottom),
+                            LanPlusUi.BLURPLE);
+                }
+                LevelSummary s = worlds.get(i);
+                if (y + 4 >= listTop && y + 12 <= listBottom) {
+                    g.drawString(this.font, s.getLevelName(), x0 + 8, y + 4, LanPlusUi.TEXT, false);
+                }
+                if (y + 14 >= listTop && y + 22 <= listBottom) {
+                    g.drawString(this.font, s.getLevelId(), x0 + 8, y + 14, LanPlusUi.FAINT, false);
+                }
             }
-            boolean sel = i == selected;
-            boolean hover = mouseX >= MARGIN && mouseX <= this.width - MARGIN && mouseY >= y && mouseY < y + ROW_H;
-            if (sel || hover) {
-                g.fill(MARGIN, y, this.width - MARGIN, y + ROW_H, sel ? 0x40FFFFFF : 0x20FFFFFF);
-            }
-            LevelSummary s = worlds.get(i);
-            g.drawString(this.font, s.getLevelName(), MARGIN + 8, y + 4, 0xFFFFFFFF);
-            g.drawString(this.font, s.getLevelId(), MARGIN + 8, y + 14, 0xFF9AA0A6);
             y += ROW_H;
         }
     }
 
+    private static boolean in(double mx, double my, int x, int y, int w, int h) {
+        return mx >= x && mx < x + w && my >= y && my < y + h;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (in(mouseX, mouseY, cardX + PAD, listTop, cardW - 2 * PAD, listBottom - listTop)) {
+            int max = Math.max(0, worlds.size() * ROW_H + 4 - (listBottom - listTop));
+            listScroll = Math.max(0, Math.min(max, listScroll - (int) (delta * ROW_H)));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && !loading) {
-            int listBottom = this.height - 86;
-            int y = CONTENT_TOP + 2;
-            for (int i = 0; i < worlds.size() && y + ROW_H <= listBottom; i++) {
-                if (mouseX >= MARGIN && mouseX <= this.width - MARGIN && mouseY >= y && mouseY < y + ROW_H) {
-                    selected = i;
+        if (button == 0) {
+            if (!loading && in(mouseX, mouseY, cardX + PAD, listTop, cardW - 2 * PAD, listBottom - listTop)) {
+                int idx = (int) ((mouseY - (listTop + 2 - listScroll)) / ROW_H);
+                if (idx >= 0 && idx < worlds.size()) {
+                    selected = idx;
                     rebuildWidgets();
-                    return true;
                 }
-                y += ROW_H;
+                return true;
+            }
+            int chipW = (cardW - 2 * PAD - 2 * 6) / 3;
+            if (!allowNonPremium && in(mouseX, mouseY, cardX + PAD, chipsY, cardW - 2 * PAD, 20)) {
+                if (mouseX < cardX + PAD + chipW) {
+                    accessMode = HostAccessMode.EVERYONE;
+                } else if (mouseX < cardX + PAD + 2 * chipW + 6) {
+                    accessMode = HostAccessMode.FRIENDS;
+                } else {
+                    accessMode = HostAccessMode.INVITED;
+                }
+                return true;
+            }
+            if (in(mouseX, mouseY, cardX + PAD, premiumY, cardW - 2 * PAD, 20)) {
+                allowNonPremium = !allowNonPremium;
+                if (allowNonPremium) {
+                    accessMode = HostAccessMode.EVERYONE;
+                }
+                return true;
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -135,6 +223,7 @@ HostScreen extends Screen {
                         }
                         this.worlds = usable;
                         this.loading = false;
+                        rebuildWidgets();
                     }));
         } catch (LevelStorageException e) {
             this.worlds = List.of();
@@ -153,29 +242,5 @@ HostScreen extends Screen {
         } else {
             this.minecraft.setScreen(new InviteOverlayScreen(this, world, accessMode));
         }
-    }
-
-    private Button modeButton(String key, HostAccessMode mode, int x, int y) {
-        Button b = Button.builder(Component.translatable(key), btn -> {
-            this.accessMode = mode;
-            rebuildWidgets();
-        }).bounds(x, y, 112, 20).build();
-        b.active = !allowNonPremium && this.accessMode != mode;
-        return b;
-    }
-
-    private Button nonPremiumButton(int x, int y) {
-        String state = allowNonPremium ? "gui.lanplus.host.nonpremium.on" : "gui.lanplus.host.nonpremium.off";
-        Button b = Button.builder(Component.translatable("gui.lanplus.host.nonpremium",
-                Component.translatable(state)), btn -> {
-            this.allowNonPremium = !this.allowNonPremium;
-            if (this.allowNonPremium) {
-                this.accessMode = HostAccessMode.EVERYONE; // offline-mode is open-world only (Phase 1)
-            }
-            rebuildWidgets();
-        }).bounds(x, y, 230, 20).build();
-        b.setTooltip(net.minecraft.client.gui.components.Tooltip.create(
-                Component.translatable("gui.lanplus.host.nonpremium.tip")));
-        return b;
     }
 }

@@ -25,6 +25,7 @@ import dev.bgame.lanplus.skins.DefaultSkinService;
 import dev.bgame.lanplus.skins.SkinService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
+import net.minecraft.client.server.IntegratedServer;
 import org.slf4j.Logger;
 
 import java.util.List;
@@ -60,10 +61,11 @@ public final class LanPlusClient {
         profiles = new DefaultProfilesService(network, LanPlusClient::localIdentity);
 
         skinTextures = new SkinTextures();
-        skins = new DefaultSkinService(skinTextures);
+        skins = new DefaultSkinService(skinTextures, network);
         friends.addListener(LanPlusClient::resolveFriendSkins);
 
-        discord = new DiscordRichPresence(Config.discordEnabled ? Config.discordAppId : "");
+        discord = new DiscordRichPresence(Config.discordEnabled ? Config.discordAppId : "",
+                LanPlusClient::integratedPartySize, LanPlusClient::joinFromDiscord);
         presence.addListener(discord::update);
         discord.update(presence.current());
 
@@ -148,15 +150,58 @@ public final class LanPlusClient {
         }
     }
 
+    public static UUID selfUuid() {
+        if (network != null) {
+            UUID session = network.sessionUuid();
+            if (session != null) {
+                return session;
+            }
+        }
+        try {
+            User user = Minecraft.getInstance().getUser();
+            return user == null ? null : user.getProfileId();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     private static PlayerIdentity localIdentity() {
         User user = Minecraft.getInstance().getUser();
         if (user == null) {
             return null;
         }
         try {
-            return new PlayerIdentity(user.getProfileId(), user.getName());
+            UUID uuid = selfUuid();
+            return uuid == null ? null : new PlayerIdentity(uuid, user.getName());
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    private static int[] integratedPartySize() {
+        try {
+            IntegratedServer server = Minecraft.getInstance().getSingleplayerServer();
+            if (server == null || !server.isPublished()) {
+                return null;
+            }
+            return new int[]{server.getPlayerCount(), server.getMaxPlayers()};
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static void joinFromDiscord(String inviteCode) {
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> {
+            InviteService inviteService = invites;
+            if (inviteService == null || inviteCode == null || inviteCode.isBlank()) {
+                return;
+            }
+            inviteService.resolve(inviteCode).whenComplete((invite, err) -> mc.execute(() -> {
+                if (err == null && invite != null) {
+                    JoinHelper.connect(mc, invite.address());
+                }
+            }));
+        });
     }
 }

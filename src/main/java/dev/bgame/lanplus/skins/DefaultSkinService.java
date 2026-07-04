@@ -5,6 +5,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.bgame.lanplus.api.SkinRef;
+import dev.bgame.lanplus.api.SkinUploadResult;
+import dev.bgame.lanplus.network.LanPlusNetwork;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -28,14 +30,29 @@ public final class DefaultSkinService implements SkinService {
     private static final String PROFILE_API = "https://sessionserver.mojang.com/session/minecraft/profile/";
 
     private final SkinTextureSink sink;
+    private final LanPlusNetwork network;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final Executor executor = Executors.newFixedThreadPool(2, daemon());
     private final ConcurrentHashMap<String, byte[]> cache = new ConcurrentHashMap<>();
 
     private volatile SkinRef localSkin;
 
-    public DefaultSkinService(SkinTextureSink sink) {
+    public DefaultSkinService(SkinTextureSink sink, LanPlusNetwork network) {
         this.sink = sink;
+        this.network = network;
+    }
+
+    @Override
+    public CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, boolean slim) {
+        if (network == null) {
+            return CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"));
+        }
+        return network.uploadSkin(png, slim ? "slim" : null);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> deleteSkin() {
+        return network == null ? CompletableFuture.completedFuture(false) : network.deleteSkin();
     }
 
     @Override

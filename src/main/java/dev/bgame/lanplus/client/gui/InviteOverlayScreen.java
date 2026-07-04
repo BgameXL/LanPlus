@@ -55,16 +55,16 @@ public final class InviteOverlayScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         renderBackground(g);
-        g.fill(panelX, panelY, panelX + PANEL_W, panelY + PANEL_H, 0xF0101018);
-        g.fill(panelX, panelY, panelX + PANEL_W, panelY + 22, 0xFF1B1B26);
-        g.drawString(this.font, this.title, panelX + 8, panelY + 7, 0xFFFFFFFF);
+        LanPlusUi.backdrop(g, this.width, this.height);
+        LanPlusUi.panel(g, panelX, panelY, panelX + PANEL_W, panelY + PANEL_H);
+        LanPlusUi.header(g, this.font, this.title, panelX + 8, panelY + 8, PANEL_W - 32);
 
         List<Friend> friends = friends();
         int listTop = panelY + 28;
         int listBottom = panelY + PANEL_H - 32;
         if (friends.isEmpty()) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.invite.nofriends"),
-                    panelX + PANEL_W / 2, listTop + 20, 0xFF888888);
+                    panelX + PANEL_W / 2, listTop + 20, LanPlusUi.FAINT);
         } else {
             int y = listTop;
             for (Friend f : friends) {
@@ -74,13 +74,14 @@ public final class InviteOverlayScreen extends Screen {
                 boolean on = picked.contains(f.uuid());
                 boolean hover = mouseX >= panelX + 6 && mouseX <= panelX + PANEL_W - 6 && mouseY >= y && mouseY < y + ROW_H;
                 if (hover) {
-                    g.fill(panelX + 6, y, panelX + PANEL_W - 6, y + ROW_H, 0x20FFFFFF);
+                    g.fill(panelX + 6, y, panelX + PANEL_W - 6, y + ROW_H, 0x14FFFFFF);
                 }
                 int bx = panelX + 10;
                 int by = y + 5;
-                g.fill(bx, by, bx + 9, by + 9, 0xFF555560);
-                g.fill(bx + 1, by + 1, bx + 8, by + 8, on ? 0xFF43B581 : 0xFF1B1B26);
-                g.drawString(this.font, f.username(), panelX + 26, y + 5, 0xFFFFFFFF);
+                g.fill(bx, by, bx + 9, by + 9, on ? LanPlusUi.BLURPLE : LanPlusUi.SURFACE_RAISED);
+                LanPlusUi.border(g, bx, by, bx + 9, by + 9);
+                g.drawString(this.font, f.username(), panelX + 26, y + 5,
+                        on ? LanPlusUi.TEXT : LanPlusUi.MUTED, false);
                 y += ROW_H;
             }
         }

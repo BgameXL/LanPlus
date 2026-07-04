@@ -6,6 +6,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -72,7 +73,12 @@ public final class BackendServer {
                 return;
             }
             Resp r = route(req);
-            Http.writeJson(socket.getOutputStream(), r.status, r.body);
+            if (r.raw != null) {
+                Http.writeBytes(socket.getOutputStream(), r.status, r.contentType, r.raw,
+                        "public, max-age=300");
+            } else {
+                Http.writeJson(socket.getOutputStream(), r.status, r.body);
+            }
             socket.close();
         } catch (IOException e) {
             close(socket);
@@ -80,7 +86,11 @@ public final class BackendServer {
     }
 
     // REST routing
-    private record Resp(int status, Object body) {}
+    private record Resp(int status, Object body, byte[] raw, String contentType) {
+        Resp(int status, Object body) {
+            this(status, body, null, null);
+        }
+    }
 
     private static Resp ok(Object body) {
         return new Resp(200, body);
@@ -110,6 +120,9 @@ public final class BackendServer {
             }
             if (m.equals("GET") && path.equals("/relay/guest/validate")) {
                 return relayGuestValidate(req);
+            }
+            if (m.equals("GET") && path.startsWith("/skins/") && path.endsWith(".png")) {
+                return skinPng(path.substring("/skins/".length(), path.length() - ".png".length()));
             }
             Store.Session session = store.validateSession(bearer(req));
             if (session == null) {
@@ -169,6 +182,13 @@ public final class BackendServer {
             }
             if (m.equals("POST") && path.equals("/profile/advancement")) {
                 return profileAdvancement(req, self);
+            }
+            if (m.equals("POST") && path.equals("/skin")) {
+                return skinUpload(req, self);
+            }
+            if (m.equals("POST") && path.equals("/skin/delete")) {
+                store.deleteHostedSkin(self);
+                return ok(Map.of("success", true));
             }
             if (m.equals("GET") && path.equals("/modpacks")) {
                 return ok(store.listModpacks());
@@ -450,6 +470,75 @@ public final class BackendServer {
     private static Map<String, Object> error(String code) {
         return ordered("success", false, "error", code);
     }
+
+    // hosted skins
+    private static final int MAX_SKIN_B64_CHARS = 44 * 1024;
+    private static final int MAX_SKIN_PNG_BYTES = 32 * 1024;
+
+    private Resp skinUpload(Http.Request req, UUID self) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        Object modelObj = b.get("model");
+        String model = modelObj == null ? null : String.valueOf(modelObj);
+        if (model != null && !model.equals("slim")) {
+            return ok(error("bad_model"));
+        }
+        if (!(b.get("png") instanceof String b64) || b64.isEmpty()) {
+            return ok(error("bad_png"));
+        }
+        if (b64.length() > MAX_SKIN_B64_CHARS) {
+            return ok(error("too_large"));
+        }
+        byte[] png;
+        try {
+            png = Base64.getDecoder().decode(b64);
+        } catch (IllegalArgumentException e) {
+            return ok(error("bad_png"));
+        }
+        if (png.length > MAX_SKIN_PNG_BYTES) {
+            return ok(error("too_large"));
+        }
+        int[] dims = pngDimensions(png);
+        if (dims == null) {
+            return ok(error("bad_png"));
+        }
+        if (!(dims[0] == 64 && (dims[1] == 64 || dims[1] == 32))) {
+            return ok(error("bad_dimensions"));
+        }
+        String hash = Store.sha256Hex(png);
+        store.putHostedSkin(self, png, hash, model);
+        return ok(ordered("url", "/skins/" + self + ".png", "hash", hash));
+    }
+
+    private Resp skinPng(String uuidPart) {
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(uuidPart);
+        } catch (IllegalArgumentException e) {
+            return NOT_FOUND;
+        }
+        byte[] png = store.hostedSkinPng(uuid);
+        return png == null ? NOT_FOUND : new Resp(200, null, png, "image/png");
+    }
+
+    /** Width/height from the PNG IHDR (no image decoding), or null if not a well-formed PNG header. */
+    private static int[] pngDimensions(byte[] png) {
+        byte[] sig = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+        if (png.length < 24) {
+            return null;
+        }
+        for (int i = 0; i < sig.length; i++) {
+            if (png[i] != sig[i]) {
+                return null;
+            }
+        }
+        if (png[12] != 'I' || png[13] != 'H' || png[14] != 'D' || png[15] != 'R') {
+            return null;
+        }
+        int w = ((png[16] & 0xFF) << 24) | ((png[17] & 0xFF) << 16) | ((png[18] & 0xFF) << 8) | (png[19] & 0xFF);
+        int h = ((png[20] & 0xFF) << 24) | ((png[21] & 0xFF) << 16) | ((png[22] & 0xFF) << 8) | (png[23] & 0xFF);
+        return new int[]{w, h};
+    }
+
 
     private static boolean containsObviousLink(String text) {
         String t = text.toLowerCase(Locale.ROOT);

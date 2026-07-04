@@ -3,7 +3,6 @@ package dev.bgame.lanplus.mixin.client;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -34,10 +33,6 @@ public abstract class AbstractClientPlayerMixin {
     }
 
     private SkinTextures.Resolved lanplus$resolved() {
-        if ((Object) this instanceof LocalPlayer) {
-            return null;
-        }
-        
         SkinTextures textures = LanPlusClient.skinTextures();
         return textures == null ? null : textures.get(((AbstractClientPlayer) (Object) this).getUUID());
     }
