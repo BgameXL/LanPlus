@@ -1,9 +1,11 @@
 package dev.bgame.lanplus.client.gui;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.client.HostController;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.FaviconTexture;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -11,8 +13,13 @@ import net.minecraft.world.level.storage.LevelStorageException;
 import net.minecraft.world.level.storage.LevelStorageSource;
 import net.minecraft.world.level.storage.LevelSummary;
 
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -26,8 +33,10 @@ public final class HostScreen extends Screen {
     private static final int CARD_W = 320;
     private static final int ROW_H = 24;
     private static final int PAD = 10;
+    private static final int ICON = ROW_H - 4;
 
     private final Screen parent;
+    private final Map<String, FaviconTexture> icons = new HashMap<>();
     private List<LevelSummary> worlds = List.of();
     private boolean loading = true;
     private int selected = -1;
@@ -66,6 +75,10 @@ public final class HostScreen extends Screen {
     protected void init() {
         if (loading) {
             loadWorlds();
+        } else if (icons.isEmpty() && !worlds.isEmpty()) {
+            for (LevelSummary s : worlds) {
+                loadIcon(s);
+            }
         }
         layout();
 
@@ -147,11 +160,16 @@ public final class HostScreen extends Screen {
                             LanPlusUi.BLURPLE);
                 }
                 LevelSummary s = worlds.get(i);
+                FaviconTexture icon = icons.get(s.getLevelId());
+                if (icon != null && y + 2 >= listTop && y + 2 + ICON <= listBottom) {
+                    g.blit(icon.textureLocation(), x0 + 4, y + 2, ICON, ICON, 0.0F, 0.0F, 64, 64, 64, 64);
+                }
+                int textX = x0 + 8 + ICON + 6;
                 if (y + 4 >= listTop && y + 12 <= listBottom) {
-                    g.drawString(this.font, s.getLevelName(), x0 + 8, y + 4, LanPlusUi.TEXT, false);
+                    g.drawString(this.font, s.getLevelName(), textX, y + 4, LanPlusUi.TEXT, false);
                 }
                 if (y + 14 >= listTop && y + 22 <= listBottom) {
-                    g.drawString(this.font, s.getLevelId(), x0 + 8, y + 14, LanPlusUi.FAINT, false);
+                    g.drawString(this.font, s.getLevelId(), textX, y + 14, LanPlusUi.FAINT, false);
                 }
             }
             y += ROW_H;
@@ -219,6 +237,7 @@ public final class HostScreen extends Screen {
                         for (LevelSummary s : list) {
                             if (!s.isDisabled()) {
                                 usable.add(s);
+                                loadIcon(s);
                             }
                         }
                         this.worlds = usable;
@@ -229,6 +248,34 @@ public final class HostScreen extends Screen {
             this.worlds = List.of();
             this.loading = false;
         }
+    }
+
+    private void loadIcon(LevelSummary summary) {
+        Path iconFile = summary.getIcon();
+        if (iconFile == null || !Files.isRegularFile(iconFile)) {
+            return;
+        }
+        FaviconTexture tex = FaviconTexture.forWorld(this.minecraft.getTextureManager(), summary.getLevelId());
+        try (InputStream in = Files.newInputStream(iconFile)) {
+            NativeImage image = NativeImage.read(in);
+            if (image.getWidth() == 64 && image.getHeight() == 64) {
+                tex.upload(image); // takes ownership of the NativeImage
+                icons.put(summary.getLevelId(), tex);
+            } else {
+                image.close();
+                tex.close();
+            }
+        } catch (Throwable t) {
+            tex.close();
+        }
+    }
+
+    @Override
+    public void removed() {
+        for (FaviconTexture tex : icons.values()) {
+            tex.close();
+        }
+        icons.clear();
     }
 
     private void doHost() {
