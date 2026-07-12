@@ -27,7 +27,8 @@ public record Profile(
         int advancements,
         int xp,
         Map<String, Integer> xpSources,
-        ProfileBackground background
+        ProfileBackground background,
+        CatalogImage banner
 ) {
     public Profile {
         Objects.requireNonNull(uuid, "uuid");

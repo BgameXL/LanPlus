@@ -1,5 +1,6 @@
 package dev.bgame.lanplus.profiles;
 
+import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.Profile;
 
@@ -19,7 +20,15 @@ public interface ProfilesService {
 
     CompletableFuture<String> setFavoriteModpack(String modpackId);
 
-    CompletableFuture<String> setBackground(String style, int color, int opacity);
+    CompletableFuture<String> setBackground(String style, int color, int opacity, String imageId);
+
+    CompletableFuture<String> setBanner(String bannerId);
+
+    CompletableFuture<List<CatalogImage>> backgrounds();
+
+    CompletableFuture<List<CatalogImage>> banners();
+
+    CompletableFuture<byte[]> imageBytes(CatalogImage image);
 
     CompletableFuture<List<ModpackRef>> modpacks();
 

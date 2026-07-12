@@ -1,5 +1,6 @@
 package dev.bgame.lanplus.network;
 
+import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.ModpackRef;
@@ -106,8 +107,9 @@ final class Wire {
                       Map<String, String> links, Map<String, String> prompts,
                       boolean online, Long lastSeen, Boolean invisible, ModpackDto currentlyPlaying,
                       ModpackDto lastPlayed, ModpackDto favorite, ModpackDto recentlyPlayed,
-                      BackgroundDto background, SettingsDto settings, ProgressionDto progression) {
-        Profile toApi() {
+                      BackgroundDto background, CatalogImageDto banner,
+                      SettingsDto settings, ProgressionDto progression) {
+        Profile toApi(String base) {
             SettingsDto s = settings == null ? new SettingsDto(true, true, true) : settings;
             ProgressionDto p = progression == null ? new ProgressionDto(0, 0, null, null) : progression;
             return new Profile(UUID.fromString(uuid), username, friendCode,
@@ -128,7 +130,8 @@ final class Wire {
                     p.advancements() == null ? 0 : p.advancements(),
                     p.xp() == null ? -1 : p.xp(),
                     p.sources() == null ? Map.of() : p.sources(),
-                    background == null ? ProfileBackground.DEFAULT : background.toApi());
+                    background == null ? ProfileBackground.DEFAULT : background.toApi(base),
+                    banner == null ? null : banner.toApi(base));
         }
     }
 
@@ -140,16 +143,43 @@ final class Wire {
         }
     }
 
-    record BackgroundDto(String style, Integer color, Integer opacity) {
-        ProfileBackground toApi() {
+    record BackgroundDto(String style, Integer color, Integer opacity,
+                         String imageId, String image, String imageHash) {
+        ProfileBackground toApi(String base) {
+            CatalogImage img = imageId == null || image == null ? null
+                    : new CatalogImage(imageId, versionedUrl(base, image, imageHash), imageHash);
             return new ProfileBackground(
                     style,
                     color == null ? ProfileBackground.DEFAULT.color() : color,
-                    opacity == null ? ProfileBackground.DEFAULT.opacity() : opacity);
+                    opacity == null ? ProfileBackground.DEFAULT.opacity() : opacity,
+                    img);
         }
     }
 
-    record BackgroundUpdate(String uuid, BackgroundDto background) {}
+    record CatalogImageDto(String id, String url, String hash) {
+        CatalogImage toApi(String base) {
+            return id == null || url == null ? null
+                    : new CatalogImage(id, versionedUrl(base, url, hash), hash);
+        }
+    }
+
+    /**
+     * Catalog urls arrive relative to the backend; the per-id url is stable across replacements,
+     * so it is versioned by content hash — url-keyed caches (memory and disk) re-download on change.
+     */
+    static String versionedUrl(String base, String url, String hash) {
+        String absolute = url.startsWith("http") ? url : base + url;
+        if (hash == null || hash.isEmpty()) {
+            return absolute;
+        }
+        return absolute + "?v=" + hash.substring(0, Math.min(16, hash.length()));
+    }
+
+    record BackgroundUpdateDto(String style, Integer color, Integer opacity, String imageId) {}
+
+    record BackgroundUpdate(String uuid, BackgroundUpdateDto background) {}
+
+    record BannerUpdate(String uuid, String bannerId) {}
 
     record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {}
 

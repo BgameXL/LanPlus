@@ -283,11 +283,11 @@ public final class HostScreen extends Screen {
         if (world == null) {
             return;
         }
-        if (accessMode == HostAccessMode.EVERYONE) {
+        if (accessMode == HostAccessMode.INVITED) {
+            this.minecraft.setScreen(new InviteOverlayScreen(this, world, accessMode));
+        } else {
             HostController.requestHost(accessMode, Set.of(), allowNonPremium);
             this.minecraft.createWorldOpenFlows().loadLevel(this, world.getLevelId());
-        } else {
-            this.minecraft.setScreen(new InviteOverlayScreen(this, world, accessMode));
         }
     }
 }

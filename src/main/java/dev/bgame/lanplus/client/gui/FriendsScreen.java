@@ -66,7 +66,9 @@ public final class FriendsScreen extends Screen {
     private UUID selectedUuid;
     private EditBox addBox;
     private EditBox joinBox;
+    private static final long STATUS_DISPLAY_MS = 4000;
     private Component status;
+    private long statusUntil;
     private boolean primed;
     private boolean showAddress;
     private boolean showCode;
@@ -171,7 +173,11 @@ public final class FriendsScreen extends Screen {
         renderDetail(g, rightX, rightW);
 
         if (status != null) {
-            g.drawString(this.font, status, leftX, paneBottom + 13, LanPlusUi.MUTED);
+            if (System.currentTimeMillis() < statusUntil) {
+                g.drawString(this.font, status, leftX, paneBottom + 13, LanPlusUi.MUTED);
+            } else {
+                status = null;
+            }
         }
         super.render(g, mouseX, mouseY, partialTick);
         renderContextMenu(g, mouseX, mouseY);
@@ -656,6 +662,7 @@ public final class FriendsScreen extends Screen {
 
     private void setStatus(Component message) {
         this.status = message;
+        this.statusUntil = System.currentTimeMillis() + STATUS_DISPLAY_MS;
     }
 
     private UserProfile localProfile() {

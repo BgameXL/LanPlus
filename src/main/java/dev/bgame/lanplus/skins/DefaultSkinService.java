@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinUploadResult;
+import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.network.LanPlusNetwork;
 
 import java.nio.charset.StandardCharsets;
@@ -13,7 +14,6 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -23,7 +23,8 @@ import java.net.http.HttpClient;
  * Resolves skin references into PNG bytes off the game thread and hands them to a {@link
  * SkinTextureSink} for client-side binding. MOJANG refs are resolved via the session server (which
  * also carries the slim/classic model); CUSTOM refs are fetched directly behind {@link SkinUrlGuard}.
- * Bytes are cached by key (hash or URL) so a shared URL or a reconnecting player is not re-downloaded.
+ * Bytes are cached by key (hash or URL) in the shared {@link AssetCache} (memory + disk), so a
+ * shared URL or a reconnecting player is not re-downloaded, across sessions too.
  */
 public final class DefaultSkinService implements SkinService {
 
@@ -31,15 +32,16 @@ public final class DefaultSkinService implements SkinService {
 
     private final SkinTextureSink sink;
     private final LanPlusNetwork network;
+    private final AssetCache cache;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final Executor executor = Executors.newFixedThreadPool(2, daemon());
-    private final ConcurrentHashMap<String, byte[]> cache = new ConcurrentHashMap<>();
 
     private volatile SkinRef localSkin;
 
-    public DefaultSkinService(SkinTextureSink sink, LanPlusNetwork network) {
+    public DefaultSkinService(SkinTextureSink sink, LanPlusNetwork network, AssetCache cache) {
         this.sink = sink;
         this.network = network;
+        this.cache = cache;
     }
 
     @Override
@@ -140,12 +142,12 @@ public final class DefaultSkinService implements SkinService {
     }
 
     private byte[] download(String key, String url) {
-        byte[] cached = cache.get(key);
+        byte[] cached = cache == null ? null : cache.get(key);
         if (cached != null) {
             return cached;
         }
         byte[] png = SkinUrlGuard.fetch(http, url);
-        if (png != null) {
+        if (png != null && cache != null) {
             cache.put(key, png);
         }
         return png;

@@ -13,10 +13,12 @@ final class BackendConfig {
     final String sessionServerUrl;
     final boolean allowOffline;
     final long sessionTtlMs;
+    final String backgroundsDir;
+    final String bannersDir;
 
     private BackendConfig(InetSocketAddress bind, String baseDomain, String relayHost, int relayPort,
                           int heartbeatTtlMs, String dataFile, String sessionServerUrl, boolean allowOffline,
-                          long sessionTtlMs) {
+                          long sessionTtlMs, String backgroundsDir, String bannersDir) {
         this.bind = bind;
         this.baseDomain = baseDomain;
         this.relayHost = relayHost;
@@ -26,6 +28,8 @@ final class BackendConfig {
         this.sessionServerUrl = sessionServerUrl;
         this.allowOffline = allowOffline;
         this.sessionTtlMs = sessionTtlMs;
+        this.backgroundsDir = backgroundsDir;
+        this.bannersDir = bannersDir;
     }
 
     static BackendConfig fromEnv() {
@@ -38,7 +42,9 @@ final class BackendConfig {
                 env("LANPLUS_BACKEND_DATA_FILE", "lanplus.db"),
                 stripTrailingSlash(env("LANPLUS_BACKEND_SESSION_SERVER", "https://sessionserver.mojang.com")),
                 bool("LANPLUS_BACKEND_ALLOW_OFFLINE", true),
-                (long) intEnv("LANPLUS_BACKEND_SESSION_TTL_SECONDS", 30 * 24 * 3600) * 1000);
+                (long) intEnv("LANPLUS_BACKEND_SESSION_TTL_SECONDS", 30 * 24 * 3600) * 1000,
+                env("LANPLUS_BACKEND_BACKGROUNDS_DIR", "backgrounds"),
+                env("LANPLUS_BACKEND_BANNERS_DIR", "banners"));
     }
 
     private static InetSocketAddress addr(String s) {

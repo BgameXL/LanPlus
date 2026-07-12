@@ -1,5 +1,6 @@
 package dev.bgame.lanplus.network;
 
+import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.Invite;
 import dev.bgame.lanplus.api.ModpackRef;
@@ -37,7 +38,10 @@ public interface LanPlusNetwork {
                                             Boolean favoriteVisible, Boolean currentlyPlayingVisible,
                                             Boolean recentlyPlayedVisible);
     CompletableFuture<String> setFavoriteModpack(UUID uuid, String modpackId);
-    CompletableFuture<String> setBackground(UUID uuid, String style, int color, int opacity);
+    CompletableFuture<String> setBackground(UUID uuid, String style, int color, int opacity, String imageId);
+    CompletableFuture<String> setBanner(UUID uuid, String bannerId);
+    CompletableFuture<List<CatalogImage>> getBackgrounds();
+    CompletableFuture<List<CatalogImage>> getBanners();
     CompletableFuture<List<ModpackRef>> getModpacks();
     CompletableFuture<Void> reportAdvancement(UUID uuid, String advancementId);
     CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, String model);

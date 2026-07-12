@@ -233,6 +233,13 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     @Override
     public void onFriendRequest(UUID fromUuid, String fromUsername) {
         refreshRequests();
+        for (FriendsListener listener : listeners) {
+            try {
+                listener.onFriendRequest(fromUuid, fromUsername);
+            } catch (RuntimeException e) {
+                LOGGER.warn("LAN+ friends listener error", e);
+            }
+        }
     }
 
     @Override

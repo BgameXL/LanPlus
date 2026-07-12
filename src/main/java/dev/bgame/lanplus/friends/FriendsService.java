@@ -32,5 +32,7 @@ public interface FriendsService {
         void onFriendsChanged(List<Friend> friends);
         default void onFriendStartedHosting(UUID uuid, String joinCode) {
         }
+        default void onFriendRequest(UUID fromUuid, String fromUsername) {
+        }
     }
 }

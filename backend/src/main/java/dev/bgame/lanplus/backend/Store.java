@@ -98,6 +98,8 @@ final class Store {
 
     private final Object lock = new Object();
     private final Connection connection;
+    private final AssetCatalog backgrounds;
+    private final AssetCatalog banners;
 
     private final Map<UUID, Presence> presences = new ConcurrentHashMap<>();
     private final Map<String, Invite> invites = new ConcurrentHashMap<>();
@@ -106,12 +108,15 @@ final class Store {
     private final Map<String, Long> challenges = new ConcurrentHashMap<>(); // serverId -> expiresAt
 
     Store(long ttlMs, String baseDomain, String dataFile,
-          String sessionServerUrl, boolean allowOffline, long sessionTtlMs) {
+          String sessionServerUrl, boolean allowOffline, long sessionTtlMs,
+          AssetCatalog backgrounds, AssetCatalog banners) {
         this.ttlMs = ttlMs;
         this.baseDomain = baseDomain;
         this.sessionServerUrl = sessionServerUrl;
         this.allowOffline = allowOffline;
         this.sessionTtlMs = sessionTtlMs;
+        this.backgrounds = backgrounds;
+        this.banners = banners;
         String path = (dataFile == null || dataFile.isBlank()) ? ":memory:" : dataFile;
         this.connection = openDb(path);
     }
@@ -156,6 +161,7 @@ final class Store {
                         + "recently_played_visible INTEGER NOT NULL DEFAULT 1, "
                         + "currently_playing_visible INTEGER NOT NULL DEFAULT 1, "
                         + "bg_style TEXT, bg_color INTEGER, bg_opacity INTEGER, "
+                        + "bg_image_id TEXT, banner_id TEXT, "
                         + "updated_at INTEGER NOT NULL)");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS presence_state ("
                         + "uuid TEXT PRIMARY KEY, online INTEGER NOT NULL DEFAULT 0, last_disconnect_at INTEGER)");
@@ -194,6 +200,10 @@ final class Store {
                     st.executeUpdate("ALTER TABLE profile_settings ADD COLUMN bg_style TEXT");
                     st.executeUpdate("ALTER TABLE profile_settings ADD COLUMN bg_color INTEGER");
                     st.executeUpdate("ALTER TABLE profile_settings ADD COLUMN bg_opacity INTEGER");
+                }
+                if (!columnExists(st, "profile_settings", "bg_image_id")) {
+                    st.executeUpdate("ALTER TABLE profile_settings ADD COLUMN bg_image_id TEXT");
+                    st.executeUpdate("ALTER TABLE profile_settings ADD COLUMN banner_id TEXT");
                 }
                 st.executeUpdate("UPDATE presence_state SET online=0");
             }
@@ -897,7 +907,7 @@ final class Store {
     private static final Set<String> VISIBILITY_COLUMNS = Set.of(
             "favorite_modpack_visible", "currently_playing_visible", "recently_played_visible");
 
-    private static final Set<String> BACKGROUND_STYLES = Set.of("DARK", "SOLID", "MINECRAFT");
+    private static final Set<String> BACKGROUND_STYLES = Set.of("DARK", "SOLID", "MINECRAFT", "IMAGE");
     static final String DEFAULT_BG_STYLE = "DARK";
     static final int DEFAULT_BG_COLOR = 0x0A0C10;
     static final int DEFAULT_BG_OPACITY = 92;
@@ -1125,9 +1135,12 @@ final class Store {
                 String bgStyle = DEFAULT_BG_STYLE;
                 int bgColor = DEFAULT_BG_COLOR;
                 int bgOpacity = DEFAULT_BG_OPACITY;
+                String bgImageId = null;
+                String bannerId = null;
                 try (PreparedStatement ps = connection.prepareStatement(
                         "SELECT favorite_modpack_id, favorite_modpack_visible, currently_playing_visible, "
-                                + "recently_played_visible, bg_style, bg_color, bg_opacity "
+                                + "recently_played_visible, bg_style, bg_color, bg_opacity, "
+                                + "bg_image_id, banner_id "
                                 + "FROM profile_settings WHERE uuid=?")) {
                     ps.setString(1, uuid.toString());
                     try (ResultSet rs = ps.executeQuery()) {
@@ -1148,6 +1161,8 @@ final class Store {
                             if (!rs.wasNull()) {
                                 bgOpacity = Math.max(0, Math.min(100, opacity));
                             }
+                            bgImageId = rs.getString(8);
+                            bannerId = rs.getString(9);
                         }
                     }
                 }
@@ -1160,12 +1175,32 @@ final class Store {
                 m.put("lastPlayed", showLastPlayed ? resolveModpackLocked(lastModpackLocked(uuid)) : null);
                 m.put("favorite", (self || favoriteVisible) ? resolveModpackLocked(favoriteId) : null);
                 m.put("recentlyPlayed", (self || recentlyPlayedVisible) ? recentlyPlayedLocked(uuid) : null);
-
+                String bgImageHash = bgImageId == null || backgrounds == null ? null : backgrounds.hash(bgImageId);
+                if (bgImageHash == null) {
+                    bgImageId = null;
+                    if ("IMAGE".equals(bgStyle)) {
+                        bgStyle = DEFAULT_BG_STYLE;
+                    }
+                }
                 Map<String, Object> background = new LinkedHashMap<>();
                 background.put("style", bgStyle);
                 background.put("color", bgColor);
                 background.put("opacity", bgOpacity);
+                background.put("imageId", bgImageId);
+                background.put("image", bgImageId == null ? null : backgrounds.url(bgImageId));
+                background.put("imageHash", bgImageHash);
                 m.put("background", background);
+
+                String bannerHash = bannerId == null || banners == null ? null : banners.hash(bannerId);
+                if (bannerHash == null) {
+                    m.put("banner", null);
+                } else {
+                    Map<String, Object> banner = new LinkedHashMap<>();
+                    banner.put("id", bannerId);
+                    banner.put("url", banners.url(bannerId));
+                    banner.put("hash", bannerHash);
+                    m.put("banner", banner);
+                }
 
                 if (self) {
                     Map<String, Object> settings = new LinkedHashMap<>();
@@ -1437,6 +1472,46 @@ final class Store {
                 }
             } catch (SQLException e) {
                 throw fail("setBackground", e);
+            }
+        }
+    }
+
+    void setBackgroundImage(UUID uuid, String imageId) {
+        setSettingsText(uuid, "bg_image_id", imageId, "setBackgroundImage");
+    }
+
+    void setBanner(UUID uuid, String bannerId) {
+        setSettingsText(uuid, "banner_id", bannerId, "setBanner");
+    }
+
+    private void setSettingsText(UUID uuid, String column, String value, String op) {
+        String v = value == null || value.isBlank() ? null : value;
+        synchronized (lock) {
+            try {
+                ensureSettingsRowLocked(uuid);
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "UPDATE profile_settings SET " + column + "=?, updated_at=? WHERE uuid=?")) {
+                    ps.setString(1, v);
+                    ps.setLong(2, System.currentTimeMillis());
+                    ps.setString(3, uuid.toString());
+                    ps.executeUpdate();
+                }
+            } catch (SQLException e) {
+                throw fail(op, e);
+            }
+        }
+    }
+
+    String backgroundImageId(UUID uuid) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT bg_image_id FROM profile_settings WHERE uuid=?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getString(1) : null;
+                }
+            } catch (SQLException e) {
+                throw fail("backgroundImageId", e);
             }
         }
     }

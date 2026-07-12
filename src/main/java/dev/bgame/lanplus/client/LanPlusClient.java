@@ -6,6 +6,8 @@ import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.SkinRef;
+import dev.bgame.lanplus.client.gui.LanPlusNotifications;
+import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.discord.DiscordPresence;
 import dev.bgame.lanplus.discord.DiscordRichPresence;
 import dev.bgame.lanplus.friends.DefaultFriendsService;
@@ -26,6 +28,7 @@ import dev.bgame.lanplus.skins.SkinService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraftforge.fml.loading.FMLPaths;
 import org.slf4j.Logger;
 
 import java.util.List;
@@ -56,16 +59,18 @@ public final class LanPlusClient {
         }
         network = new HttpLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity,
                 new ClientMinecraftAuth());
+        AssetCache assetCache = new AssetCache(FMLPaths.GAMEDIR.get().resolve("lanplus/cache/assets"));
         presence = new DefaultPresenceManager(network);
         friends = new DefaultFriendsService(network, LanPlusClient::localIdentity);
-        profiles = new DefaultProfilesService(network, LanPlusClient::localIdentity);
+        profiles = new DefaultProfilesService(network, LanPlusClient::localIdentity, assetCache);
 
         skinTextures = new SkinTextures();
-        skins = new DefaultSkinService(skinTextures, network);
+        skins = new DefaultSkinService(skinTextures, network, assetCache);
         friends.addListener(LanPlusClient::resolveFriendSkins);
+        friends.addListener(new SocialToastListener());
 
         discord = new DiscordRichPresence(Config.discordEnabled ? Config.discordAppId : "",
-                LanPlusClient::integratedPartySize, LanPlusClient::joinFromDiscord);
+                LanPlusClient::integratedPartySize, LanPlusClient::joinByInviteCode);
         presence.addListener(discord::update);
         discord.update(presence.current());
 
@@ -190,7 +195,35 @@ public final class LanPlusClient {
         }
     }
 
-    private static void joinFromDiscord(String inviteCode) {
+    private static final class SocialToastListener implements FriendsService.FriendsListener {
+        @Override
+        public void onFriendsChanged(List<Friend> friends) {
+        }
+
+        @Override
+        public void onFriendStartedHosting(UUID uuid, String joinCode) {
+            LanPlusNotifications.friendHosting(uuid, usernameOf(uuid), joinCode);
+        }
+
+        @Override
+        public void onFriendRequest(UUID fromUuid, String fromUsername) {
+            String name = fromUsername != null && !fromUsername.isBlank() ? fromUsername : usernameOf(fromUuid);
+            LanPlusNotifications.friendRequest(fromUuid, name);
+        }
+
+        private static String usernameOf(UUID uuid) {
+            if (friends != null && uuid != null) {
+                for (Friend f : friends.friends()) {
+                    if (uuid.equals(f.uuid())) {
+                        return f.username();
+                    }
+                }
+            }
+            return "?";
+        }
+    }
+
+    public static void joinByInviteCode(String inviteCode) {
         Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> {
             InviteService inviteService = invites;

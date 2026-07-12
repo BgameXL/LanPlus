@@ -17,8 +17,9 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Small overlay shown after picking a world to host with FRIENDS/INVITED access: tick the friends to
- * pre-admit, then "Host now". Optional — closing it (Esc or the X) still hosts the world (Essential-style).
+ * Small overlay shown after picking a world to host with INVITED access: tick the friends to invite
+ * (only they may join, and each gets a "Join" notification), then "Host now". Optional — closing it
+ * (Esc or the X) still hosts the world.
  */
 public final class InviteOverlayScreen extends Screen {
 
@@ -120,6 +121,10 @@ public final class InviteOverlayScreen extends Screen {
         }
         launched = true;
         HostController.requestHost(mode, picked, false); // premium path: keep online-mode + uuid gate
+        if (!picked.isEmpty()) {
+            LanPlusNotifications.info(Component.translatable("gui.lanplus.toast.invited.title"),
+                    Component.translatable("gui.lanplus.toast.invited", picked.size()));
+        }
         this.minecraft.createWorldOpenFlows().loadLevel(parent, world.getLevelId());
     }
 

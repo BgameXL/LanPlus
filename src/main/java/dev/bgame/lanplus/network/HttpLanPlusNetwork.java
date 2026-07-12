@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
+import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.GameplayState;
@@ -277,7 +278,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         return get(path)
                 .thenApply(resp -> {
                     Wire.ProfileDto dto = GSON.fromJson(resp.body(), Wire.ProfileDto.class);
-                    return dto == null || dto.uuid() == null ? null : dto.toApi();
+                    return dto == null || dto.uuid() == null ? null : dto.toApi(base());
                 })
                 .exceptionally(err -> {
                     onError(err);
@@ -318,16 +319,64 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
-    public CompletableFuture<String> setBackground(UUID uuid, String style, int color, int opacity) {
+    public CompletableFuture<String> setBackground(UUID uuid, String style, int color, int opacity, String imageId) {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture("offline");
         }
-        Wire.BackgroundDto bg = new Wire.BackgroundDto(style, color, opacity);
+        Wire.BackgroundUpdateDto bg = new Wire.BackgroundUpdateDto(style, color, opacity, imageId);
         return postNulls("/profile/update", new Wire.BackgroundUpdate(uuid.toString(), bg))
                 .thenApply(this::parseUpdateResult)
                 .exceptionally(err -> {
                     onError(err);
                     return "offline";
+                });
+    }
+
+    @Override
+    public CompletableFuture<String> setBanner(UUID uuid, String bannerId) {
+        if (!configured() || uuid == null) {
+            return CompletableFuture.completedFuture("offline");
+        }
+        return postNulls("/profile/update", new Wire.BannerUpdate(uuid.toString(), bannerId))
+                .thenApply(this::parseUpdateResult)
+                .exceptionally(err -> {
+                    onError(err);
+                    return "offline";
+                });
+    }
+
+    @Override
+    public CompletableFuture<List<CatalogImage>> getBackgrounds() {
+        return getCatalog("/backgrounds");
+    }
+
+    @Override
+    public CompletableFuture<List<CatalogImage>> getBanners() {
+        return getCatalog("/banners");
+    }
+
+    private CompletableFuture<List<CatalogImage>> getCatalog(String path) {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get(path)
+                .thenApply(resp -> {
+                    Wire.CatalogImageDto[] arr = GSON.fromJson(resp.body(), Wire.CatalogImageDto[].class);
+                    if (arr == null) {
+                        return List.<CatalogImage>of();
+                    }
+                    List<CatalogImage> out = new ArrayList<>(arr.length);
+                    for (Wire.CatalogImageDto dto : arr) {
+                        CatalogImage img = dto == null ? null : dto.toApi(base());
+                        if (img != null) {
+                            out.add(img);
+                        }
+                    }
+                    return out;
+                })
+                .exceptionally(err -> {
+                    onError(err);
+                    return List.of();
                 });
     }
 

@@ -29,11 +29,15 @@ public final class BackendServer {
     private final BackendConfig cfg;
     private final Store store;
     private final EventHub hub = new EventHub();
+    private final AssetCatalog backgrounds;
+    private final AssetCatalog banners;
 
     private BackendServer(BackendConfig cfg) {
         this.cfg = cfg;
+        this.backgrounds = new AssetCatalog(java.nio.file.Path.of(cfg.backgroundsDir), "/backgrounds/");
+        this.banners = new AssetCatalog(java.nio.file.Path.of(cfg.bannersDir), "/banners/");
         this.store = new Store(cfg.heartbeatTtlMs, cfg.baseDomain, cfg.dataFile,
-                cfg.sessionServerUrl, cfg.allowOffline, cfg.sessionTtlMs);
+                cfg.sessionServerUrl, cfg.allowOffline, cfg.sessionTtlMs, backgrounds, banners);
     }
 
     public static void main(String[] args) throws Exception {
@@ -124,6 +128,12 @@ public final class BackendServer {
             if (m.equals("GET") && path.startsWith("/skins/") && path.endsWith(".png")) {
                 return skinPng(path.substring("/skins/".length(), path.length() - ".png".length()));
             }
+            if (m.equals("GET") && path.startsWith("/backgrounds/") && path.endsWith(".png")) {
+                return catalogPng(backgrounds, path.substring("/backgrounds/".length(), path.length() - ".png".length()));
+            }
+            if (m.equals("GET") && path.startsWith("/banners/") && path.endsWith(".png")) {
+                return catalogPng(banners, path.substring("/banners/".length(), path.length() - ".png".length()));
+            }
             Store.Session session = store.validateSession(bearer(req));
             if (session == null) {
                 return UNAUTHORIZED;
@@ -192,6 +202,12 @@ public final class BackendServer {
             }
             if (m.equals("GET") && path.equals("/modpacks")) {
                 return ok(store.listModpacks());
+            }
+            if (m.equals("GET") && path.equals("/backgrounds")) {
+                return ok(backgrounds.list());
+            }
+            if (m.equals("GET") && path.equals("/banners")) {
+                return ok(banners.list());
             }
             if (m.equals("POST") && path.equals("/invite/create")) {
                 return inviteCreate(req, self);
@@ -290,11 +306,15 @@ public final class BackendServer {
             hub.send(friend, Map.of("type", "PRESENCE_UPDATE", "data", data));
         }
         if (announceHosting && !invisible) {
+            boolean invited = "INVITED".equalsIgnoreCase((String) b.get("accessMode"));
+            log("hosting-start by " + uuid + " access=" + b.get("accessMode")
+                    + " -> joinCode " + (invited ? "sent (invited)" : "withheld"));
             for (UUID friend : recipients) {
                 if (!store.joinCodeVisibleTo(uuid, friend)) {
                     continue;
                 }
-                hub.send(friend, ordered("type", "FRIEND_STARTED_HOSTING", "uuid", uuid.toString(), "joinCode", joinCode));
+                hub.send(friend, ordered("type", "FRIEND_STARTED_HOSTING", "uuid", uuid.toString(),
+                        "joinCode", invited ? joinCode : null));
             }
         }
         return OK_EMPTY;
@@ -460,9 +480,32 @@ public final class BackendServer {
             if (style != null && !store.isBackgroundStyle(style)) {
                 return ok(error("bad_background"));
             }
+            boolean hasImageId = bg.containsKey("imageId");
+            Object imageObj = bg.get("imageId");
+            String imageId = imageObj == null || String.valueOf(imageObj).isBlank()
+                    ? null : String.valueOf(imageObj);
+            if (imageId != null && !backgrounds.has(imageId)) {
+                return ok(error("bad_background"));
+            }
+
+            String effectiveImage = hasImageId ? imageId : store.backgroundImageId(uuid);
+            if ("IMAGE".equals(style) && effectiveImage == null) {
+                return ok(error("bad_background"));
+            }
             int color = bg.get("color") instanceof Number cn ? cn.intValue() : Store.DEFAULT_BG_COLOR;
             int opacity = bg.get("opacity") instanceof Number on ? on.intValue() : Store.DEFAULT_BG_OPACITY;
             store.setBackground(uuid, style == null ? Store.DEFAULT_BG_STYLE : style, color, opacity);
+            if (hasImageId) {
+                store.setBackgroundImage(uuid, imageId);
+            }
+        }
+        if (b.containsKey("bannerId")) {
+            Object v = b.get("bannerId");
+            String bannerId = v == null || String.valueOf(v).isBlank() ? null : String.valueOf(v);
+            if (bannerId != null && !banners.has(bannerId)) {
+                return ok(error("bad_banner"));
+            }
+            store.setBanner(uuid, bannerId);
         }
         return ok(Map.of("success", true));
     }
@@ -507,6 +550,11 @@ public final class BackendServer {
         String hash = Store.sha256Hex(png);
         store.putHostedSkin(self, png, hash, model);
         return ok(ordered("url", "/skins/" + self + ".png", "hash", hash));
+    }
+
+    private static Resp catalogPng(AssetCatalog catalog, String id) {
+        byte[] png = catalog.png(id);
+        return png == null ? NOT_FOUND : new Resp(200, null, png, "image/png");
     }
 
     private Resp skinPng(String uuidPart) {
