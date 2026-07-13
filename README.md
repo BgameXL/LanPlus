@@ -58,7 +58,7 @@ Want your modpack to show up on players' LAN+ profiles? See [Integrating your mo
 
 ## Issues & feedback
 
-Found a bug or have an idea? Open an issue on [GitHub](https://github.com/BgameXL/LanPlus/issues) or come say hi on our [Discord](https://discord.gg/r7PeUvMytZ).
+Found a bug or have an idea? Open an issue on [GitHub](https://github.com/BgameXL/LanPlus/issues) or come say hi on our [Discord](https://discord.gg/kAKk3wRAVh).
 
 ## A note from Dev
 
