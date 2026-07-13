@@ -60,6 +60,11 @@ Want your modpack to show up on players' LAN+ profiles? See [Integrating your mo
 
 Found a bug or have an idea? Open an issue on [GitHub](https://github.com/BgameXL/LanPlus/issues) or come say hi on our [Discord](https://discord.gg/r7PeUvMytZ).
 
+## A note from Dev
+
+LAN+ is built with help from an AI coding tool (Claude). I use it, but every feature is designed, reviewed, and tested in-game by me before it ships.
+Over 70% is made by a human, 30% was made with AI
+
 ## License
 
 [GNU LGPL v3.0](https://github.com/BgameXL/LanPlus/blob/main/LICENSE)
