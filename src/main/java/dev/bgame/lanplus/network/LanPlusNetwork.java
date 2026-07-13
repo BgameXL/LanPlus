@@ -3,7 +3,6 @@ package dev.bgame.lanplus.network;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.Invite;
-import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.PresenceUpdate;
 import dev.bgame.lanplus.api.Profile;
@@ -42,7 +41,6 @@ public interface LanPlusNetwork {
     CompletableFuture<String> setBanner(UUID uuid, String bannerId);
     CompletableFuture<List<CatalogImage>> getBackgrounds();
     CompletableFuture<List<CatalogImage>> getBanners();
-    CompletableFuture<List<ModpackRef>> getModpacks();
     CompletableFuture<Void> reportAdvancement(UUID uuid, String advancementId);
     CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, String model);
     CompletableFuture<Boolean> deleteSkin();

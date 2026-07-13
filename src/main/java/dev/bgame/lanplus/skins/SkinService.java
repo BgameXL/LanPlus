@@ -18,11 +18,6 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface SkinService {
 
-    /** The local player's current skin reference, or {@code null} if unknown. */
-    SkinRef localSkin();
-
-    void setLocalSkin(SkinRef ref);
-
     /**
      * Ensure a player's skin reference is resolved and cached, downloading as needed.
      * Implementations must not block gameplay.

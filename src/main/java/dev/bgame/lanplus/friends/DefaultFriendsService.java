@@ -201,11 +201,6 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     }
 
     @Override
-    public void removeListener(FriendsListener listener) {
-        listeners.remove(listener);
-    }
-
-    @Override
     public void onConnected() {
         refresh();
         fetchProfile();

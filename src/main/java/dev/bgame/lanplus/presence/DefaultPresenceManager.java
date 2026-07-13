@@ -76,11 +76,6 @@ public final class DefaultPresenceManager implements PresenceManager {
         listeners.add(listener);
     }
 
-    @Override
-    public void removeListener(PresenceListener listener) {
-        listeners.remove(listener);
-    }
-
     private void apply(PresenceSnapshot next) {
         if (next.equals(snapshot)) {
             return;

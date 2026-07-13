@@ -1,7 +1,6 @@
 package dev.bgame.lanplus.profiles;
 
 import dev.bgame.lanplus.api.CatalogImage;
-import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.core.AssetCache;
@@ -152,11 +151,6 @@ public final class DefaultProfilesService implements ProfilesService {
             Thread.currentThread().interrupt();
             return null;
         }
-    }
-
-    @Override
-    public CompletableFuture<List<ModpackRef>> modpacks() {
-        return network.getModpacks();
     }
 
     @Override

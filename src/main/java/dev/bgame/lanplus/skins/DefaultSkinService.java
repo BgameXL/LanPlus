@@ -36,8 +36,6 @@ public final class DefaultSkinService implements SkinService {
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final Executor executor = Executors.newFixedThreadPool(2, daemon());
 
-    private volatile SkinRef localSkin;
-
     public DefaultSkinService(SkinTextureSink sink, LanPlusNetwork network, AssetCache cache) {
         this.sink = sink;
         this.network = network;
@@ -55,16 +53,6 @@ public final class DefaultSkinService implements SkinService {
     @Override
     public CompletableFuture<Boolean> deleteSkin() {
         return network == null ? CompletableFuture.completedFuture(false) : network.deleteSkin();
-    }
-
-    @Override
-    public SkinRef localSkin() {
-        return localSkin;
-    }
-
-    @Override
-    public void setLocalSkin(SkinRef ref) {
-        this.localSkin = ref;
     }
 
     @Override

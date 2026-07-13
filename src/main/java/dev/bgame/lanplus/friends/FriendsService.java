@@ -27,7 +27,6 @@ public interface FriendsService {
     void connect();
     void disconnect();
     void addListener(FriendsListener listener);
-    void removeListener(FriendsListener listener);
     interface FriendsListener {
         void onFriendsChanged(List<Friend> friends);
         default void onFriendStartedHosting(UUID uuid, String joinCode) {

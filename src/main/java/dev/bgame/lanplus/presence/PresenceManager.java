@@ -29,8 +29,6 @@ public interface PresenceManager {
 
     void addListener(PresenceListener listener);
 
-    void removeListener(PresenceListener listener);
-
     interface PresenceListener {
         void onPresenceChanged(PresenceSnapshot snapshot);
     }

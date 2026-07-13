@@ -1,7 +1,6 @@
 package dev.bgame.lanplus.profiles;
 
 import dev.bgame.lanplus.api.CatalogImage;
-import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.Profile;
 
 import java.util.List;
@@ -29,8 +28,6 @@ public interface ProfilesService {
     CompletableFuture<List<CatalogImage>> banners();
 
     CompletableFuture<byte[]> imageBytes(CatalogImage image);
-
-    CompletableFuture<List<ModpackRef>> modpacks();
 
     CompletableFuture<Void> reportAdvancement(String advancementId);
 }

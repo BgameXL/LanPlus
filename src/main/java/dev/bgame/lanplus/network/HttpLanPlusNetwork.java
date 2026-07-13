@@ -10,7 +10,6 @@ import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.Invite;
-import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.PresenceUpdate;
@@ -428,31 +427,6 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return null;
         }
         return r != null && r.error() != null ? r.error() : "error";
-    }
-
-    @Override
-    public CompletableFuture<List<ModpackRef>> getModpacks() {
-        if (!configured()) {
-            return CompletableFuture.completedFuture(List.of());
-        }
-        return get("/modpacks")
-                .thenApply(resp -> {
-                    Wire.ModpackDto[] arr = GSON.fromJson(resp.body(), Wire.ModpackDto[].class);
-                    if (arr == null) {
-                        return List.<ModpackRef>of();
-                    }
-                    List<ModpackRef> out = new ArrayList<>(arr.length);
-                    for (Wire.ModpackDto dto : arr) {
-                        if (dto != null && dto.modpackId() != null) {
-                            out.add(dto.toApi());
-                        }
-                    }
-                    return out;
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return List.of();
-                });
     }
 
     @Override

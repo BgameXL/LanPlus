@@ -114,7 +114,6 @@ public final class ClientPresenceDetector {
         lastSkin = ref;
         SkinService skins = LanPlusClient.skins();
         if (skins != null) {
-            skins.setLocalSkin(ref);
             UUID self = LanPlusClient.selfUuid();
             if (self != null && ref != null) {
                 skins.resolve(self, ref);
