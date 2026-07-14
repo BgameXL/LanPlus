@@ -28,7 +28,8 @@ public record Profile(
         int xp,
         Map<String, Integer> xpSources,
         ProfileBackground background,
-        CatalogImage banner
+        CatalogImage banner,
+        boolean cached
 ) {
     public Profile {
         Objects.requireNonNull(uuid, "uuid");
@@ -36,6 +37,14 @@ public record Profile(
         prompts = prompts == null ? Map.of() : Map.copyOf(prompts);
         xpSources = xpSources == null ? Map.of() : Map.copyOf(xpSources);
         background = background == null ? ProfileBackground.DEFAULT : background;
+    }
+
+    public Profile withCached(boolean cached) {
+        return cached == this.cached ? this
+                : new Profile(uuid, username, friendCode, skin, pronouns, bio, links, prompts,
+                online, lastSeen, invisible, currentlyPlaying, lastPlayed, favorite, recentlyPlayed,
+                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible,
+                tier, advancements, xp, xpSources, background, banner, cached);
     }
 
     public String link(String platform) {

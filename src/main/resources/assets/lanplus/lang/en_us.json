@@ -98,6 +98,7 @@
   "gui.lanplus.profile.back": "< Back",
   "gui.lanplus.profile.loading": "Loading…",
   "gui.lanplus.profile.unavailable": "Profile unavailable",
+  "gui.lanplus.profile.cached": "Cached",
   "gui.lanplus.profile.about": "About me",
   "gui.lanplus.profile.identity": "Identity",
   "gui.lanplus.profile.nobio": "No bio yet",

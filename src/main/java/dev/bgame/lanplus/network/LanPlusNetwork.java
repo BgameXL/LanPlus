@@ -52,6 +52,12 @@ public interface LanPlusNetwork {
     void disconnect();
     boolean isConnected();
 
+    String baseUrl();
+
+    Profile parseProfileJson(String body);
+
+    void setProfileBodySink(java.util.function.BiConsumer<UUID, String> sink);
+
     UUID sessionUuid();
     interface BackendEventListener {
 

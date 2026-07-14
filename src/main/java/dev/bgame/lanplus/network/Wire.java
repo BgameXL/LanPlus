@@ -18,6 +18,8 @@ import java.util.UUID;
 
 final class Wire {
 
+    private static final com.google.gson.Gson GSON = new com.google.gson.Gson();
+
     private Wire() {}
 
     record Skin(String type, String id, String hash, String model) {
@@ -131,7 +133,20 @@ final class Wire {
                     p.xp() == null ? -1 : p.xp(),
                     p.sources() == null ? Map.of() : p.sources(),
                     background == null ? ProfileBackground.DEFAULT : background.toApi(base),
-                    banner == null ? null : banner.toApi(base));
+                    banner == null ? null : banner.toApi(base),
+                    false);
+        }
+
+        public static ProfileDto fromJson(String body) {
+            if (body == null) {
+                return null;
+            }
+            try {
+                ProfileDto dto = GSON.fromJson(body, ProfileDto.class);
+                return dto == null || dto.uuid() == null ? null : dto;
+            } catch (RuntimeException e) {
+                return null;
+            }
         }
     }
 

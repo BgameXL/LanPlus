@@ -1005,6 +1005,13 @@ public final class ProfileScreen extends Screen {
             g.drawString(this.font, profile.friendCode(), l, y, 0xFF9AA0A6);
             hits.add(new Hit(l, y - 1, this.font.width(profile.friendCode()), 10, () -> copyText(profile.friendCode())));
         }
+        if (profile.cached()) {
+            int chipW = this.font.width(Component.translatable("gui.lanplus.profile.cached").getString()) + 8;
+            int rx = r - chipW;
+            int ry = y - 2;
+            g.fill(rx, ry, rx + chipW, ry + 11, 0x40E8A317);
+            g.drawString(this.font, Component.translatable("gui.lanplus.profile.cached"), rx + 4, ry + 1, 0xFFE8A317);
+        }
         int presX = r - this.font.width(presenceLabel());
         g.fill(presX - 10, y + 1, presX - 4, y + 7, profile.online() ? 0xFF43B581 : 0xFF747F8D);
         g.drawString(this.font, presenceLabel(), presX, y, profile.online() ? 0xFF55C46A : 0xFF9AA0A6);
@@ -1113,6 +1120,10 @@ public final class ProfileScreen extends Screen {
         int hx = ax + av + 8;
         String name = profile.username() == null ? "?" : profile.username();
         g.drawString(this.font, name, hx, bottom - 12, 0xFFFFFFFF);
+        if (profile.cached()) {
+            g.drawString(this.font, Component.translatable("gui.lanplus.profile.cached"),
+                    hx + this.font.width(name) + 6, bottom - 12, 0xFFE8A317);
+        }
         if (profile.pronouns() != null) {
             int px = hx + this.font.width(name) + 6;
             int pw = this.font.width(profile.pronouns()) + 6;
@@ -1445,7 +1456,7 @@ public final class ProfileScreen extends Screen {
     private void drawPlayerModel(GuiGraphics g, int cx, int feetY, int scale) {
         SkinTextures st = LanPlusClient.skinTextures();
         SkinTextures.Resolved res = st == null ? null : st.get(uuid);
-        ResourceLocation skin = res != null ? res.texture() : DefaultPlayerSkin.getDefaultSkin(uuid);
+        ResourceLocation skin = res != null ? res.texture() : resolveFallbackSkin();
         boolean slim = res != null && res.slim();
         PlayerModel<LivingEntity> model = playerModel(slim);
         model.setAllVisible(true);
@@ -1662,10 +1673,36 @@ public final class ProfileScreen extends Screen {
         return false;
     }
 
+    private ResourceLocation resolveFallbackSkin() {
+        Minecraft mc = this.minecraft;
+        if (own && mc != null) {
+            net.minecraft.client.player.AbstractClientPlayer local = mc.player;
+            if (local != null && uuid.equals(local.getUUID())) {
+                ResourceLocation loc = local.getSkinTextureLocation();
+                if (loc != null) {
+                    return loc;
+                }
+            }
+        }
+        return DefaultPlayerSkin.getDefaultSkin(uuid);
+    }
+
     private void drawAvatar(GuiGraphics g, UUID id, int x, int y, int size) {
         SkinTextures textures = LanPlusClient.skinTextures();
-        SkinTextures.Resolved resolved = textures == null ? null : textures.get(id);
-        ResourceLocation tex = resolved != null ? resolved.texture() : DefaultPlayerSkin.getDefaultSkin(id);
+        SkinTextures.Resolved resolved = textures == null ? null : textures.get(uuid);
+        ResourceLocation tex;
+        if (resolved != null) {
+            tex = resolved.texture();
+        } else if (own && this.minecraft != null) {
+            net.minecraft.client.player.AbstractClientPlayer local = this.minecraft.player;
+            if (local != null && uuid.equals(local.getUUID())) {
+                tex = local.getSkinTextureLocation();
+            } else {
+                tex = DefaultPlayerSkin.getDefaultSkin(id);
+            }
+        } else {
+            tex = DefaultPlayerSkin.getDefaultSkin(id);
+        }
         PlayerFaceRenderer.draw(g, tex, x, y, size);
     }
 

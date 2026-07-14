@@ -4,6 +4,7 @@ import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.core.AssetCache;
+import dev.bgame.lanplus.core.ProfileCache;
 import dev.bgame.lanplus.network.LanPlusNetwork;
 
 import java.io.ByteArrayOutputStream;
@@ -31,6 +32,7 @@ public final class DefaultProfilesService implements ProfilesService {
     private final LanPlusNetwork network;
     private final Supplier<PlayerIdentity> identity;
     private final AssetCache assets;
+    private final ProfileCache profileCache;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private final Executor fetchExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "lanplus-profile-assets");
@@ -38,10 +40,24 @@ public final class DefaultProfilesService implements ProfilesService {
         return t;
     });
 
-    public DefaultProfilesService(LanPlusNetwork network, Supplier<PlayerIdentity> identity, AssetCache assets) {
+    public DefaultProfilesService(LanPlusNetwork network, Supplier<PlayerIdentity> identity, AssetCache assets,
+                                   ProfileCache profileCache) {
         this.network = network;
         this.identity = identity;
         this.assets = assets;
+        this.profileCache = profileCache;
+        if (network != null) {
+            network.setProfileBodySink((target, body) -> {
+                if (profileCache == null) {
+                    return;
+                }
+                PlayerIdentity id = identity == null ? null : identity.get();
+                if (id == null || !id.uuid().equals(target)) {
+                    return;
+                }
+                profileCache.put(id.uuid(), body);
+            });
+        }
     }
 
     @Override
@@ -51,7 +67,17 @@ public final class DefaultProfilesService implements ProfilesService {
         }
         PlayerIdentity id = identity.get();
         UUID viewer = id == null ? null : id.uuid();
-        return network.getProfile(uuid, viewer);
+        boolean ownProfile = viewer != null && viewer.equals(uuid);
+        return network.getProfile(uuid, viewer).exceptionally(err -> cachedFallback(uuid, ownProfile));
+    }
+
+    private Profile cachedFallback(UUID uuid, boolean ownProfile) {
+        if (!ownProfile || profileCache == null || network == null) {
+            return null;
+        }
+        String body = profileCache.get(uuid);
+        Profile parsed = network.parseProfileJson(body);
+        return parsed == null ? null : parsed.withCached(true);
     }
 
     @Override

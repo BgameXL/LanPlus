@@ -74,6 +74,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     private final AtomicBoolean connecting = new AtomicBoolean(false);
     private final AtomicBoolean reconnectPending = new AtomicBoolean(false);
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
+    private volatile java.util.function.BiConsumer<UUID, String> profileBodySink;
 
     public HttpLanPlusNetwork(Supplier<String> baseUrl, Supplier<PlayerIdentity> identity, MinecraftAuth auth) {
         this.baseUrl = baseUrl;
@@ -276,13 +277,25 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         String path = "/profile?uuid=" + uuid + (viewer != null ? "&viewer=" + viewer : "");
         return get(path)
                 .thenApply(resp -> {
-                    Wire.ProfileDto dto = GSON.fromJson(resp.body(), Wire.ProfileDto.class);
-                    return dto == null || dto.uuid() == null ? null : dto.toApi(base());
+                    String body = resp.body();
+                    java.util.function.BiConsumer<UUID, String> sink = profileBodySink;
+                    if (sink != null && body != null && !body.isBlank()) {
+                        try {
+                            sink.accept(uuid, body);
+                        } catch (RuntimeException ignored) {
+                        }
+                    }
+                    return parseProfileJson(body);
                 })
                 .exceptionally(err -> {
                     onError(err);
                     return null;
                 });
+    }
+
+    @Override
+    public void setProfileBodySink(java.util.function.BiConsumer<UUID, String> sink) {
+        this.profileBodySink = sink;
     }
 
     @Override
@@ -519,6 +532,17 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     @Override
     public boolean isConnected() {
         return reachable;
+    }
+
+    @Override
+    public String baseUrl() {
+        return base();
+    }
+
+    @Override
+    public Profile parseProfileJson(String body) {
+        Wire.ProfileDto dto = Wire.ProfileDto.fromJson(body);
+        return dto == null ? null : dto.toApi(base());
     }
 
     // internals

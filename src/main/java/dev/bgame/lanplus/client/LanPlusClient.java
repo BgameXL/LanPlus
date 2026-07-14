@@ -8,6 +8,7 @@ import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.core.AssetCache;
+import dev.bgame.lanplus.core.ProfileCache;
 import dev.bgame.lanplus.discord.DiscordPresence;
 import dev.bgame.lanplus.discord.DiscordRichPresence;
 import dev.bgame.lanplus.friends.DefaultFriendsService;
@@ -60,9 +61,10 @@ public final class LanPlusClient {
         network = new HttpLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity,
                 new ClientMinecraftAuth());
         AssetCache assetCache = new AssetCache(FMLPaths.GAMEDIR.get().resolve("lanplus/cache/assets"));
+        ProfileCache profileCache = new ProfileCache(FMLPaths.GAMEDIR.get().resolve("lanplus/cache/profiles"));
         presence = new DefaultPresenceManager(network);
         friends = new DefaultFriendsService(network, LanPlusClient::localIdentity);
-        profiles = new DefaultProfilesService(network, LanPlusClient::localIdentity, assetCache);
+        profiles = new DefaultProfilesService(network, LanPlusClient::localIdentity, assetCache, profileCache);
 
         skinTextures = new SkinTextures();
         skins = new DefaultSkinService(skinTextures, network, assetCache);
