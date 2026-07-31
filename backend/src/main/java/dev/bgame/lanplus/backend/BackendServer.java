@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
@@ -45,27 +47,43 @@ public final class BackendServer {
     }
 
     private void run() throws IOException {
-        ExecutorService pool = Executors.newCachedThreadPool(daemon("backend-worker"));
+        ExecutorService pool = Executors.newFixedThreadPool(cfg.workerThreads, daemon("backend-worker"));
         ScheduledExecutorService sched = Executors.newSingleThreadScheduledExecutor(daemon("backend-sched"));
         sched.scheduleAtFixedRate(hub::pingAll, 20, 20, TimeUnit.SECONDS);
         sched.scheduleAtFixedRate(store::sweep, 30, 30, TimeUnit.SECONDS);
-        Runtime.getRuntime().addShutdownHook(new Thread(store::close, "backend-close"));
 
         ServerSocket server = new ServerSocket();
         server.setReuseAddress(true);
         server.bind(cfg.bind);
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            BackendServer.log("shutdown signal received");
+            try { server.close(); } catch (IOException ignored) {}
+            pool.shutdownNow();
+            sched.shutdownNow();
+            try { pool.awaitTermination(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+            try { sched.awaitTermination(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+            store.close();
+        }, "backend-close"));
+
         log("LAN+ backend up — http+ws " + cfg.bind + ", relay " + cfg.relayHost + ":" + cfg.relayPort
                 + ", base domain " + cfg.baseDomain
                 + ", data " + (cfg.dataFile == null || cfg.dataFile.isBlank() ? "in-memory" : cfg.dataFile));
         while (true) {
-            Socket socket = server.accept();
-            pool.execute(() -> handle(socket));
+            try {
+                Socket socket = server.accept();
+                pool.execute(() -> handle(socket));
+            } catch (SocketException | SocketTimeoutException e) {
+                // Server socket closed during shutdown.
+                break;
+            }
         }
     }
 
     private void handle(Socket socket) {
         try {
             socket.setTcpNoDelay(true);
+            socket.setSoTimeout(cfg.requestTimeoutMs);
             InputStream in = socket.getInputStream();
             Http.Request req = Http.read(in);
             if (req == null) {
@@ -84,6 +102,8 @@ public final class BackendServer {
                 Http.writeJson(socket.getOutputStream(), r.status, r.body);
             }
             socket.close();
+        } catch (SocketTimeoutException e) {
+            close(socket);
         } catch (IOException e) {
             close(socket);
         }

@@ -169,6 +169,11 @@ final class Store {
                         + "id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL, source TEXT NOT NULL, "
                         + "amount INTEGER NOT NULL, detail TEXT, created_at INTEGER NOT NULL)");
                 st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_xp_events_uuid ON xp_events(uuid)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS xp_totals ("
+                        + "uuid TEXT NOT NULL, source TEXT NOT NULL, total INTEGER NOT NULL DEFAULT 0, "
+                        + "updated_at INTEGER NOT NULL, PRIMARY KEY (uuid, source))");
+                st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_xp_totals_uuid ON xp_totals(uuid)");
+                migrateXpTotalsLocked(st);
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS advancements ("
                         + "uuid TEXT NOT NULL, advancement_id TEXT NOT NULL, earned_at INTEGER NOT NULL, "
                         + "PRIMARY KEY (uuid, advancement_id))");
@@ -992,6 +997,7 @@ final class Store {
                     ps.setLong(2, windowStart);
                     ps.executeUpdate();
                 }
+                addXpTotalLocked(uuid, "advancement", XP_PER_ADVANCEMENT, now);
                 try (PreparedStatement ps = connection.prepareStatement(
                         "INSERT INTO xp_events (uuid, source, amount, detail, created_at) VALUES (?,?,?,?,?)")) {
                     ps.setString(1, uuid.toString());
@@ -1014,19 +1020,12 @@ final class Store {
         if (target <= 0) {
             return;
         }
-        long awarded;
-        try (PreparedStatement ps = connection.prepareStatement(
-                "SELECT COALESCE(SUM(amount), 0) FROM xp_events WHERE uuid=? AND source=?")) {
-            ps.setString(1, uuid.toString());
-            ps.setString(2, source);
-            try (ResultSet rs = ps.executeQuery()) {
-                awarded = rs.next() ? rs.getLong(1) : 0;
-            }
-        }
+        long awarded = getXpTotalLocked(uuid, source);
         long delta = target - awarded;
         if (delta <= 0) {
             return;
         }
+        addXpTotalLocked(uuid, source, delta, now);
         try (PreparedStatement ps = connection.prepareStatement(
                 "INSERT INTO xp_events (uuid, source, amount, detail, created_at) VALUES (?,?,?,?,?)")) {
             ps.setString(1, uuid.toString());
@@ -1040,11 +1039,45 @@ final class Store {
 
     private long totalXpLocked(UUID uuid) throws SQLException {
         try (PreparedStatement ps = connection.prepareStatement(
-                "SELECT COALESCE(SUM(amount), 0) FROM xp_events WHERE uuid=?")) {
+                "SELECT COALESCE(SUM(total), 0) FROM xp_totals WHERE uuid=?")) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : 0;
             }
+        }
+    }
+
+    private long getXpTotalLocked(UUID uuid, String source) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT total FROM xp_totals WHERE uuid=? AND source=?")) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, source);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0;
+            }
+        }
+    }
+
+    private void addXpTotalLocked(UUID uuid, String source, long amount, long now) throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO xp_totals (uuid, source, total, updated_at) VALUES (?,?,?,?) "
+                        + "ON CONFLICT(uuid, source) DO UPDATE SET total=total+excluded.total, updated_at=excluded.updated_at")) {
+            ps.setString(1, uuid.toString());
+            ps.setString(2, source);
+            ps.setLong(3, amount);
+            ps.setLong(4, now);
+            ps.executeUpdate();
+        }
+    }
+
+    private static void migrateXpTotalsLocked(Statement st) throws SQLException {
+        try {
+            st.executeUpdate(
+                    "INSERT INTO xp_totals (uuid, source, total, updated_at) "
+                            + "SELECT uuid, source, SUM(amount), MAX(created_at) FROM xp_events GROUP BY uuid, source "
+                            + "ON CONFLICT(uuid, source) DO UPDATE SET total=excluded.total, updated_at=excluded.updated_at");
+        } catch (SQLException e) {
+            BackendServer.log("SQLite error (migrateXpTotals): " + e.getMessage());
         }
     }
 
@@ -1064,7 +1097,7 @@ final class Store {
         m.put("playtime", 0);
         m.put("social", 0);
         try (PreparedStatement ps = connection.prepareStatement(
-                "SELECT source, COALESCE(SUM(amount), 0) FROM xp_events WHERE uuid=? GROUP BY source")) {
+                "SELECT source, total FROM xp_totals WHERE uuid=?")) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -1846,7 +1879,11 @@ final class Store {
     // caller holds lock
     private String uniqueFriendCode() throws SQLException {
         String code;
+        int attempts = 0;
         do {
+            if (++attempts > 10_000) {
+                throw new IllegalStateException("LAN+ backend: exhausted friend code space");
+            }
             code = "LAN-" + randomFrom(CODE_ALPHABET, 5);
         } while (friendCodeTaken(code));
         return code;
@@ -1863,11 +1900,25 @@ final class Store {
     }
 
     private String uniqueDomain() throws SQLException {
-        String domain;
-        do {
-            domain = WORDS[RNG.nextInt(WORDS.length)] + "-" + WORDS[RNG.nextInt(WORDS.length)] + "." + baseDomain;
-        } while (domainTaken(domain));
-        return domain;
+        // Two-word combinations (30*30=900) may be exhausted in production.
+        // Try them briefly, then fall back to three-word combinations,
+        // and finally to a UUID-based domain.
+        for (int i = 0; i < 200; i++) {
+            String domain = WORDS[RNG.nextInt(WORDS.length)] + "-" + WORDS[RNG.nextInt(WORDS.length)] + "." + baseDomain;
+            if (!domainTaken(domain)) {
+                return domain;
+            }
+        }
+        for (int i = 0; i < 500; i++) {
+            String domain = WORDS[RNG.nextInt(WORDS.length)] + "-"
+                    + WORDS[RNG.nextInt(WORDS.length)] + "-"
+                    + WORDS[RNG.nextInt(WORDS.length)] + "." + baseDomain;
+            if (!domainTaken(domain)) {
+                return domain;
+            }
+        }
+        // Fallback to a UUID-based domain that is effectively guaranteed to be unique.
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 16) + "." + baseDomain;
     }
 
     private boolean domainTaken(String domain) throws SQLException {

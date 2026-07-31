@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 
 final class EventHub {
 
@@ -31,29 +32,29 @@ final class EventHub {
 
     void send(UUID uuid, Object event) {
         Set<WebSocket> set = byUser.get(uuid);
-        if (set == null) {
+        if (set == null || set.isEmpty()) {
             return;
         }
         String json = Json.write(event);
         for (WebSocket ws : set) {
-            try {
-                ws.sendText(json);
-            } catch (IOException e) {
-                ws.close();
-                unregister(ws);
-            }
+            // Offload to avoid blocking REST/WebSocket worker threads on a dead peer.
+            ForkJoinPool.commonPool().execute(() -> sendOne(ws, json));
         }
     }
 
     void pingAll() {
         String ping = Json.write(Map.of("type", "PING"));
         for (WebSocket ws : userOf.keySet()) {
-            try {
-                ws.sendText(ping);
-            } catch (IOException e) {
-                ws.close();
-                unregister(ws);
-            }
+            ForkJoinPool.commonPool().execute(() -> sendOne(ws, ping));
+        }
+    }
+
+    private void sendOne(WebSocket ws, String json) {
+        try {
+            ws.sendText(json);
+        } catch (IOException e) {
+            ws.close();
+            unregister(ws);
         }
     }
 }

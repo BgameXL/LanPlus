@@ -15,10 +15,13 @@ final class BackendConfig {
     final long sessionTtlMs;
     final String backgroundsDir;
     final String bannersDir;
+    final int workerThreads;
+    final int requestTimeoutMs;
 
     private BackendConfig(InetSocketAddress bind, String baseDomain, String relayHost, int relayPort,
                           int heartbeatTtlMs, String dataFile, String sessionServerUrl, boolean allowOffline,
-                          long sessionTtlMs, String backgroundsDir, String bannersDir) {
+                          long sessionTtlMs, String backgroundsDir, String bannersDir,
+                          int workerThreads, int requestTimeoutMs) {
         this.bind = bind;
         this.baseDomain = baseDomain;
         this.relayHost = relayHost;
@@ -30,6 +33,8 @@ final class BackendConfig {
         this.sessionTtlMs = sessionTtlMs;
         this.backgroundsDir = backgroundsDir;
         this.bannersDir = bannersDir;
+        this.workerThreads = workerThreads;
+        this.requestTimeoutMs = requestTimeoutMs;
     }
 
     static BackendConfig fromEnv() {
@@ -44,7 +49,9 @@ final class BackendConfig {
                 bool("LANPLUS_BACKEND_ALLOW_OFFLINE", true),
                 (long) intEnv("LANPLUS_BACKEND_SESSION_TTL_SECONDS", 30 * 24 * 3600) * 1000,
                 env("LANPLUS_BACKEND_BACKGROUNDS_DIR", "backgrounds"),
-                env("LANPLUS_BACKEND_BANNERS_DIR", "banners"));
+                env("LANPLUS_BACKEND_BANNERS_DIR", "banners"),
+                intEnv("LANPLUS_BACKEND_WORKER_THREADS", 128),
+                intEnv("LANPLUS_BACKEND_REQUEST_TIMEOUT_MS", 60_000));
     }
 
     private static InetSocketAddress addr(String s) {
