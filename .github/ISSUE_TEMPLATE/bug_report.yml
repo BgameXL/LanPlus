@@ -1,0 +1,86 @@
+name: Bug Report
+description: Report a bug or and error.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: checkboxes
+    id: checked-existing
+    attributes:
+      label: Existing issues
+      description: Confirm that there is no existing issue similar to this one.
+      options:
+        - label: I have checked that there is no existing issue similar to this one
+          required: true
+
+  - type: checkboxes
+    id: tested-latest
+    attributes:
+      label: Latest version
+      description: Confirm that you have tested that the bug occurs in the latest version of the mod.
+      options:
+        - label: I confirm that this occurs in the latest version
+          required: true
+
+  - type: input
+    id: mod-version
+    attributes:
+      label: Mod version
+      description: Find the jar file in the mods folder, or in the in-game mods viewer.
+      placeholder: "Example: v1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: minecraft-version
+    attributes:
+      label: Minecraft version
+      placeholder: "Example: 1.20.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mod-loader
+    attributes:
+      label: Mod loader
+      options:
+        - Forge
+        - Fabric
+        - NeoForge
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug description
+      description: What happened, what did you expect to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Do this
+        2. Do that
+        3. See the error
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / crash report
+      description: Paste the complete log or a link to pastebin/gist.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional information
+      description: Screenshots, additional mods installed, etc.
+    validations:
+      required: false
