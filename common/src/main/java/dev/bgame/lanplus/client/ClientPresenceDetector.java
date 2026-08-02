@@ -1,0 +1,184 @@
+package dev.bgame.lanplus.client;
+
+import dev.bgame.lanplus.Config;
+import dev.bgame.lanplus.api.GameplayState;
+import dev.bgame.lanplus.api.SkinRef;
+import dev.bgame.lanplus.api.SkinType;
+import dev.bgame.lanplus.platform.PlatformHolder;
+import dev.bgame.lanplus.presence.PresenceManager;
+import dev.bgame.lanplus.skins.SkinService;
+import com.google.gson.JsonObject;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.User;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.util.GsonHelper;
+
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Objects;
+import java.util.UUID;
+
+/**
+ * Loader-agnostic client-side presence detector. Loader modules are responsible for
+ * subscribing the public static methods to the appropriate client tick and logout events.
+ */
+public final class ClientPresenceDetector {
+
+    private static final String MODPACK_CONFIG_FILE = "lanplus-modpack.json";
+
+    private static int tickCounter = 0;
+    private static GameplayState lastState = null;
+    private static SkinRef lastSkin = null;
+    private static String lastModpack = null;
+    private static boolean modpackCached = false;
+    private static String cachedModpack = null;
+
+    private ClientPresenceDetector() {}
+
+    /** Called from each loader's client tick event at the END phase. */
+    public static void onClientTick() {
+        PresenceManager presence = LanPlusClient.presence();
+        if (presence == null) {
+            return;
+        }
+
+        Minecraft mc = Minecraft.getInstance();
+        GameplayState state = detectState(mc);
+        if (state != lastState) {
+            lastState = state;
+            publishSkinIfChanged(mc, presence);
+            publishModpackIfChanged(mc, presence);
+            presence.updateState(state, detectWorldName(mc, state), detectAddress(mc, state));
+        }
+
+        int intervalTicks = Math.max(5, Config.heartbeatSeconds) * 20;
+        if (++tickCounter >= intervalTicks) {
+            tickCounter = 0;
+            publishSkinIfChanged(mc, presence);
+            publishModpackIfChanged(mc, presence);
+            presence.heartbeat();
+        }
+    }
+
+    /** Called from each loader's logout/disconnect event. */
+    public static void onLogout() {
+        PresenceManager presence = LanPlusClient.presence();
+        if (presence == null) {
+            return;
+        }
+        lastState = GameplayState.MENU;
+        lastModpack = null;
+        modpackCached = false;
+        cachedModpack = null;
+        presence.updateModpack(null);
+        presence.updateState(GameplayState.MENU, null, null);
+    }
+
+    private static void publishModpackIfChanged(Minecraft mc, PresenceManager presence) {
+        String id = detectModpackId(mc);
+        if (Objects.equals(id, lastModpack)) {
+            return;
+        }
+        lastModpack = id;
+        presence.updateModpack(id);
+    }
+
+    private static String detectModpackId(Minecraft mc) {
+        if (mc.level == null || !mc.hasSingleplayerServer()) {
+            modpackCached = false;
+            cachedModpack = null;
+            return null;
+        }
+        if (modpackCached) {
+            return cachedModpack;
+        }
+        cachedModpack = readModpackId();
+        modpackCached = true;
+        return cachedModpack;
+    }
+
+    private static String readModpackId() {
+        Path file = PlatformHolder.get().getConfigDir().resolve(MODPACK_CONFIG_FILE);
+        if (!Files.isRegularFile(file)) {
+            return null;
+        }
+        try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            JsonObject obj = GsonHelper.parse(reader);
+            String id = GsonHelper.getAsString(obj, "modpackId", null);
+            return id == null || id.isBlank() ? null : id.trim();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static void publishSkinIfChanged(Minecraft mc, PresenceManager presence) {
+        SkinRef ref = detectSkin(mc);
+        if (Objects.equals(ref, lastSkin)) {
+            return;
+        }
+        lastSkin = ref;
+        SkinService skins = LanPlusClient.skins();
+        if (skins != null) {
+            UUID self = LanPlusClient.selfUuid();
+            if (self != null && ref != null) {
+                skins.resolve(self, ref);
+                User user = mc.getUser();
+                UUID launcher = user == null ? null : user.getProfileId();
+                if (launcher != null && !launcher.equals(self)) {
+                    skins.resolve(launcher, ref);
+                }
+            }
+        }
+        presence.updateSkin(ref);
+    }
+
+    private static SkinRef detectSkin(Minecraft mc) {
+        if (Config.skinCustomActive && !Config.skinUrl.isBlank()) {
+            return new SkinRef(SkinType.CUSTOM, Config.skinUrl, null, Config.skinSlim ? "slim" : null);
+        }
+        UUID self = LanPlusClient.selfUuid();
+        return self == null ? null : new SkinRef(SkinType.MOJANG, self.toString(), null, null);
+    }
+
+    private static GameplayState detectState(Minecraft mc) {
+        if (mc.level == null) {
+            return GameplayState.MENU;
+        }
+        if (mc.hasSingleplayerServer()) {
+            IntegratedServer server = mc.getSingleplayerServer();
+            return server != null && server.isPublished() ? GameplayState.HOSTING : GameplayState.SINGLEPLAYER;
+        }
+        return GameplayState.MULTIPLAYER;
+    }
+
+    private static String detectWorldName(Minecraft mc, GameplayState state) {
+        return switch (state) {
+            case SINGLEPLAYER, HOSTING -> {
+                IntegratedServer server = mc.getSingleplayerServer();
+                yield server == null ? null : server.getWorldData().getLevelName();
+            }
+            case MULTIPLAYER -> {
+                ServerData data = mc.getCurrentServer();
+                yield data == null ? null : data.name;
+            }
+            default -> null;
+        };
+    }
+
+    private static String detectAddress(Minecraft mc, GameplayState state) {
+        return switch (state) {
+            case HOSTING -> {
+                IntegratedServer server = mc.getSingleplayerServer();
+                yield server == null ? null : "localhost:" + server.getPort();
+            }
+            case MULTIPLAYER -> {
+                ServerData data = mc.getCurrentServer();
+                yield data == null ? null : data.ip;
+            }
+            default -> null;
+        };
+    }
+}

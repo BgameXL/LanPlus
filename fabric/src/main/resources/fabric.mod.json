@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "${mod_name}",
+  "description": "${mod_description}",
+  "authors": [
+    "${mod_authors}"
+  ],
+  "contact": {
+    "homepage": "${mod_display_url}",
+    "issues": "${mod_issue_tracker_url}",
+    "sources": "${mod_display_url}"
+  },
+  "license": "${mod_license}",
+  "icon": "assets/lanplus/textures/lan_logo.png",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "dev.bgame.lanplus.LanplusFabricClient"
+    ],
+    "main": [
+      "dev.bgame.lanplus.LanplusFabric"
+    ]
+  },
+  "mixins": [
+    "${mod_id}.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "${minecraft_version_range}",
+    "fabric-api": ">=0.92.0"
+  }
+}
