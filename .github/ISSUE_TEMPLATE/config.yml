@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions/Support
+    url: https://discord.gg/kAKk3wRAVh
+    about: For general questions, use Discord instead of an issue.
