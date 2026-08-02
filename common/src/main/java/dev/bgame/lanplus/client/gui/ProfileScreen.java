@@ -15,6 +15,7 @@ import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
 import dev.bgame.lanplus.client.gui.ProfilePromptCatalog.Prompt;
 import dev.bgame.lanplus.friends.FriendsService;
+import dev.bgame.lanplus.network.LanPlusNetwork;
 import dev.bgame.lanplus.profiles.ProfilesService;
 import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -111,6 +112,7 @@ public final class ProfileScreen extends Screen {
     private boolean editing;
     private Component status;
     private long statusUntil;
+    private List<Friend> profileFriends = List.of();
 
     // scroll + manual hit testing
     private int scrollY;
@@ -174,6 +176,12 @@ public final class ProfileScreen extends Screen {
         this.parent = parent;
         this.uuid = uuid;
         this.own = isOwn(uuid);
+        if (this.own) {
+            FriendsService svc = LanPlusClient.friends();
+            if (svc != null) {
+                this.profileFriends = new ArrayList<>(svc.friends());
+            }
+        }
     }
 
     private static boolean isOwn(UUID uuid) {
@@ -1270,8 +1278,7 @@ public final class ProfileScreen extends Screen {
     }
 
     private int renderSidebarFriends(GuiGraphics g, int left, int y) {
-        FriendsService svc = LanPlusClient.friends();
-        List<Friend> all = svc == null ? new ArrayList<>() : new ArrayList<>(svc.friends());
+        List<Friend> all = new ArrayList<>(profileFriends);
         int online = 0;
         for (Friend f : all) {
             if (isLive(f)) {
@@ -1622,6 +1629,19 @@ public final class ProfileScreen extends Screen {
             this.loaded = true;
             if (this.minecraft.screen == this) {
                 rebuildWidgets();
+            }
+        }));
+        loadSidebarFriends();
+    }
+
+    private void loadSidebarFriends() {
+        LanPlusNetwork network = LanPlusClient.network();
+        if (network == null) {
+            return;
+        }
+        network.getFriends(uuid).whenComplete((friends, ex) -> this.minecraft.execute(() -> {
+            if (friends != null) {
+                this.profileFriends = friends;
             }
         }));
     }

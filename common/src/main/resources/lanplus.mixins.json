@@ -8,7 +8,8 @@
     "PlayerListMixin"
   ],
   "client": [
-    "client.AbstractClientPlayerMixin"
+    "client.AbstractClientPlayerMixin",
+    "client.ScreenAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

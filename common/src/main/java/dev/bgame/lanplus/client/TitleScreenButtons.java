@@ -3,6 +3,7 @@ package dev.bgame.lanplus.client;
 import dev.bgame.lanplus.LanplusCommon;
 import dev.bgame.lanplus.client.gui.FriendsScreen;
 import dev.bgame.lanplus.client.gui.HostScreen;
+import dev.bgame.lanplus.mixin.client.ScreenAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -40,9 +41,10 @@ public final class TitleScreenButtons {
         }
         int x = singleplayer.getX() + singleplayer.getWidth() + 4;
         int y = singleplayer.getY();
-        screen.addRenderableWidget(new IconButton(x, y, HOST_ICON, "gui.lanplus.host.tooltip",
+        ScreenAccessor accessor = (ScreenAccessor) screen;
+        accessor.lanplus$invokeAddRenderableWidget(new IconButton(x, y, HOST_ICON, "gui.lanplus.host.tooltip",
                 b -> Minecraft.getInstance().setScreen(new HostScreen(title))));
-        screen.addRenderableWidget(new IconButton(x + 22, y, FRIENDS_ICON, "gui.lanplus.friends.tooltip",
+        accessor.lanplus$invokeAddRenderableWidget(new IconButton(x + 22, y, FRIENDS_ICON, "gui.lanplus.friends.tooltip",
                 b -> Minecraft.getInstance().setScreen(new FriendsScreen(title))));
     }
 

@@ -1,0 +1,44 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.google.code.gson:gson:2.10.1'
+    }
+}
+
+plugins {
+    id 'architectury-plugin' version '3.4.164'
+    id 'dev.architectury.loom' version '1.5.391' apply false
+}
+
+architectury {
+    minecraft = rootProject.minecraft_version
+}
+
+allprojects {
+    apply plugin: 'java'
+    apply plugin: 'architectury-plugin'
+    apply plugin: 'maven-publish'
+
+    group = rootProject.mod_group_id
+    version = rootProject.mod_version
+
+    tasks.withType(JavaCompile) {
+        options.encoding = 'UTF-8'
+        options.release = 17
+    }
+}
+
+subprojects {
+    apply plugin: 'dev.architectury.loom'
+
+    loom {
+        silentMojangMappingsLicense()
+    }
+
+    dependencies {
+        minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+        mappings loom.officialMojangMappings()
+    }
+}

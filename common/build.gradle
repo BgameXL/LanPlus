@@ -7,13 +7,14 @@ base {
 }
 
 loom {
-    silentMojangMappingsLicense()
+    mixin {
+        defaultRefmapName = "lanplus.refmap.json"
+    }
 }
 
 dependencies {
-    minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
-    mappings loom.officialMojangMappings()
-
+    modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
+    compileOnly "org.spongepowered:mixin:0.8.5"
 }
 
 java {

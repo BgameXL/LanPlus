@@ -8,15 +8,24 @@ base {
 
 loom {
     silentMojangMappingsLicense()
+    mixin {
+        defaultRefmapName = "lanplus.refmap.json"
+    }
     mods {
         lanplus {
             sourceSet sourceSets.main
+            sourceSet project(':common').sourceSets.main
         }
     }
 }
 
+jar {
+    from project(':common').sourceSets.main.output
+}
+
 dependencies {
     implementation project(path: ':common', configuration: 'namedElements')
+    runtimeOnly project(':common').sourceSets.main.output
     modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
 }
@@ -25,6 +34,7 @@ processResources {
     var replaceProperties = [
             minecraft_version       : rootProject.minecraft_version,
             minecraft_version_range : rootProject.minecraft_version_range,
+            fabric_minecraft_version_range : rootProject.fabric_minecraft_version_range,
             mod_id                  : rootProject.mod_id,
             mod_name                : rootProject.mod_name,
             mod_license             : rootProject.mod_license,
