@@ -1,0 +1,26 @@
+// LAN+ relay server — standalone, pure-JDK (no external dependencies, no Minecraft/Forge).
+// Build:  ./gradlew :relay:jar   -> relay/build/libs/lanplus-relay-<version>.jar
+// Run:    java -jar lanplus-relay-<version>.jar   (zero classpath; JDK only)
+plugins {
+    id 'java'
+}
+
+group = 'dev.bgame.lanplus'
+version = '1.0.0'
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(17)
+}
+
+// Intentionally no repositories / dependencies: the relay is JDK-only so the jar runs as-is.
+
+tasks.named('jar', Jar).configure {
+    archiveBaseName = 'lanplus-relay'
+    manifest {
+        attributes('Main-Class': 'dev.bgame.lanplus.relay.RelayServer')
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

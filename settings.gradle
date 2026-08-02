@@ -1,0 +1,23 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven {
+            name = 'MinecraftForge'
+            url = 'https://maven.minecraftforge.net/'
+        }
+    }
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.7.0'
+}
+
+rootProject.name = 'LanPlus'
+
+// LAN+ relay: standalone, pure-JDK tunnel server for the VPS (see docs/dev/PROTOCOL.md § Relay).
+// No Minecraft/Forge dependency; builds an executable jar via ':relay:jar'.
+include 'relay'
+
+// LAN+ backend: standalone, pure-JDK presence/friends/invites + relay-ticket server (stub).
+// No Minecraft/Forge dependency; builds an executable jar via ':backend:jar'.
+include 'backend'
