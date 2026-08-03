@@ -58,7 +58,9 @@
   "gui.lanplus.state.playing": "Playing on %s",
 
   "gui.lanplus.host.tooltip": "Host a world",
+  "gui.lanplus.host.pausebutton": "Hosting a world",
   "gui.lanplus.host.title": "Host a World",
+  "gui.lanplus.host.titleingame": "Hosting This World",
   "gui.lanplus.host.loading": "Loading worlds…",
   "gui.lanplus.host.noworlds": "No worlds found — create one in Singleplayer first",
   "gui.lanplus.host.access": "Who can join:",
@@ -69,6 +71,11 @@
   "gui.lanplus.host.nonpremium.on": "ON",
   "gui.lanplus.host.nonpremium.off": "OFF",
   "gui.lanplus.host.nonpremium.tip": "Opens the world in offline-mode so non-premium players can join. Forces 'Everyone' and disables identity checks — anyone with the address can join and usernames are not verified.",
+  "gui.lanplus.host.gamemode": "Game Mode",
+  "gui.lanplus.host.commands": "Allow Commands",
+  "gui.lanplus.host.commands.on": "ON",
+  "gui.lanplus.host.commands.off": "OFF",
+  "gui.lanplus.host.difficulty": "Difficulty",
   "gui.lanplus.host.start": "Host",
 
   "gui.lanplus.invite.title": "Invite friends",

@@ -1,0 +1,14 @@
+{
+  "mappings": {
+    "dev/bgame/lanplus/mixin/PlayerListMixin": {
+      "canPlayerLogin": "Lnet/minecraft/server/players/PlayerList;m_6418_(Ljava/net/SocketAddress;Lcom/mojang/authlib/GameProfile;)Lnet/minecraft/network/chat/Component;"
+    },
+    "dev/bgame/lanplus/mixin/client/AbstractClientPlayerMixin": {
+      "getModelName": "Lnet/minecraft/client/player/AbstractClientPlayer;m_108564_()Ljava/lang/String;",
+      "getSkinTextureLocation": "Lnet/minecraft/client/player/AbstractClientPlayer;m_108560_()Lnet/minecraft/resources/ResourceLocation;"
+    },
+    "dev/bgame/lanplus/mixin/client/ScreenAccessor": {
+      "addRenderableWidget": "Lnet/minecraft/client/gui/screens/Screen;m_142416_(Lnet/minecraft/client/gui/components/events/GuiEventListener;)Lnet/minecraft/client/gui/components/events/GuiEventListener;"
+    }
+  }
+}

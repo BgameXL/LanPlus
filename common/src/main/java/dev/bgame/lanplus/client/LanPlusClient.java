@@ -119,7 +119,7 @@ public final class LanPlusClient {
         return discord;
     }
 
-    private static void resolveFriendSkins(List<Friend> list) {
+    public static void resolveFriendSkins(List<Friend> list) {
         if (skins == null) {
             return;
         }

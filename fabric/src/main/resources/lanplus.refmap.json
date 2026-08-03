@@ -1,0 +1,14 @@
+{
+  "mappings": {
+    "dev/bgame/lanplus/mixin/PlayerListMixin": {
+      "canPlayerLogin": "Lnet/minecraft/class_3324;method_14586(Ljava/net/SocketAddress;Lcom/mojang/authlib/GameProfile;)Lnet/minecraft/class_2561;"
+    },
+    "dev/bgame/lanplus/mixin/client/AbstractClientPlayerMixin": {
+      "getModelName": "Lnet/minecraft/class_742;method_3121()Ljava/lang/String;",
+      "getSkinTextureLocation": "Lnet/minecraft/class_742;method_3117()Lnet/minecraft/class_2960;"
+    },
+    "dev/bgame/lanplus/mixin/client/ScreenAccessor": {
+      "addRenderableWidget": "method_37063(Lnet/minecraft/class_364;)Lnet/minecraft/class_364;"
+    }
+  }
+}

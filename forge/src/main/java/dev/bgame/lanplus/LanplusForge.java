@@ -6,6 +6,7 @@ import dev.bgame.lanplus.client.ClientPresenceDetector;
 import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.LanPlusKeybinds;
+import dev.bgame.lanplus.client.PauseMenuButtons;
 import dev.bgame.lanplus.client.TitleScreenButtons;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.platform.LanplusPlatform;
@@ -81,6 +82,7 @@ public class LanplusForge {
         @SubscribeEvent
         public static void onScreenInit(ScreenEvent.Init.Post event) {
             TitleScreenButtons.tryAddButtons(event.getScreen());
+            PauseMenuButtons.tryAddHostButton(event.getScreen());
         }
 
         @SubscribeEvent

@@ -8,6 +8,8 @@ import dev.bgame.lanplus.invites.HostAccessControl;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.util.HttpUtil;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameType;
 import org.slf4j.Logger;
 
 import java.util.HashSet;
@@ -28,13 +30,19 @@ public final class HostController {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final long REQUEST_TTL_MS = 60_000;
 
-    private static volatile HostAccessMode pendingMode;
-    private static volatile Set<UUID> pendingInvites = Set.of();
-    private static volatile boolean pendingAllowNonPremium;
+    private static volatile HostSettings pending;
     private static volatile long pendingAt;
     private static volatile boolean offlineHosting;
 
     private HostController() {}
+
+    public record HostSettings(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium,
+                               GameType gameType, Difficulty difficulty, boolean allowCommands) {
+
+        public static HostSettings defaults(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium) {
+            return new HostSettings(mode, preInvited, allowNonPremium, null, null, true);
+        }
+    }
 
     public static boolean isOfflineHosting() {
         return offlineHosting;
@@ -47,9 +55,11 @@ public final class HostController {
      * join (only meaningful with EVERYONE access — the uuid gate is useless once uuids are spoofable).
      */
     public static void requestHost(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium) {
-        pendingMode = mode;
-        pendingInvites = preInvited == null ? Set.of() : Set.copyOf(preInvited);
-        pendingAllowNonPremium = allowNonPremium;
+        requestHost(HostSettings.defaults(mode, preInvited, allowNonPremium));
+    }
+
+    public static void requestHost(HostSettings settings) {
+        pending = settings;
         pendingAt = System.currentTimeMillis();
     }
 
@@ -64,40 +74,43 @@ public final class HostController {
             offlineHosting = false;
         }
 
-        HostAccessMode mode = pendingMode;
-        if (mode == null) {
+        HostSettings settings = pending;
+        if (settings == null) {
             return;
         }
         if (System.currentTimeMillis() - pendingAt > REQUEST_TTL_MS) {
-            pendingMode = null;
+            pending = null;
             return;
         }
         IntegratedServer server = mc.getSingleplayerServer();
         if (server == null || mc.player == null) {
             return;
         }
-        Set<UUID> preInvited = pendingInvites;
-        boolean allowNonPremium = pendingAllowNonPremium;
-        pendingMode = null;
-        pendingInvites = Set.of();
-        pendingAllowNonPremium = false;
-        publish(server, mode, preInvited, allowNonPremium);
+        pending = null;
+        publish(server, settings);
     }
 
-    private static void publish(IntegratedServer server, HostAccessMode mode, Set<UUID> preInvited,
-                                boolean allowNonPremium) {
+    private static void publish(IntegratedServer server, HostSettings s) {
         UUID host = localUuid();
-        Set<UUID> initial = allowlistFor(mode, preInvited);
-        offlineHosting = allowNonPremium;
+        Set<UUID> initial = allowlistFor(s.mode(), s.preInvited());
+        offlineHosting = s.allowNonPremium();
         server.execute(() -> {
-            HostAccessControl.set(mode, host, initial);
-            if (allowNonPremium) {
+            HostAccessControl.set(s.mode(), host, initial);
+            if (s.allowNonPremium()) {
                 server.setUsesAuthentication(false);
             }
+            if (s.gameType() != null) {
+                server.setDefaultGameType(s.gameType());
+            }
+            if (s.difficulty() != null) {
+                server.setDifficulty(s.difficulty(), false);
+            }
             if (!server.isPublished()) {
-                boolean ok = server.publishServer(server.getDefaultGameType(), true, HttpUtil.getAvailablePort());
-                LOGGER.info("LAN+ opened world to LAN ({}), access={}, nonPremium={}",
-                        ok ? "ok" : "failed", mode, allowNonPremium);
+                boolean ok = server.publishServer(
+                        s.gameType() != null ? s.gameType() : server.getDefaultGameType(),
+                        s.allowCommands(), HttpUtil.getAvailablePort());
+                LOGGER.info("LAN+ opened world to LAN ({}), access={}, nonPremium={}, gameType={}, cheats={}, difficulty={}",
+                        ok ? "ok" : "failed", s.mode(), s.allowNonPremium(), s.gameType(), s.allowCommands(), s.difficulty());
             }
         });
     }

@@ -1642,6 +1642,9 @@ public final class ProfileScreen extends Screen {
         network.getFriends(uuid).whenComplete((friends, ex) -> this.minecraft.execute(() -> {
             if (friends != null) {
                 this.profileFriends = friends;
+                if (LanPlusClient.skins() != null) {
+                    LanPlusClient.resolveFriendSkins(friends);
+                }
             }
         }));
     }
@@ -1709,17 +1712,15 @@ public final class ProfileScreen extends Screen {
 
     private void drawAvatar(GuiGraphics g, UUID id, int x, int y, int size) {
         SkinTextures textures = LanPlusClient.skinTextures();
-        SkinTextures.Resolved resolved = textures == null ? null : textures.get(uuid);
+        SkinTextures.Resolved resolved = textures == null ? null : textures.get(id);
         ResourceLocation tex;
         if (resolved != null) {
             tex = resolved.texture();
-        } else if (own && this.minecraft != null) {
+        } else if (own && uuid.equals(id) && this.minecraft != null) {
             net.minecraft.client.player.AbstractClientPlayer local = this.minecraft.player;
-            if (local != null && uuid.equals(local.getUUID())) {
-                tex = local.getSkinTextureLocation();
-            } else {
-                tex = DefaultPlayerSkin.getDefaultSkin(id);
-            }
+            tex = local != null && uuid.equals(local.getUUID())
+                    ? local.getSkinTextureLocation()
+                    : DefaultPlayerSkin.getDefaultSkin(id);
         } else {
             tex = DefaultPlayerSkin.getDefaultSkin(id);
         }

@@ -23,6 +23,8 @@ loom {
 }
 
 jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(rootProject.file("${project.path.replace(':','')}/srgpack")) { into '' }
     from project(':common').sourceSets.main.output
 }
 
