@@ -3,19 +3,14 @@ package dev.bgame.lanplus.client;
 import dev.bgame.lanplus.LanplusCommon;
 import dev.bgame.lanplus.client.gui.FriendsScreen;
 import dev.bgame.lanplus.client.gui.HostScreen;
+import dev.bgame.lanplus.client.gui.LanPlusIconButton;
 import dev.bgame.lanplus.mixin.client.ScreenAccessor;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.ResourceLocation;
-
-import java.util.function.Consumer;
 
 /**
  * Adds two small icon buttons next to the title screen's "Singleplayer" button: a gear that opens
@@ -26,7 +21,7 @@ import java.util.function.Consumer;
  */
 public final class TitleScreenButtons {
 
-    private static final ResourceLocation HOST_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/host.png");
+    static final ResourceLocation HOST_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/host.png");
     private static final ResourceLocation FRIENDS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/friends.png");
 
     private TitleScreenButtons() {}
@@ -42,15 +37,13 @@ public final class TitleScreenButtons {
         int x = singleplayer.getX() + singleplayer.getWidth() + 4;
         int y = singleplayer.getY();
         ScreenAccessor accessor = (ScreenAccessor) screen;
-        accessor.lanplus$invokeAddRenderableWidget(new IconButton(x, y, HOST_ICON, "gui.lanplus.host.tooltip",
+        accessor.lanplus$invokeAddRenderableWidget(new LanPlusIconButton(x, y, HOST_ICON, "gui.lanplus.host.tooltip",
                 b -> Minecraft.getInstance().setScreen(new HostScreen(title))));
-        accessor.lanplus$invokeAddRenderableWidget(new IconButton(x + 22, y, FRIENDS_ICON, "gui.lanplus.friends.tooltip",
+        accessor.lanplus$invokeAddRenderableWidget(new LanPlusIconButton(x + 22, y, FRIENDS_ICON, "gui.lanplus.friends.tooltip",
                 b -> Minecraft.getInstance().setScreen(new FriendsScreen(title))));
     }
 
     private static AbstractWidget findSingleplayer(Screen screen) {
-        // TitleScreen stores its buttons in the renderables list; the "Singleplayer" button
-        // is identified by its translation key.
         for (var child : screen.children()) {
             if (child instanceof AbstractWidget w
                     && w.getMessage().getContents() instanceof TranslatableContents tc
@@ -59,22 +52,5 @@ public final class TitleScreenButtons {
             }
         }
         return null;
-    }
-
-    private static final class IconButton extends Button {
-
-        private final ResourceLocation icon;
-
-        private IconButton(int x, int y, ResourceLocation icon, String tooltipKey, OnPress onPress) {
-            super(x, y, 20, 20, Component.empty(), onPress, DEFAULT_NARRATION);
-            this.icon = icon;
-            setTooltip(Tooltip.create(Component.translatable(tooltipKey)));
-        }
-
-        @Override
-        public void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-            super.renderWidget(g, mouseX, mouseY, partialTick);
-            g.blit(icon, getX() + 2, getY() + 2, 0, 0, 16, 16, 16, 16);
-        }
     }
 }

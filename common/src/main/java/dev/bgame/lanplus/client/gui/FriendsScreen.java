@@ -15,7 +15,6 @@ import dev.bgame.lanplus.invites.HostAccessControl;
 import dev.bgame.lanplus.invites.InviteService;
 import dev.bgame.lanplus.presence.PresenceManager;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
 import net.minecraft.client.resources.DefaultPlayerSkin;
@@ -104,13 +103,13 @@ public final class FriendsScreen extends Screen {
         layout();
 
         // "My Profile" sits in the top bar (right-aligned, beside the tabs) so it reads as a primary action
-        addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.profile.mine"), b -> doMyProfile())
+        addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.mine"), b -> doMyProfile())
                 .bounds(contentRight - 96, headerTop + 13, 96, 18).build());
 
         int btnY = paneBottom + 8;
-        addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.refresh"), b -> doRefresh())
+        addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.refresh"), b -> doRefresh())
                 .bounds(contentRight - 180, btnY, 88, 20).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
+        addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                 .bounds(contentRight - 88, btnY, 88, 20).build());
 
         if (tab == Tab.ADD) {
@@ -118,26 +117,26 @@ public final class FriendsScreen extends Screen {
                     Component.translatable("gui.lanplus.add.hint"));
             addBox.setHint(Component.translatable("gui.lanplus.add.hint"));
             addRenderableWidget(addBox);
-            addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.add.button"), b -> doAdd())
+            addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.add.button"), b -> doAdd())
                     .bounds(rightX + rightW - 72, paneTop + 22, 66, 20).build());
         } else if (tab == Tab.JOIN) {
             joinBox = new EditBox(this.font, rightX + 6, paneTop + 22, rightW - 84, 20,
                     Component.translatable("gui.lanplus.join.hint"));
             joinBox.setHint(Component.translatable("gui.lanplus.join.hint"));
             addRenderableWidget(joinBox);
-            addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.join.button"), b -> doJoinByCode())
+            addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.join.button"), b -> doJoinByCode())
                     .bounds(rightX + rightW - 72, paneTop + 22, 66, 20).build());
         } else if (tab == Tab.DETAILS) {
             HostInfo info = hostInfo();
             if (info != null) {
                 int bx = rightX + rightW - 116;
-                addRenderableWidget(Button.builder(showLabel(showAddress), b -> { showAddress = !showAddress; rebuildWidgets(); })
+                addRenderableWidget(LanPlusButton.create(showLabel(showAddress), b -> { showAddress = !showAddress; rebuildWidgets(); })
                         .bounds(bx, paneTop + 62, 52, 18).build());
-                addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.address()))
+                addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.address()))
                         .bounds(bx + 56, paneTop + 62, 52, 18).build());
-                addRenderableWidget(Button.builder(showLabel(showCode), b -> { showCode = !showCode; rebuildWidgets(); })
+                addRenderableWidget(LanPlusButton.create(showLabel(showCode), b -> { showCode = !showCode; rebuildWidgets(); })
                         .bounds(bx, paneTop + 94, 52, 18).build());
-                addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.code()))
+                addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.code()))
                         .bounds(bx + 56, paneTop + 94, 52, 18).build());
             }
         }

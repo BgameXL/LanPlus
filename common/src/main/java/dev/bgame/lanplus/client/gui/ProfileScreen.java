@@ -210,18 +210,18 @@ public final class ProfileScreen extends Screen {
     private int leftColHeight() {
         int n = linkRowCount();
         boolean addRow = linkRows.size() < PLATFORMS.length;
-        return 16 + 18 + 10                              // about header + bio + gap
-                + 16 + n * 24 + (addRow ? 20 : 0) + 12   // links
-                + 16 + MAX_SLOTS * 24;                    // questions
+        return 16 + 18 + 10
+                + 16 + n * 24 + (addRow ? 20 : 0) + 12
+                + 16 + MAX_SLOTS * 24;
     }
 
     // right column: Identity + Modpack + Background + Banner + Skin
     private int rightColHeight() {
-        return 16 + 20 + 12          // identity (pronouns/invisible)
-                + 16 + 18 + 12       // modpack chips
-                + 16 + 20 + 12       // background
-                + 16 + 20 + 12       // banner
-                + 16 + 20 + 4 + 20 + 14; // skin (source/slim, remove, hint)
+        return 16 + 20 + 12
+                + 16 + 18 + 12
+                + 16 + 20 + 12
+                + 16 + 20 + 12
+                + 16 + 20 + 4 + 20 + 14;
     }
 
     private int formContentHeight() {
@@ -283,21 +283,20 @@ public final class ProfileScreen extends Screen {
             buildEditWidgets();
 
             int by = Math.min(editFormBottom() + 10, this.height - 28);
-            addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.profile.save"), b -> doSave())
-                    .bounds(eL, by, 90, 20).build());
-            addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.profile.cancel"),
+            int bx = eL - 10;
+            addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.save"), b -> doSave())
+                    .bounds(bx, by, 90, 20).build());
+            addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.cancel"),
                             b -> { editing = false; status = null; rebuildWidgets(); })
-                    .bounds(eL + 96, by, 90, 20).build());
-            addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
-                    .bounds(eR - 80, by, 80, 20).build());
+                    .bounds(bx + 96, by, 90, 20).build());
         } else {
-            addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
+            addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                     .bounds(right - 80, this.height - 28, 80, 20).build());
             if (loaded && profile != null) {
-                addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.profile.back"), b -> onClose())
+                addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.back"), b -> onClose())
                         .bounds(left, 6, 80, 20).build());
                 if (own) {
-                    addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.profile.edit"),
+                    addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.edit"),
                                     b -> { editing = true; primeEdit(); rebuildWidgets(); })
                             .bounds(left, this.height - 28, 110, 20).build());
                 }
@@ -314,13 +313,13 @@ public final class ProfileScreen extends Screen {
         addRenderableWidget(bioBox);
 
         int half = (colW - 6) / 2;
-        pronounButton = Button.builder(pronounLabel(), b -> {
+        pronounButton = LanPlusButton.create(pronounLabel(), b -> {
             pronounIndex = (pronounIndex + 1) % PRONOUN_CYCLE.length;
             pronounButton.setMessage(pronounLabel());
         }).bounds(colRX, aIdentityY, half, 20).build();
         addRenderableWidget(pronounButton);
 
-        invisibleButton = Button.builder(invisibleLabel(), b -> {
+        invisibleButton = LanPlusButton.create(invisibleLabel(), b -> {
             invisibleToggle = !invisibleToggle;
             invisibleButton.setMessage(invisibleLabel());
         }).bounds(colRX + half + 6, aIdentityY, colW - half - 6, 20).build();
@@ -335,16 +334,16 @@ public final class ProfileScreen extends Screen {
 
     private void buildSkinWidgets() {
         int half = (colW - 6) / 2;
-        skinSourceButton = Button.builder(skinSourceLabel(), b -> toggleSkinSource())
+        skinSourceButton = LanPlusButton.create(skinSourceLabel(), b -> toggleSkinSource())
                 .bounds(colRX, aSkinRowY, half, 20).build();
         skinSourceButton.active = !Config.skinUrl.isBlank();
         addRenderableWidget(skinSourceButton);
 
-        skinSlimButton = Button.builder(skinSlimLabel(), b -> toggleSkinSlim())
+        skinSlimButton = LanPlusButton.create(skinSlimLabel(), b -> toggleSkinSlim())
                 .bounds(colRX + half + 6, aSkinRowY, colW - half - 6, 20).build();
         addRenderableWidget(skinSlimButton);
 
-        skinRemoveButton = Button.builder(Component.translatable("gui.lanplus.profile.skin.remove"),
+        skinRemoveButton = LanPlusButton.create(Component.translatable("gui.lanplus.profile.skin.remove"),
                         b -> removeHostedSkin())
                 .bounds(colRX, aSkinRowY + 24, half, 20).build();
         skinRemoveButton.active = !Config.skinUrl.isBlank();
@@ -472,17 +471,16 @@ public final class ProfileScreen extends Screen {
 
     private void buildBackgroundWidgets() {
         int w = (colW - 12) / 3;
-        bgStyleButton = Button.builder(bgStyleLabel(), b -> cycleBgStyle())
+        bgStyleButton = LanPlusButton.create(bgStyleLabel(), b -> cycleBgStyle())
                 .bounds(colRX, aBgRowY, w, 20).build();
         addRenderableWidget(bgStyleButton);
 
-        // with IMAGE active the middle button picks the catalog image instead of the solid color
         if (bgStyle == BG_IMAGE) {
-            bgColorButton = Button.builder(bgImageLabel(), b -> cycleBgImage())
+            bgColorButton = LanPlusButton.create(bgImageLabel(), b -> cycleBgImage())
                     .bounds(colRX + w + 6, aBgRowY, w, 20).build();
             bgColorButton.active = !bgCatalog.isEmpty();
         } else {
-            bgColorButton = Button.builder(Component.translatable("gui.lanplus.profile.bg.color"), b -> cycleBgColor())
+            bgColorButton = LanPlusButton.create(Component.translatable("gui.lanplus.profile.bg.color"), b -> cycleBgColor())
                     .bounds(colRX + w + 6, aBgRowY, w, 20).build();
             bgColorButton.active = bgStyle == BG_SOLID;
         }
@@ -494,7 +492,7 @@ public final class ProfileScreen extends Screen {
     }
 
     private void buildBannerWidgets() {
-        bannerButton = Button.builder(bannerLabel(), b -> cycleBanner())
+        bannerButton = LanPlusButton.create(bannerLabel(), b -> cycleBanner())
                 .bounds(colRX, aBannerRowY, colW, 20).build();
         bannerButton.active = !bannerCatalog.isEmpty() || banner != null;
         addRenderableWidget(bannerButton);
@@ -650,7 +648,7 @@ public final class ProfileScreen extends Screen {
             LinkRow r = linkRows.get(i);
             int y = aLinksRowsY + i * 24;
             final int idx = i;
-            addRenderableWidget(Button.builder(Component.literal(platformLabel(PLATFORMS[r.platform])),
+            addRenderableWidget(LanPlusButton.create(Component.literal(platformLabel(PLATFORMS[r.platform])),
                     b -> cycleLinkPlatform(idx)).bounds(colLX, y, pickW, 20).build());
             EditBox box = new EditBox(this.font, boxX, y + 1, boxW, 18, Component.literal(PLATFORMS[r.platform]));
             box.setMaxLength(40);
@@ -658,11 +656,11 @@ public final class ProfileScreen extends Screen {
             box.setValue(r.value == null ? "" : r.value);
             r.box = box;
             addRenderableWidget(box);
-            addRenderableWidget(Button.builder(Component.literal("x"), b -> removeLinkRow(idx))
+            addRenderableWidget(LanPlusButton.create(Component.literal("x"), b -> removeLinkRow(idx))
                     .bounds(colLX + colW - rmW, y, rmW, 20).build());
         }
         if (linkRows.size() < PLATFORMS.length) {
-            addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.profile.link.add"),
+            addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.link.add"),
                     b -> addLinkRow()).bounds(colLX, aAddLinkY, colW, 18).build());
         }
     }
@@ -738,7 +736,7 @@ public final class ProfileScreen extends Screen {
             slotFreeBox[i] = null;
             int y = aQRowsY + i * 24;
             final int slot = i;
-            addRenderableWidget(Button.builder(pickerLabel(slot), b -> changeSlotPrompt(slot))
+            addRenderableWidget(LanPlusButton.create(pickerLabel(slot), b -> changeSlotPrompt(slot))
                     .bounds(colLX, y, pickerW, 20).build());
 
             Prompt p = ProfilePromptCatalog.byId(slotPromptId[i]);
@@ -753,7 +751,7 @@ public final class ProfileScreen extends Screen {
                 slotFreeBox[i] = box;
                 addRenderableWidget(box);
             } else {
-                addRenderableWidget(Button.builder(choiceLabel(slot), b -> cycleChoice(slot))
+                addRenderableWidget(LanPlusButton.create(choiceLabel(slot), b -> cycleChoice(slot))
                         .bounds(answerX, y, answerW, 20).build());
             }
         }
@@ -894,7 +892,7 @@ public final class ProfileScreen extends Screen {
 
         if (status != null) {
             if (System.currentTimeMillis() < statusUntil) {
-                g.drawString(this.font, status, layoutLeft(), this.height - 42, 0xFFE0A030);
+                g.drawString(this.font, status, layoutLeft() + 12, this.height - 52, 0xFFE0A030);
             } else {
                 status = null;
             }
@@ -911,11 +909,9 @@ public final class ProfileScreen extends Screen {
             ProfileImages.Tex tex = ProfileImages.get(bgImage);
             if (tex != null) {
                 ProfileImages.blitCover(g, tex, 0, 0, this.width, this.height);
-                // opacity acts as a dark scrim over the image so the content stays readable
                 g.fill(0, 0, this.width, this.height, alpha(bgOpacity));
                 return;
             }
-            // image still downloading: fall through to the dark backdrop
         }
         int rgb = bgStyle == BG_SOLID ? (bgColor & 0xFFFFFF) : 0x05070B;
         g.fill(0, 0, this.width, this.height, alpha(bgOpacity) | rgb);
@@ -994,7 +990,6 @@ public final class ProfileScreen extends Screen {
 
         int y;
         if (banner != null) {
-            // identity lives on the banner (osu-style); leave room for the avatar overhang
             y = renderSidebarProgression(g, l, r, base + 26);
         } else {
             drawAvatar(g, uuid, l, base, 36);
@@ -1080,12 +1075,10 @@ public final class ProfileScreen extends Screen {
         }
     }
 
-    /** Banner strip height; the image is cover-cropped, so one asset fits any window size. */
     private int bannerHeight() {
         return Math.max(44, Math.min(64, layoutWidth() / 8));
     }
 
-    /** Top of the two-column layout — pushed down by the banner strip when one is selected. */
     private int contentTop() {
         return CONTENT_TOP + (banner == null ? 0 : bannerHeight() + 6);
     }
@@ -1103,7 +1096,6 @@ public final class ProfileScreen extends Screen {
         if (tex != null) {
             ProfileImages.blitCover(g, tex, left, top, right - left, bottom - top);
         }
-        // legibility scrim along the bottom edge, where the identity sits
         g.fillGradient(left, bottom - 26, right, bottom, 0x00000000, 0xA0000000);
         drawBorder(g, left, top, right, bottom, BORDER);
     }
@@ -1144,7 +1136,7 @@ public final class ProfileScreen extends Screen {
     private void drawTierChip(GuiGraphics g, int rightX, int y) {
         int tier = profile.tier();
         if (tier <= 0) {
-            return; // no chip until the player reaches tier 1; the XP line still shows progress
+            return;
         }
         Component label = Component.translatable("gui.lanplus.profile.tier", tier);
         int w = this.font.width(label) + 10;
@@ -1804,8 +1796,6 @@ public final class ProfileScreen extends Screen {
             return Component.translatable("gui.lanplus.rel.muted");
         }
         if (!isLive(f)) {
-            // only ONLINE/STALE are "live"; OFFLINE and UNKNOWN (no presence record) both read as offline,
-            // matching the "X/Y online" count which uses the same isLive() gate.
             return Component.translatable("gui.lanplus.state.offline");
         }
         GameplayState state = f.state();

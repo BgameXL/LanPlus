@@ -63,7 +63,6 @@ public final class HostController {
         pendingAt = System.currentTimeMillis();
     }
 
-    /** Called from each loader's client tick event at the END phase. */
     public static void onClientTick() {
         Minecraft mc = Minecraft.getInstance();
 
@@ -72,6 +71,7 @@ public final class HostController {
                 HostAccessControl.clear();
             }
             offlineHosting = false;
+            PauseMenuButtons.resetHostedInWorld();
         }
 
         HostSettings settings = pending;
