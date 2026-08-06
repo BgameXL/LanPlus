@@ -7,6 +7,8 @@ import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.UserProfile;
+import dev.bgame.lanplus.client.FriendNotifications;
+import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.JoinHelper;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
@@ -50,6 +52,7 @@ public final class FriendsScreen extends Screen {
     private static final int FOOTER_H = 28;
     private static final int ROW_H = 24;
     private static final int MENU_ROW_H = 14;
+    private static final int TAB_GAP = 26;
 
     private int leftX;
     private int rightX;
@@ -82,6 +85,12 @@ public final class FriendsScreen extends Screen {
     public FriendsScreen(Screen parent) {
         super(Component.translatable("gui.lanplus.title"));
         this.parent = parent;
+    }
+
+    public FriendsScreen(Screen parent, UUID focus) {
+        this(parent);
+        this.selectedUuid = focus;
+        FriendNotifications.markSeen(focus);
     }
 
     private void layout() {
@@ -139,6 +148,12 @@ public final class FriendsScreen extends Screen {
                 addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.code()))
                         .bounds(bx + 56, paneTop + 94, 52, 18).build());
             }
+        } else if (tab == Tab.FRIENDS) {
+            Friend sel = selectedFriend();
+            if (sel != null && sel.state() == GameplayState.HOSTING && sel.joinCode() != null) {
+                addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.action.join"), b -> doJoin())
+                        .bounds(rightX + 8, paneTop + 74, 80, 20).build());
+            }
         }
 
         if (!primed) {
@@ -189,7 +204,7 @@ public final class FriendsScreen extends Screen {
     private int tabX(int index) {
         int x = leftX;
         for (int i = 0; i < index; i++) {
-            x += this.font.width(tabLabel(TABS[i])) + 18;
+            x += this.font.width(tabLabel(TABS[i])) + TAB_GAP;
         }
         return x;
     }
@@ -206,7 +221,32 @@ public final class FriendsScreen extends Screen {
             if (active) {
                 g.fill(x, tabsTop + 11, x + w, tabsTop + 12, LanPlusUi.BLURPLE);
             }
+            int count = badgeCount(TABS[i]);
+            if (count > 0) {
+                drawTabBadge(g, x + w + 7, tabsTop, count);
+            }
         }
+    }
+
+    private int badgeCount(Tab t) {
+        return switch (t) {
+            case FRIENDS -> unreadInviteCount();
+            case ADD -> requests().size();
+            default -> 0;
+        };
+    }
+
+    private void drawTabBadge(GuiGraphics g, int x, int y, int count) {
+        String s = Integer.toString(count);
+        float scale = 0.85f;
+        int tw = Math.round(this.font.width(s) * scale);
+        int w = tw + 4;
+        g.fill(x, y - 1, x + w, y + 8, LanPlusUi.BLURPLE);
+        g.pose().pushPose();
+        g.pose().translate(x + (w - tw) / 2.0f, y + 0.5f, 0);
+        g.pose().scale(scale, scale, 1f);
+        g.drawString(this.font, s, 0, 0, 0xFFFFFFFF, false);
+        g.pose().popPose();
     }
 
     private Tab tabAt(double mouseX, double mouseY) {
@@ -237,9 +277,12 @@ public final class FriendsScreen extends Screen {
             }
             boolean selected = f.uuid().equals(selectedUuid);
             boolean hover = mouseX >= leftX && mouseX <= leftX + LEFT_W && mouseY >= y && mouseY < y + ROW_H;
+            boolean unread = isInviteUnread(f);
             if (selected || hover) {
                 g.fill(leftX + 1, y, leftX + LEFT_W - 1, y + ROW_H,
                         selected ? LanPlusUi.BLURPLE_TINT : 0x14FFFFFF);
+            } else if (unread) {
+                g.fill(leftX + 1, y, leftX + LEFT_W - 1, y + ROW_H, LanPlusUi.BLURPLE_TINT);
             }
             if (selected) {
                 g.fill(leftX + 1, y, leftX + 3, y + ROW_H, LanPlusUi.BLURPLE);
@@ -248,6 +291,11 @@ public final class FriendsScreen extends Screen {
             g.fill(leftX + 28, y + ROW_H / 2 - 3, leftX + 34, y + ROW_H / 2 + 3, statusColor(f.connectivity()));
             g.drawString(this.font, f.username(), leftX + 40, y + 4, LanPlusUi.TEXT, false);
             g.drawString(this.font, secondaryText(f), leftX + 40, y + 14, LanPlusUi.MUTED, false);
+            if (unread) {
+                int bx = leftX + LEFT_W - 12;
+                int by = y + ROW_H / 2 - 3;
+                g.fill(bx, by, bx + 6, by + 6, LanPlusUi.BLURPLE);
+            }
             y += ROW_H;
         }
     }
@@ -316,6 +364,10 @@ public final class FriendsScreen extends Screen {
         g.drawString(this.font, connectivityText(f), x + 50, paneTop + 22, LanPlusUi.MUTED, false);
         g.fill(x + 8, paneTop + 38, x + w - 8, paneTop + 39, LanPlusUi.DIVIDER);
         g.drawString(this.font, secondaryText(f), x + 8, paneTop + 46, LanPlusUi.MUTED, false);
+        if (f.state() == GameplayState.HOSTING && f.joinCode() != null) {
+            g.drawString(this.font, Component.translatable("gui.lanplus.notif.invitedyou"),
+                    x + 8, paneTop + 60, LanPlusUi.BLURPLE, false);
+        }
     }
 
     private void renderDetails(GuiGraphics g, int x, int w) {
@@ -363,6 +415,7 @@ public final class FriendsScreen extends Screen {
             Friend f = friendAt(mouseX, mouseY);
             if (f != null) {
                 selectedUuid = f.uuid();
+                FriendNotifications.markSeen(f.uuid());
                 rebuildWidgets();
                 return true;
             }
@@ -414,6 +467,9 @@ public final class FriendsScreen extends Screen {
         entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.viewprofile"), this::doViewProfile, true));
         boolean canJoin = f.state() == GameplayState.HOSTING && f.joinCode() != null;
         entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.join"), this::doJoin, canJoin));
+        if (HostAccessControl.isActive() && !f.uuid().equals(LanPlusClient.selfUuid())) {
+            entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.invite"), this::doInvite, true));
+        }
         entries.add(new ContextEntry(
                 Component.translatable(f.muted() ? "gui.lanplus.action.unmute" : "gui.lanplus.action.mute"),
                 this::doToggleMute, true));
@@ -545,6 +601,20 @@ public final class FriendsScreen extends Screen {
                 setStatus(Component.translatable("gui.lanplus.add.notfound", text));
             }
         }));
+    }
+
+    private void doInvite() {
+        Friend friend = selectedFriend();
+        InviteService invites = LanPlusClient.invites();
+        if (friend == null || invites == null || !HostAccessControl.isActive()) {
+            return;
+        }
+        HostAccessControl.invite(friend.uuid());
+        if (HostController.isOfflineHosting()) {
+            HostAccessControl.invite(HostController.offlineUuid(friend.username()));
+        }
+        invites.refreshHostAccess();
+        setStatus(Component.translatable("gui.lanplus.invite.sent", friend.username()));
     }
 
     private void doJoin() {
@@ -699,17 +769,32 @@ public final class FriendsScreen extends Screen {
     }
 
     private static String safe(String s) {
-        return s == null || s.isEmpty() ? "—" : s;
+        return s == null || s.isEmpty() ? "-" : s;
     }
 
     private static String mask(String s) {
-        return s == null || s.isEmpty() ? "—" : "*".repeat(Math.min(s.length(), 24));
+        return s == null || s.isEmpty() ? "-" : "*".repeat(Math.min(s.length(), 24));
     }
 
     // helpers
     private List<Friend> friends() {
         FriendsService friends = LanPlusClient.friends();
         return friends == null ? List.of() : friends.friends();
+    }
+
+    private boolean isInviteUnread(Friend f) {
+        return FriendNotifications.isUnread(f.uuid())
+                && f.state() == GameplayState.HOSTING && f.joinCode() != null;
+    }
+
+    private int unreadInviteCount() {
+        int n = 0;
+        for (Friend f : friends()) {
+            if (isInviteUnread(f)) {
+                n++;
+            }
+        }
+        return n;
     }
 
     private List<ResolvedUser> requests() {

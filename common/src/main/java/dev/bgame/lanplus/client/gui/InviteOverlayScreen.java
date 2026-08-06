@@ -4,6 +4,7 @@ import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
+import dev.bgame.lanplus.client.PauseMenuButtons;
 import dev.bgame.lanplus.friends.FriendsService;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -18,7 +19,7 @@ import java.util.UUID;
 
 /**
  * Small overlay shown after picking a world to host with INVITED access: tick the friends to invite
- * (only they may join, and each gets a "Join" notification), then "Host now". Optional — closing it
+ * (only they may join, and each gets a "Join" notification), then "Host now". Optional - closing it
  * (Esc or the X) still hosts the world.
  */
 public final class InviteOverlayScreen extends Screen {
@@ -30,17 +31,30 @@ public final class InviteOverlayScreen extends Screen {
     private final Screen parent;
     private final LevelSummary world;
     private final HostAccessMode mode;
+    private final boolean allowNonPremium;
+    private final HostController.HostSettings inWorldBase;
     private final Set<UUID> picked = new HashSet<>();
     private boolean launched;
 
     private int panelX;
     private int panelY;
 
-    public InviteOverlayScreen(Screen parent, LevelSummary world, HostAccessMode mode) {
+    public InviteOverlayScreen(Screen parent, LevelSummary world, HostAccessMode mode, boolean allowNonPremium) {
+        this(parent, world, mode, allowNonPremium, null);
+    }
+
+    public InviteOverlayScreen(Screen parent, HostController.HostSettings inWorldBase) {
+        this(parent, null, inWorldBase.mode(), inWorldBase.allowNonPremium(), inWorldBase);
+    }
+
+    private InviteOverlayScreen(Screen parent, LevelSummary world, HostAccessMode mode,
+                                boolean allowNonPremium, HostController.HostSettings inWorldBase) {
         super(Component.translatable("gui.lanplus.invite.title"));
         this.parent = parent;
         this.world = world;
         this.mode = mode;
+        this.allowNonPremium = allowNonPremium;
+        this.inWorldBase = inWorldBase;
     }
 
     @Override
@@ -120,12 +134,25 @@ public final class InviteOverlayScreen extends Screen {
             return;
         }
         launched = true;
-        HostController.requestHost(mode, picked, false); // premium path: keep online-mode + uuid gate
+        if (inWorldBase != null) {
+            PauseMenuButtons.markHostedInWorld();
+            HostController.requestHost(new HostController.HostSettings(
+                    mode, picked, inWorldBase.allowNonPremium(), inWorldBase.gameType(),
+                    inWorldBase.difficulty(), inWorldBase.allowCommands()));
+            notifyInvited();
+            this.minecraft.setScreen(null);
+            return;
+        }
+        HostController.requestHost(mode, picked, allowNonPremium);
+        notifyInvited();
+        this.minecraft.createWorldOpenFlows().loadLevel(parent, world.getLevelId());
+    }
+
+    private void notifyInvited() {
         if (!picked.isEmpty()) {
             LanPlusNotifications.info(Component.translatable("gui.lanplus.toast.invited.title"),
                     Component.translatable("gui.lanplus.toast.invited", picked.size()));
         }
-        this.minecraft.createWorldOpenFlows().loadLevel(parent, world.getLevelId());
     }
 
     private List<Friend> friends() {

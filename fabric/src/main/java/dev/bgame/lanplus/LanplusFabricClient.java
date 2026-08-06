@@ -1,6 +1,5 @@
 package dev.bgame.lanplus;
 
-import dev.bgame.lanplus.client.ClientAdvancementDetector;
 import dev.bgame.lanplus.client.ClientPresenceDetector;
 import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
@@ -19,8 +18,9 @@ import net.minecraft.client.gui.GuiGraphics;
 /**
  * Fabric client entry point. Wires the loader-agnostic common handlers to Fabric events.
  *
- * NOTE: Advancement tracking is not wired here because Fabric lacks a client advancement event.
- * It should be implemented via a Mixin in the common module.
+ * NOTE: Advancement tracking is handled by the fabric mixin client.PlayerAdvancementsMixin
+ * (Fabric has no client advancement event), so nothing is wired here for it. Forge uses
+ * AdvancementEarnEvent instead.
  */
 public class LanplusFabricClient implements ClientModInitializer {
 

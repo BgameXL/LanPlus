@@ -57,6 +57,15 @@ public final class DefaultInviteService implements InviteService, PresenceManage
     }
 
     @Override
+    public void refreshHostAccess() {
+        String code = activeCode;
+        if (code == null || presence.current().state() != GameplayState.HOSTING) {
+            return;
+        }
+        presence.setJoinCode(code, HostAccessControl.mode(), HostAccessControl.allowedSnapshot());
+    }
+
+    @Override
     public void onPresenceChanged(PresenceSnapshot snapshot) {
         if (snapshot.state() == GameplayState.HOSTING) {
             mintIfNeeded(snapshot);

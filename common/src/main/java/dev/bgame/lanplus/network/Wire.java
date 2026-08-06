@@ -180,7 +180,7 @@ final class Wire {
 
     /**
      * Catalog urls arrive relative to the backend; the per-id url is stable across replacements,
-     * so it is versioned by content hash — url-keyed caches (memory and disk) re-download on change.
+     * so it is versioned by content hash - url-keyed caches (memory and disk) re-download on change.
      */
     static String versionedUrl(String base, String url, String hash) {
         String absolute = url.startsWith("http") ? url : base + url;

@@ -16,7 +16,7 @@ import java.net.SocketAddress;
  * INVITED mode, a player whose uuid is not allowed is rejected before entering the world.
  *
  * {@link HostAccessControl#isAllowed} returns true whenever no policy is armed (EVERYONE, vanilla
- * LAN, or a dedicated server), so this is a no-op outside LAN+ hosting — the decision lives in the
+ * LAN, or a dedicated server), so this is a no-op outside LAN+ hosting - the decision lives in the
  * policy holder, not here.
  */
 @Mixin(PlayerList.class)

@@ -9,6 +9,10 @@
     },
     "dev/bgame/lanplus/mixin/client/ScreenAccessor": {
       "addRenderableWidget": "method_37063(Lnet/minecraft/class_364;)Lnet/minecraft/class_364;"
+    },
+    "dev/bgame/lanplus/mixin/client/PlayerAdvancementsMixin": {
+      "award(Lnet/minecraft/advancements/Advancement;Ljava/lang/String;)Z": "Lnet/minecraft/class_2985;method_12878(Lnet/minecraft/class_161;Ljava/lang/String;)Z",
+      "Lnet/minecraft/advancements/AdvancementRewards;grant(Lnet/minecraft/server/level/ServerPlayer;)V": "Lnet/minecraft/class_170;method_748(Lnet/minecraft/class_3222;)V"
     }
   }
 }

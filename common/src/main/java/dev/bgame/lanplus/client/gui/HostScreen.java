@@ -26,7 +26,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * "Host a World" — pick one of your worlds from the title flow (or configure the running world from
+ * "Host a World" - pick one of your worlds from the title flow (or configure the running world from
  * the pause menu, in-game flow), choose who can join, and open it to LAN+.
  * Each option row shows its translatable label with the control (dropdown / toggle) right next to it;
  * opening a dropdown draws it on top of the card without resizing it.
@@ -264,16 +264,17 @@ public final class HostScreen extends Screen {
         LanPlusUi.chip(g, this.font, premium, cardX + PAD, premiumRowY, cardW - 2 * PAD, DROPDOWN_H,
                 allowNonPremium, true, hover);
         if (hover) {
-            g.renderTooltip(this.font, Component.translatable("gui.lanplus.host.nonpremium.tip"), mouseX, mouseY);
+            g.renderTooltip(this.font,
+                    this.font.split(Component.translatable("gui.lanplus.host.nonpremium.tip"), 220),
+                    mouseX, mouseY);
         }
     }
 
     private void renderModeChip(GuiGraphics g, int mouseX, int mouseY, HostAccessMode mode, String key,
                                 int x, int w) {
-        boolean enabled = !allowNonPremium;
-        boolean hover = enabled && in(mouseX, mouseY, x, accessRowY, w, DROPDOWN_H);
+        boolean hover = in(mouseX, mouseY, x, accessRowY, w, DROPDOWN_H);
         LanPlusUi.chip(g, this.font, Component.translatable(key), x, accessRowY, w, DROPDOWN_H,
-                accessMode == mode, enabled, hover);
+                accessMode == mode, true, hover);
     }
 
     private static <T> int indexOf(T value, T[] values) {
@@ -419,7 +420,7 @@ public final class HostScreen extends Screen {
 
     private boolean handleSharedClick(double mouseX, double mouseY, int button) {
         if (button == 0) {
-            if (!allowNonPremium && in(mouseX, mouseY, cardX + PAD, accessRowY, cardW - 2 * PAD, DROPDOWN_H)) {
+            if (in(mouseX, mouseY, cardX + PAD, accessRowY, cardW - 2 * PAD, DROPDOWN_H)) {
                 int chipW = (cardW - 2 * PAD - 2 * 6) / 3;
                 if (mouseX < cardX + PAD + chipW) {
                     accessMode = HostAccessMode.EVERYONE;
@@ -432,11 +433,6 @@ public final class HostScreen extends Screen {
             }
             if (in(mouseX, mouseY, cardX + PAD, premiumRowY, cardW - 2 * PAD, DROPDOWN_H)) {
                 allowNonPremium = !allowNonPremium;
-                if (allowNonPremium) {
-                    accessMode = HostAccessMode.EVERYONE;
-                    gameTypeOpen = false;
-                    difficultyOpen = false;
-                }
                 return true;
             }
         }
@@ -500,9 +496,14 @@ public final class HostScreen extends Screen {
 
     private void doStart() {
         if (inWorld) {
+            HostController.HostSettings settings = new HostController.HostSettings(
+                    accessMode, Set.of(), allowNonPremium, gameType, difficulty, allowCheats);
+            if (accessMode == HostAccessMode.INVITED) {
+                this.minecraft.setScreen(new InviteOverlayScreen(this, settings));
+                return;
+            }
             PauseMenuButtons.markHostedInWorld();
-            HostController.requestHost(new HostController.HostSettings(
-                    accessMode, Set.of(), allowNonPremium, gameType, difficulty, allowCheats));
+            HostController.requestHost(settings);
             onClose();
             return;
         }
@@ -511,7 +512,7 @@ public final class HostScreen extends Screen {
             return;
         }
         if (accessMode == HostAccessMode.INVITED) {
-            this.minecraft.setScreen(new InviteOverlayScreen(this, world, accessMode));
+            this.minecraft.setScreen(new InviteOverlayScreen(this, world, accessMode, allowNonPremium));
         } else {
             HostController.requestHost(accessMode, Set.of(), allowNonPremium);
             this.minecraft.createWorldOpenFlows().loadLevel(this, world.getLevelId());

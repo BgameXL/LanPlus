@@ -6,6 +6,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import net.minecraft.client.gui.screens.OptionsScreen;
+import net.minecraft.client.gui.screens.OptionsSubScreen;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
@@ -41,8 +44,8 @@ public final class LanPlusNotifications {
         boolean invited = joinCode != null && !joinCode.isBlank();
         Component subtitle = Component.translatable(invited
                 ? "gui.lanplus.notif.invitedyou" : "gui.lanplus.toast.hosting");
-        Component action = invited ? Component.translatable("gui.lanplus.notif.join") : null;
-        Runnable onAction = invited ? () -> LanPlusClient.joinByInviteCode(joinCode) : null;
+        Component action = invited ? Component.translatable("gui.lanplus.notif.view") : null;
+        Runnable onAction = invited ? () -> LanPlusClient.openFriendsFocused(friend) : null;
         push(new Notif(friend, Component.literal(name), subtitle, action, onAction,
                 invited ? HOLD_ACTION_MS : HOLD_INFO_MS));
     }
@@ -80,15 +83,26 @@ public final class LanPlusNotifications {
 
     /** Called from the loader's screen render event. */
     public static void onScreenRender(GuiGraphics g, double mouseX, double mouseY) {
+        if (hiddenOnCurrentScreen()) {
+            return;
+        }
         renderAll(g, mouseX, mouseY);
     }
 
     /** Called from the loader's screen mouse-click event. Returns true if the click was consumed. */
     public static boolean onMouseClick(double mouseX, double mouseY, int button) {
+        if (hiddenOnCurrentScreen()) {
+            return false;
+        }
         if (button == 0 && handleClick(mouseX, mouseY)) {
             return true;
         }
         return false;
+    }
+
+    private static boolean hiddenOnCurrentScreen() {
+        Screen s = Minecraft.getInstance().screen;
+        return s instanceof OptionsScreen || s instanceof OptionsSubScreen;
     }
 
     private static void renderAll(GuiGraphics g, double mouseX, double mouseY) {

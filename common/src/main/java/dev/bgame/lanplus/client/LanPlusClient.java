@@ -3,9 +3,11 @@ package dev.bgame.lanplus.client;
 import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.api.Friend;
+import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.SkinRef;
+import dev.bgame.lanplus.client.gui.FriendsScreen;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.core.ProfileCache;
@@ -32,8 +34,10 @@ import net.minecraft.client.server.IntegratedServer;
 import dev.bgame.lanplus.platform.PlatformHolder;
 import org.slf4j.Logger;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -198,12 +202,31 @@ public final class LanPlusClient {
     }
 
     private static final class SocialToastListener implements FriendsService.FriendsListener {
+        private static final Set<UUID> lastJoinable = ConcurrentHashMap.newKeySet();
+        private static boolean joinablePrimed;
+
         @Override
-        public void onFriendsChanged(List<Friend> friends) {
+        public void onFriendsChanged(List<Friend> list) {
+            Set<UUID> nowJoinable = new HashSet<>();
+            for (Friend f : list) {
+                if (f.state() == GameplayState.HOSTING && f.joinCode() != null) {
+                    nowJoinable.add(f.uuid());
+                    if (joinablePrimed && !lastJoinable.contains(f.uuid())) {
+                        FriendNotifications.invited(f.uuid());
+                    }
+                }
+            }
+            lastJoinable.clear();
+            lastJoinable.addAll(nowJoinable);
+            joinablePrimed = true;
+            FriendNotifications.retain(nowJoinable);
         }
 
         @Override
         public void onFriendStartedHosting(UUID uuid, String joinCode) {
+            if (joinCode != null && !joinCode.isBlank()) {
+                FriendNotifications.invited(uuid);
+            }
             LanPlusNotifications.friendHosting(uuid, usernameOf(uuid), joinCode);
         }
 
@@ -223,6 +246,11 @@ public final class LanPlusClient {
             }
             return "?";
         }
+    }
+
+    public static void openFriendsFocused(UUID uuid) {
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> mc.setScreen(new FriendsScreen(mc.screen, uuid)));
     }
 
     public static void joinByInviteCode(String inviteCode) {

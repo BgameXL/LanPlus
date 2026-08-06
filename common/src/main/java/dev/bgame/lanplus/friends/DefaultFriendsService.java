@@ -240,7 +240,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     @Override
     public void onInviteRedeemed(UUID guestUuid) {
         HostAccessControl.invite(guestUuid);
-        LOGGER.info("LAN+ invite redeemed by {} — admitted to hosted world", guestUuid);
+        LOGGER.info("LAN+ invite redeemed by {} - admitted to hosted world", guestUuid);
     }
 
     @Override

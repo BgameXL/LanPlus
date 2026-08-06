@@ -38,7 +38,7 @@ public final class HostAccessControl {
 
     /**
      * Admit a player (a pre-picked friend, or a guest who redeemed the invite code). Only takes
-     * effect in INVITED mode — in FRIENDS mode the code must not let a non-friend in, and in
+     * effect in INVITED mode - in FRIENDS mode the code must not let a non-friend in, and in
      * EVERYONE everyone is already allowed.
      */
     public static void invite(UUID uuid) {

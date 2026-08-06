@@ -160,7 +160,7 @@ public final class TcpRelayTunnel implements RelayTunnel {
                 out.flush();
             }
         } catch (IOException ignored) {
-            // peer closed — tear down
+            // peer closed - tear down
         } finally {
             try {
                 to.shutdownOutput();
@@ -170,8 +170,7 @@ public final class TcpRelayTunnel implements RelayTunnel {
         }
     }
 
-    // --- helpers ----------------------------------------------------------------------------------
-
+    // helpers
     private Socket connect(String host, int port) throws IOException {
         if (plaintext) {
             Socket s = new Socket();

@@ -52,7 +52,7 @@ public final class HostController {
      * Called right before loading the world: publish to LAN with this mode once up.
      * {@code preInvited} seeds the allow list (friends picked in the invite overlay).
      * {@code allowNonPremium} opens the integrated server in offline-mode so non-premium clients can
-     * join (only meaningful with EVERYONE access — the uuid gate is useless once uuids are spoofable).
+     * join, independent of the access mode (the whitelist also admits each allowed friend's offline uuid).
      */
     public static void requestHost(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium) {
         requestHost(HostSettings.defaults(mode, preInvited, allowNonPremium));
@@ -92,7 +92,7 @@ public final class HostController {
 
     private static void publish(IntegratedServer server, HostSettings s) {
         UUID host = localUuid();
-        Set<UUID> initial = allowlistFor(s.mode(), s.preInvited());
+        Set<UUID> initial = allowlistFor(s.mode(), s.preInvited(), s.allowNonPremium());
         offlineHosting = s.allowNonPremium();
         server.execute(() -> {
             HostAccessControl.set(s.mode(), host, initial);
@@ -115,17 +115,28 @@ public final class HostController {
         });
     }
 
-    private static Set<UUID> allowlistFor(HostAccessMode mode, Set<UUID> preInvited) {
+    private static Set<UUID> allowlistFor(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium) {
         Set<UUID> set = new HashSet<>(preInvited);
-        if (mode == HostAccessMode.FRIENDS) {
-            FriendsService friends = LanPlusClient.friends();
-            if (friends != null) {
-                for (Friend f : friends.friends()) {
-                    set.add(f.uuid());
-                }
+        FriendsService friends = LanPlusClient.friends();
+        if (mode == HostAccessMode.FRIENDS && friends != null) {
+            for (Friend f : friends.friends()) {
+                set.add(f.uuid());
             }
         }
+        if (allowNonPremium && friends != null) {
+            Set<UUID> offline = new HashSet<>();
+            for (Friend f : friends.friends()) {
+                if (set.contains(f.uuid())) {
+                    offline.add(offlineUuid(f.username()));
+                }
+            }
+            set.addAll(offline);
+        }
         return set;
+    }
+    
+    public static UUID offlineUuid(String username) {
+        return UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private static UUID localUuid() {

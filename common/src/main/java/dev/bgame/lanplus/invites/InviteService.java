@@ -9,4 +9,6 @@ public interface InviteService {
     CompletableFuture<Invite> create(String address, String worldName);
 
     CompletableFuture<Invite> resolve(String code);
+    
+    void refreshHostAccess();
 }

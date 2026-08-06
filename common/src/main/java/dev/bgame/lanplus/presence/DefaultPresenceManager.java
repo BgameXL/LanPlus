@@ -16,9 +16,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Default {@link PresenceManager}: the hub of {@code Minecraft → PresenceManager → LanPlusNetwork →
- * Backend}. Side-agnostic (no Minecraft types) — detection feeds it from the client.
+ * Backend}. Side-agnostic (no Minecraft types) - detection feeds it from the client.
  *
- * <p>Assembles the local {@link PresenceSnapshot} from parts contributed by different modules
+ *Assembles the local {@link PresenceSnapshot} from parts contributed by different modules
  * (state/world from detection, join code from invites, skin from skins) and pushes it on every
  * change as well as on each {@link #heartbeat()}. All pushes are fire-and-forget and fail soft.
  */

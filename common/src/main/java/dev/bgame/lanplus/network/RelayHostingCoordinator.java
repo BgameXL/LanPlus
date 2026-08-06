@@ -14,7 +14,7 @@ import java.util.function.Supplier;
 /**
  * Drives the relay {@link RelayTunnel} from presence state.
  * When the local player starts HOSTING, it requests a ticket, opens the tunnel, and republishes the assigned
- * public domain as the presence address — so {@code invites/} mints a join code that points at the
+ * public domain as the presence address - so {@code invites/} mints a join code that points at the
  * relay instead of the unreachable {@code localhost} address. When hosting stops, it closes the tunnel.
  *
  * Detection stays dumb: this only reacts to the gameplay state the detector
@@ -71,7 +71,7 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
             if (!active || ticket == null) {
                 tunneling = false;
                 if (active) {
-                    LOGGER.info("LAN+ relay unavailable — hosting LAN-only");
+                    LOGGER.info("LAN+ relay unavailable - hosting LAN-only");
                 }
                 return;
             }
@@ -79,7 +79,7 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
                 if (!active || domain == null) {
                     tunneling = false;
                     if (active) {
-                        LOGGER.warn("LAN+ relay tunnel failed — hosting LAN-only");
+                        LOGGER.warn("LAN+ relay tunnel failed - hosting LAN-only");
                     } else {
                         tunnel.close();
                     }
