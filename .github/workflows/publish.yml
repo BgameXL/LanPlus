@@ -4,6 +4,9 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        required: true
 
 permissions:
   contents: write
@@ -23,6 +26,18 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          validate-wrappers: true
+
+      - name: Normalize version
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Apply version to gradle.properties
+        run: sed -i "s/^mod_version=.*/mod_version=${{ steps.version.outputs.version }}/" gradle.properties
 
       - name: Build
         run: ./gradlew build --no-daemon
@@ -30,7 +45,6 @@ jobs:
       - name: Publish to CurseForge, Modrinth & GitHub
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          
           curseforge-id: ${{ vars.CURSEFORGE_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           modrinth-id: ${{ vars.MODRINTH_ID }}
@@ -40,12 +54,16 @@ jobs:
           files: |
             fabric/build/libs/!(*-@(dev|sources|javadoc)).jar
             forge/build/libs/!(*-@(dev|sources|javadoc)).jar
-            
-          name: LAN+ ${{ github.ref_name }}
-          version-type: release
+
+          name: LAN+ ${{ steps.version.outputs.version }}
+          version: ${{ steps.version.outputs.version }}
+          version-type: ${{ contains(github.ref_name, '-') && 'beta' || 'release' }}
           loaders: |
             fabric
             forge
           game-versions: '1.20.1'
+          java: '17'
 
           retry-attempts: 3
+          retry-delay: 10000
+          fail-mode: warn
