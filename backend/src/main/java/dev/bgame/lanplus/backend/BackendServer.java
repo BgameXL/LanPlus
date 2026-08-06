@@ -39,7 +39,8 @@ public final class BackendServer {
         this.backgrounds = new AssetCatalog(java.nio.file.Path.of(cfg.backgroundsDir), "/backgrounds/");
         this.banners = new AssetCatalog(java.nio.file.Path.of(cfg.bannersDir), "/banners/");
         this.store = new Store(cfg.heartbeatTtlMs, cfg.baseDomain, cfg.dataFile,
-                cfg.sessionServerUrl, cfg.allowOffline, cfg.sessionTtlMs, backgrounds, banners);
+                cfg.sessionServerUrl, cfg.allowOffline, cfg.sessionTtlMs, backgrounds, banners,
+                cfg.discordWebhook);
     }
 
     public static void main(String[] args) throws Exception {
@@ -154,12 +155,25 @@ public final class BackendServer {
             if (m.equals("GET") && path.startsWith("/banners/") && path.endsWith(".png")) {
                 return catalogPng(banners, path.substring("/banners/".length(), path.length() - ".png".length()));
             }
+            if (m.equals("GET") && path.equals("/admin/panel")) {
+                return new Resp(200, null,
+                        AdminPanel.HTML.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        "text/html; charset=utf-8");
+            }
+            if (path.startsWith("/admin/") && !cfg.adminKey.isBlank()
+                    && cfg.adminKey.equals(req.headers().get("x-admin-key"))) {
+                return adminRoute(m, path, req);
+            }
+
             Store.Session session = store.validateSession(bearer(req));
             if (session == null) {
                 return UNAUTHORIZED;
             }
             UUID self = session.uuid();
 
+            if (m.equals("POST") && !path.startsWith("/admin/") && store.isBanned(self)) {
+                return FORBIDDEN;
+            }
             if (m.equals("POST") && path.equals("/presence")) {
                 return presence(req, self);
             }
@@ -212,6 +226,12 @@ public final class BackendServer {
             }
             if (m.equals("POST") && path.equals("/profile/advancement")) {
                 return profileAdvancement(req, self);
+            }
+            if (m.equals("POST") && path.equals("/report")) {
+                return report(req, self);
+            }
+            if (path.startsWith("/admin/")) {
+                return isAdmin(self) ? adminRoute(m, path, req) : FORBIDDEN;
             }
             if (m.equals("POST") && path.equals("/skin")) {
                 return skinUpload(req, self);
@@ -416,6 +436,78 @@ public final class BackendServer {
         return ok(Map.of("success", true));
     }
 
+    // moderation
+    private static final Set<String> REPORT_REASONS =
+            Set.of("hate_speech", "harassment", "spam", "inappropriate", "other");
+
+    private Resp report(Http.Request req, UUID self) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        UUID target = uuid((String) b.get("targetUuid"));
+        if (target.equals(self)) {
+            return ok(error("bad_target"));
+        }
+        Object reasonObj = b.get("reason");
+        String reason = reasonObj == null ? "other" : String.valueOf(reasonObj);
+        if (!REPORT_REASONS.contains(reason)) {
+            return ok(error("bad_reason"));
+        }
+        store.addReport(self, target, reason);
+        return ok(Map.of("success", true));
+    }
+
+    private boolean isAdmin(UUID self) {
+        return cfg.adminUuids.contains(self);
+    }
+
+    private Resp adminRoute(String m, String path, Http.Request req) {
+        if (m.equals("POST") && path.equals("/admin/scrub")) {
+            return adminScrub(req);
+        }
+        if (m.equals("POST") && path.equals("/admin/ban")) {
+            return adminBan(req);
+        }
+        if (m.equals("POST") && path.equals("/admin/unban")) {
+            return adminUnban(req);
+        }
+        if (m.equals("GET") && path.equals("/admin/reports")) {
+            return ok(store.openReports());
+        }
+        if (m.equals("POST") && path.equals("/admin/reports/resolve")) {
+            return adminResolveReport(req);
+        }
+        return NOT_FOUND;
+    }
+
+    private Resp adminScrub(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        store.scrubProfile(uuid((String) b.get("targetUuid")));
+        return ok(Map.of("success", true));
+    }
+
+    private Resp adminBan(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        UUID target = uuid((String) b.get("targetUuid"));
+        String reason = b.get("reason") == null ? null : String.valueOf(b.get("reason"));
+        store.setBanned(target, true, reason);
+        log("admin ban " + target + (reason != null ? " (" + reason + ")" : ""));
+        return ok(Map.of("success", true));
+    }
+
+    private Resp adminUnban(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        UUID target = uuid((String) b.get("targetUuid"));
+        store.setBanned(target, false, null);
+        log("admin unban " + target);
+        return ok(Map.of("success", true));
+    }
+
+    private Resp adminResolveReport(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        Object idObj = b.get("id");
+        long id = idObj instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(idObj));
+        return ok(Map.of("success", store.resolveReport(id)));
+    }
+
     private Resp profileUpdate(Http.Request req, UUID uuid) {
         Map<String, Object> b = Json.parseObject(req.body());
         store.ensureUser(uuid, null);
@@ -426,6 +518,9 @@ public final class BackendServer {
             }
             if (containsObviousLink(bio)) {
                 return ok(error("bio_link"));
+            }
+            if (ContentFilter.isBlocked(bio)) {
+                return ok(error("content_blocked"));
             }
             store.setBio(uuid, bio);
         }
@@ -469,6 +564,9 @@ public final class BackendServer {
                 }
                 if (containsObviousLink(answer)) {
                     return ok(error("prompt_link"));
+                }
+                if (ContentFilter.isBlocked(answer)) {
+                    return ok(error("content_blocked"));
                 }
                 answers.put(id, answer);
             }

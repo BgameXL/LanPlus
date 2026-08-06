@@ -1,6 +1,9 @@
 package dev.bgame.lanplus.backend;
 
 import java.net.InetSocketAddress;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.UUID;
 
 final class BackendConfig {
 
@@ -17,11 +20,15 @@ final class BackendConfig {
     final String bannersDir;
     final int workerThreads;
     final int requestTimeoutMs;
+    final Set<UUID> adminUuids;
+    final String adminKey;
+    final String discordWebhook;
 
     private BackendConfig(InetSocketAddress bind, String baseDomain, String relayHost, int relayPort,
                           int heartbeatTtlMs, String dataFile, String sessionServerUrl, boolean allowOffline,
                           long sessionTtlMs, String backgroundsDir, String bannersDir,
-                          int workerThreads, int requestTimeoutMs) {
+                          int workerThreads, int requestTimeoutMs, Set<UUID> adminUuids, String adminKey,
+                          String discordWebhook) {
         this.bind = bind;
         this.baseDomain = baseDomain;
         this.relayHost = relayHost;
@@ -35,6 +42,9 @@ final class BackendConfig {
         this.bannersDir = bannersDir;
         this.workerThreads = workerThreads;
         this.requestTimeoutMs = requestTimeoutMs;
+        this.adminUuids = adminUuids;
+        this.adminKey = adminKey;
+        this.discordWebhook = discordWebhook;
     }
 
     static BackendConfig fromEnv() {
@@ -51,7 +61,24 @@ final class BackendConfig {
                 env("LANPLUS_BACKEND_BACKGROUNDS_DIR", "backgrounds"),
                 env("LANPLUS_BACKEND_BANNERS_DIR", "banners"),
                 intEnv("LANPLUS_BACKEND_WORKER_THREADS", 128),
-                intEnv("LANPLUS_BACKEND_REQUEST_TIMEOUT_MS", 60_000));
+                intEnv("LANPLUS_BACKEND_REQUEST_TIMEOUT_MS", 60_000),
+                uuidSet(env("LANPLUS_BACKEND_ADMIN_UUIDS", "")),
+                env("LANPLUS_BACKEND_ADMIN_KEY", ""),
+                env("LANPLUS_BACKEND_DISCORD_WEBHOOK", ""));
+    }
+
+    private static Set<UUID> uuidSet(String raw) {
+        Set<UUID> out = new LinkedHashSet<>();
+        for (String tok : raw.split("[,\\s]+")) {
+            if (tok.isBlank()) {
+                continue;
+            }
+            try {
+                out.add(UUID.fromString(tok.trim()));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return Set.copyOf(out);
     }
 
     private static InetSocketAddress addr(String s) {

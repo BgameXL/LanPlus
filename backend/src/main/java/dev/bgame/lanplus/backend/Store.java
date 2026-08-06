@@ -100,6 +100,7 @@ final class Store {
     private final Connection connection;
     private final AssetCatalog backgrounds;
     private final AssetCatalog banners;
+    private final String discordWebhook;
 
     private final Map<UUID, Presence> presences = new ConcurrentHashMap<>();
     private final Map<String, Invite> invites = new ConcurrentHashMap<>();
@@ -109,7 +110,7 @@ final class Store {
 
     Store(long ttlMs, String baseDomain, String dataFile,
           String sessionServerUrl, boolean allowOffline, long sessionTtlMs,
-          AssetCatalog backgrounds, AssetCatalog banners) {
+          AssetCatalog backgrounds, AssetCatalog banners, String discordWebhook) {
         this.ttlMs = ttlMs;
         this.baseDomain = baseDomain;
         this.sessionServerUrl = sessionServerUrl;
@@ -117,6 +118,7 @@ final class Store {
         this.sessionTtlMs = sessionTtlMs;
         this.backgrounds = backgrounds;
         this.banners = banners;
+        this.discordWebhook = discordWebhook;
         String path = (dataFile == null || dataFile.isBlank()) ? ":memory:" : dataFile;
         this.connection = openDb(path);
     }
@@ -210,6 +212,15 @@ final class Store {
                     st.executeUpdate("ALTER TABLE profile_settings ADD COLUMN bg_image_id TEXT");
                     st.executeUpdate("ALTER TABLE profile_settings ADD COLUMN banner_id TEXT");
                 }
+                if (!columnExists(st, "users", "banned")) {
+                    st.executeUpdate("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0");
+                    st.executeUpdate("ALTER TABLE users ADD COLUMN ban_reason TEXT");
+                }
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS reports ("
+                        + "id INTEGER PRIMARY KEY AUTOINCREMENT, reporter_uuid TEXT NOT NULL, "
+                        + "target_uuid TEXT NOT NULL, reason TEXT, status TEXT NOT NULL DEFAULT 'open', "
+                        + "created_at INTEGER NOT NULL)");
+                st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status)");
                 st.executeUpdate("UPDATE presence_state SET online=0");
             }
             return c;
@@ -284,8 +295,8 @@ final class Store {
         }
         synchronized (lock) {
             try (PreparedStatement ps = connection.prepareStatement(
-                    "SELECT uuid, username FROM users WHERE friend_code = ? COLLATE NOCASE "
-                            + "OR username = ? COLLATE NOCASE LIMIT 1")) {
+                    "SELECT uuid, username FROM users WHERE (friend_code = ? COLLATE NOCASE "
+                            + "OR username = ? COLLATE NOCASE) AND banned = 0 LIMIT 1")) {
                 ps.setString(1, query);
                 ps.setString(2, query);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -309,8 +320,8 @@ final class Store {
         }
         synchronized (lock) {
             try (PreparedStatement ps = connection.prepareStatement(
-                    "SELECT uuid, username FROM users WHERE username LIKE ? COLLATE NOCASE "
-                            + "OR friend_code LIKE ? COLLATE NOCASE")) {
+                    "SELECT uuid, username FROM users WHERE (username LIKE ? COLLATE NOCASE "
+                            + "OR friend_code LIKE ? COLLATE NOCASE) AND banned = 0")) {
                 String like = "%" + q + "%";
                 ps.setString(1, like);
                 ps.setString(2, like);
@@ -1112,7 +1123,7 @@ final class Store {
         synchronized (lock) {
             try {
                 User u = findUser(uuid);
-                if (u == null) {
+                if (u == null || isBanned(uuid)) {
                     return null;
                 }
                 Map<String, Object> m = new LinkedHashMap<>();
@@ -1643,6 +1654,162 @@ final class Store {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getString(1) : null;
+            }
+        }
+    }
+
+    // moderation
+    boolean isBanned(UUID uuid) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement("SELECT banned FROM users WHERE uuid=?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() && rs.getInt(1) != 0;
+                }
+            } catch (SQLException e) {
+                throw fail("isBanned", e);
+            }
+        }
+    }
+
+    void setBanned(UUID uuid, boolean banned, String reason) {
+        ensureUser(uuid, null);
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "UPDATE users SET banned=?, ban_reason=? WHERE uuid=?")) {
+                ps.setInt(1, banned ? 1 : 0);
+                ps.setString(2, banned ? reason : null);
+                ps.setString(3, uuid.toString());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("setBanned", e);
+            }
+        }
+        if (banned) {
+            revokeSessions(uuid);
+        }
+    }
+
+    void revokeSessions(UUID uuid) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement("DELETE FROM sessions WHERE uuid=?")) {
+                ps.setString(1, uuid.toString());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("revokeSessions", e);
+            }
+        }
+    }
+
+    // admin
+    void scrubProfile(UUID uuid) {
+        setBio(uuid, "");
+        setPrompts(uuid, Map.of());
+    }
+
+    // reports
+    void addReport(UUID reporter, UUID target, String reason) {
+        String targetUsername = null;
+        String targetBio = null;
+        synchronized (lock) {
+            try {
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "SELECT 1 FROM reports WHERE reporter_uuid=? AND target_uuid=? AND status='open' LIMIT 1")) {
+                    ps.setString(1, reporter.toString());
+                    ps.setString(2, target.toString());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            return;
+                        }
+                    }
+                }
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "INSERT INTO reports (reporter_uuid, target_uuid, reason, status, created_at) "
+                                + "VALUES (?,?,?, 'open', ?)")) {
+                    ps.setString(1, reporter.toString());
+                    ps.setString(2, target.toString());
+                    ps.setString(3, reason);
+                    ps.setLong(4, System.currentTimeMillis());
+                    ps.executeUpdate();
+                }
+                targetUsername = scalar("SELECT username FROM users WHERE uuid=?", target);
+                targetBio = scalar("SELECT text FROM profile_bio WHERE uuid=?", target);
+            } catch (SQLException e) {
+                throw fail("addReport", e);
+            }
+        }
+        notifyReportWebhook(reporter, target, targetUsername, targetBio, reason);
+    }
+
+    private void notifyReportWebhook(UUID reporter, UUID target, String username, String bio, String reason) {
+        if (discordWebhook == null || discordWebhook.isBlank()) {
+            return;
+        }
+        try {
+            List<Object> fields = new ArrayList<>();
+            fields.add(Map.of("name", "Reported user",
+                    "value", (username == null || username.isBlank() ? "?" : username) + " (`" + target + "`)"));
+            fields.add(Map.of("name", "Reason", "value", reason));
+            fields.add(Map.of("name", "Current bio",
+                    "value", (bio == null || bio.isBlank()) ? "(empty)" : bio));
+            fields.add(Map.of("name", "Reported by", "value", "`" + reporter + "`"));
+            Map<String, Object> embed = new LinkedHashMap<>();
+            embed.put("title", "New report");
+            embed.put("color", 15158332);
+            embed.put("fields", fields);
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("username", "LAN+ Moderation");
+            payload.put("embeds", List.of(embed));
+            HttpRequest req = HttpRequest.newBuilder(URI.create(discordWebhook))
+                    .timeout(Duration.ofSeconds(5))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(Json.write(payload), StandardCharsets.UTF_8))
+                    .build();
+            httpClient.sendAsync(req, HttpResponse.BodyHandlers.discarding())
+                    .exceptionally(e -> {
+                        BackendServer.log("discord webhook failed: " + e);
+                        return null;
+                    });
+        } catch (RuntimeException e) {
+            BackendServer.log("discord webhook error: " + e);
+        }
+    }
+
+    List<Object> openReports() {
+        List<Object> out = new ArrayList<>();
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT r.id, r.reporter_uuid, r.target_uuid, r.reason, r.created_at, u.username, b.text "
+                            + "FROM reports r "
+                            + "LEFT JOIN users u ON u.uuid = r.target_uuid "
+                            + "LEFT JOIN profile_bio b ON b.uuid = r.target_uuid "
+                            + "WHERE r.status='open' ORDER BY r.created_at ASC");
+                 ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(ordered(
+                            "id", rs.getLong(1),
+                            "reporterUuid", rs.getString(2),
+                            "targetUuid", rs.getString(3),
+                            "reason", rs.getString(4),
+                            "createdAt", rs.getLong(5),
+                            "targetUsername", rs.getString(6),
+                            "targetBio", rs.getString(7)));
+                }
+            } catch (SQLException e) {
+                throw fail("openReports", e);
+            }
+        }
+        return out;
+    }
+
+    boolean resolveReport(long id) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "UPDATE reports SET status='resolved' WHERE id=? AND status='open'")) {
+                ps.setLong(1, id);
+                return ps.executeUpdate() > 0;
+            } catch (SQLException e) {
+                throw fail("resolveReport", e);
             }
         }
     }
