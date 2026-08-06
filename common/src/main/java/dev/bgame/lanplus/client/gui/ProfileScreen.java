@@ -299,6 +299,11 @@ public final class ProfileScreen extends Screen {
                     addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.edit"),
                                     b -> { editing = true; primeEdit(); rebuildWidgets(); })
                             .bounds(left, this.height - 28, 110, 20).build());
+                } else {
+                    addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.report"),
+                                    b -> this.minecraft.setScreen(new ReportScreen(this, uuid,
+                                            profile.username() == null ? "" : profile.username())))
+                            .bounds(left, this.height - 28, 110, 20).build());
                 }
             }
         }
@@ -1860,6 +1865,7 @@ public final class ProfileScreen extends Screen {
         return switch (error == null ? "" : error) {
             case "bio_link" -> "gui.lanplus.profile.err.bio_link";
             case "bio_too_long" -> "gui.lanplus.profile.err.bio_too_long";
+            case "content_blocked" -> "gui.lanplus.profile.err.content_blocked";
             case "bad_pronouns" -> "gui.lanplus.profile.err.bad_pronouns";
             case "bad_link" -> "gui.lanplus.profile.err.bad_link";
             case "bad_prompt" -> "gui.lanplus.profile.err.bad_prompt";

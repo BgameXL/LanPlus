@@ -187,4 +187,12 @@ public final class DefaultProfilesService implements ProfilesService {
         }
         return network.reportAdvancement(id.uuid(), advancementId);
     }
+
+    @Override
+    public CompletableFuture<Void> reportUser(UUID targetUuid, String reason) {
+        if (targetUuid == null || reason == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return network.reportUser(targetUuid, reason);
+    }
 }

@@ -30,4 +30,6 @@ public interface ProfilesService {
     CompletableFuture<byte[]> imageBytes(CatalogImage image);
 
     CompletableFuture<Void> reportAdvancement(String advancementId);
+
+    CompletableFuture<Void> reportUser(UUID targetUuid, String reason);
 }

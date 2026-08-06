@@ -42,6 +42,7 @@ public interface LanPlusNetwork {
     CompletableFuture<List<CatalogImage>> getBackgrounds();
     CompletableFuture<List<CatalogImage>> getBanners();
     CompletableFuture<Void> reportAdvancement(UUID uuid, String advancementId);
+    CompletableFuture<Void> reportUser(UUID targetUuid, String reason);
     CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, String model);
     CompletableFuture<Boolean> deleteSkin();
     CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated);

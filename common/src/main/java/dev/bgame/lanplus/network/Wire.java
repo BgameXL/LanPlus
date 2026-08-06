@@ -209,6 +209,8 @@ final class Wire {
 
     record AdvancementReport(String uuid, String advancementId) {}
 
+    record ReportUser(String targetUuid, String reason) {}
+
     record SkinUpload(String png, String model) {}
 
     record SkinUploadResponse(String error, String url, String hash) {}

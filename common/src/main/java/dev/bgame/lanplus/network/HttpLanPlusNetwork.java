@@ -453,6 +453,16 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
+    public CompletableFuture<Void> reportUser(UUID targetUuid, String reason) {
+        if (!configured() || targetUuid == null || reason == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return post("/report", new Wire.ReportUser(targetUuid.toString(), reason))
+                .thenAccept(resp -> { })
+                .exceptionally(this::onErrorVoid);
+    }
+
+    @Override
     public CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated) {
         if (!configured()) {
             return CompletableFuture.completedFuture(null);
