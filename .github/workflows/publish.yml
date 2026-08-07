@@ -42,14 +42,26 @@ jobs:
       - name: Build
         run: ./gradlew build --no-daemon
 
+      - name: Extract changelog from tag
+        id: changelog
+        run: |
+          BODY=$(git tag -l --format='%(contents)' "${{ github.ref_name }}")
+          {
+            echo "body<<CHANGELOG_EOF"
+            echo "$BODY"
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Publish to CurseForge, Modrinth & GitHub
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          curseforge-id: ${{ vars.CURSEFORGE_ID }}
+          curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          modrinth-id: ${{ vars.MODRINTH_ID }}
+          modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+          changelog: ${{ steps.changelog.outputs.body }}
 
           files: |
             fabric/build/libs/!(*-@(dev|sources|javadoc)).jar
