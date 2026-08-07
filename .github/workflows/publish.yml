@@ -89,6 +89,7 @@ jobs:
 
           files: fabric/build/libs/LanPlus-fabric-${{ needs.build.outputs.version }}.jar
           loaders: fabric
+          environment: client
           version: ${{ needs.build.outputs.version }}-fabric
           version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
           game-versions: '1.20.1'
@@ -122,6 +123,7 @@ jobs:
 
           files: forge/build/libs/LanPlus-forge-${{ needs.build.outputs.version }}.jar
           loaders: forge
+          environment: client
           version: ${{ needs.build.outputs.version }}-forge
           version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
           game-versions: '1.20.1'
