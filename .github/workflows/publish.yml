@@ -42,10 +42,16 @@ jobs:
       - name: Build
         run: ./gradlew build --no-daemon
 
-      - name: Extract changelog from tag
+      - name: Extract changelog from annotated tag
         id: changelog
         run: |
-          BODY=$(git tag -l --format='%(contents)' "${{ github.ref_name }}")
+          TAG="${{ github.ref_name }}"
+          if [ "$(git cat-file -t "$TAG" 2>/dev/null)" = "tag" ]; then
+            BODY=$(git tag -l --format='%(contents)' "$TAG")
+          else
+            echo "::warning::$TAG no es un tag anotado; las notas quedarán vacías. Crea el tag con 'git tag -a'."
+            BODY=""
+          fi
           {
             echo "body<<CHANGELOG_EOF"
             echo "$BODY"
