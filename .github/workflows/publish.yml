@@ -84,7 +84,7 @@ jobs:
           modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
-          name: ${{ github.event.release.name || format('LAN+ {0}', needs.build.outputs.version) }}
+          name: ${{ github.event.release.name || format('LAN+ {0}', needs.build.outputs.version) }} (Fabric)
           changelog: ${{ github.event.release.body }}
 
           files: fabric/build/libs/LanPlus-fabric-${{ needs.build.outputs.version }}.jar
@@ -117,7 +117,7 @@ jobs:
           modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
-          name: ${{ github.event.release.name || format('LAN+ {0}', needs.build.outputs.version) }}
+          name: ${{ github.event.release.name || format('LAN+ {0}', needs.build.outputs.version) }} (Forge)
           changelog: ${{ github.event.release.body }}
 
           files: forge/build/libs/LanPlus-forge-${{ needs.build.outputs.version }}.jar
