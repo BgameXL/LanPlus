@@ -1,19 +1,22 @@
 name: Publish
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
+        description: 'Version to publish'
         required: true
 
 permissions:
   contents: write
 
 jobs:
-  publish:
+  build:
+    name: Build
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,7 +35,7 @@ jobs:
       - name: Normalize version
         id: version
         run: |
-          VERSION="${{ github.event.inputs.version || github.ref_name }}"
+          VERSION="${{ github.event.inputs.version || github.event.release.tag_name }}"
           VERSION="${VERSION#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
@@ -40,48 +43,91 @@ jobs:
         run: sed -i "s/^mod_version=.*/mod_version=${{ steps.version.outputs.version }}/" gradle.properties
 
       - name: Build
-        run: ./gradlew build --no-daemon
-
-      - name: Extract changelog from annotated tag
-        id: changelog
         run: |
-          TAG="${{ github.ref_name }}"
-          if [ "$(git cat-file -t "$TAG" 2>/dev/null)" = "tag" ]; then
-            BODY=$(git tag -l --format='%(contents)' "$TAG")
-          else
-            echo "::warning::$TAG no es un tag anotado; las notas quedarán vacías. Crea el tag con 'git tag -a'."
-            BODY=""
-          fi
-          {
-            echo "body<<CHANGELOG_EOF"
-            echo "$BODY"
-            echo "CHANGELOG_EOF"
-          } >> "$GITHUB_OUTPUT"
+          chmod +x gradlew
+          ./gradlew build --no-daemon --parallel
 
-      - name: Publish to CurseForge, Modrinth & GitHub
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            fabric/build/libs/
+            forge/build/libs/
+          retention-days: 7
+
+      - name: Attach jars to GitHub release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "fabric/build/libs/LanPlus-fabric-${{ steps.version.outputs.version }}.jar" \
+            "forge/build/libs/LanPlus-forge-${{ steps.version.outputs.version }}.jar" \
+            --clobber
+
+  publish-fabric:
+    name: Publish Fabric
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Publish to CurseForge & Modrinth
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-          changelog: ${{ steps.changelog.outputs.body }}
+          name: ${{ github.event.release.name || format('LAN+ {0}', needs.build.outputs.version) }}
+          changelog: ${{ github.event.release.body }}
 
-          files: |
-            fabric/build/libs/!(*-@(dev|sources|javadoc)).jar
-            forge/build/libs/!(*-@(dev|sources|javadoc)).jar
-
-          name: LAN+ ${{ steps.version.outputs.version }}
-          version: ${{ steps.version.outputs.version }}
-          version-type: ${{ contains(github.ref_name, '-') && 'beta' || 'release' }}
-          loaders: |
-            fabric
-            forge
+          files: fabric/build/libs/LanPlus-fabric-${{ needs.build.outputs.version }}.jar
+          loaders: fabric
+          version: ${{ needs.build.outputs.version }}-fabric
+          version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
           game-versions: '1.20.1'
+          game-version-filter: none
           java: '17'
 
           retry-attempts: 3
           retry-delay: 10000
-          fail-mode: warn
+          fail-mode: fail
+
+  publish-forge:
+    name: Publish Forge
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Publish to CurseForge & Modrinth
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+
+          name: ${{ github.event.release.name || format('LAN+ {0}', needs.build.outputs.version) }}
+          changelog: ${{ github.event.release.body }}
+
+          files: forge/build/libs/LanPlus-forge-${{ needs.build.outputs.version }}.jar
+          loaders: forge
+          version: ${{ needs.build.outputs.version }}-forge
+          version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
+          game-versions: '1.20.1'
+          game-version-filter: none
+          java: '17'
+
+          retry-attempts: 3
+          retry-delay: 10000
+          fail-mode: fail
