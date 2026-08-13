@@ -25,12 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
-/**
- * "Host a World" - pick one of your worlds from the title flow (or configure the running world from
- * the pause menu, in-game flow), choose who can join, and open it to LAN+.
- * Each option row shows its translatable label with the control (dropdown / toggle) right next to it;
- * opening a dropdown draws it on top of the card without resizing it.
- */
 public final class HostScreen extends Screen {
 
     private static final int CARD_W = 320;
@@ -139,7 +133,7 @@ public final class HostScreen extends Screen {
         layout();
 
         hostButton = LanPlusButton.create(Component.translatable("gui.lanplus.host.start"), b -> doStart())
-                .height(20).build();
+                .height(20).primary().build();
         hostButton.active = inWorld || selected >= 0;
         cancelButton = LanPlusButton.create(CommonComponents.GUI_CANCEL, b -> onClose())
                 .height(20).build();
@@ -220,7 +214,7 @@ public final class HostScreen extends Screen {
     private void renderDropdownButton(GuiGraphics g, int x, int y, Component label,
                                       boolean open, int mouseX, int mouseY) {
         boolean hover = in(mouseX, mouseY, x, y, ctrlW, DROPDOWN_H);
-        int bg = open ? LanPlusUi.BLURPLE : hover ? 0xFF35373C : LanPlusUi.SURFACE_RAISED;
+        int bg = open ? LanPlusUi.ACCENT : hover ? LanPlusUi.SURFACE_HOVER : LanPlusUi.SURFACE_RAISED;
         g.fill(x, y, x + ctrlW, y + DROPDOWN_H, bg);
         LanPlusUi.border(g, x, y, x + ctrlW, y + DROPDOWN_H);
         g.drawString(this.font, label, x + 6, y + (DROPDOWN_H - 8) / 2, LanPlusUi.TEXT, false);
@@ -237,9 +231,9 @@ public final class HostScreen extends Screen {
         for (int i = 0; i < count; i++) {
             int iy = menuTop + 2 + i * ITEM_H;
             boolean hover = in(mouseX, mouseY, x, iy, w, ITEM_H);
-            int bg = hover ? 0xFF35373C : LanPlusUi.SURFACE_RAISED;
+            int bg = hover ? LanPlusUi.SURFACE_HOVER : LanPlusUi.SURFACE_RAISED;
             if (i == selectedIdx) {
-                bg = LanPlusUi.BLURPLE_TINT;
+                bg = LanPlusUi.ACCENT_TINT;
             }
             g.fill(x + 1, iy, x + w - 1, iy + ITEM_H, bg);
             g.drawString(this.font, labelFn.apply(i), x + 6, iy + (ITEM_H - 8) / 2,
@@ -323,11 +317,11 @@ public final class HostScreen extends Screen {
                         Math.min(y + ROW_H, listBottom) - Math.max(y, listTop));
                 if (sel || hover) {
                     g.fill(x0 + 1, Math.max(y, listTop), x1 - 1, Math.min(y + ROW_H, listBottom),
-                            sel ? LanPlusUi.BLURPLE_TINT : 0x14FFFFFF);
+                            sel ? LanPlusUi.ACCENT_TINT : LanPlusUi.DIVIDER);
                 }
                 if (sel) {
                     g.fill(x0 + 1, Math.max(y, listTop), x0 + 3, Math.min(y + ROW_H, listBottom),
-                            LanPlusUi.BLURPLE);
+                            LanPlusUi.ACCENT);
                 }
                 LevelSummary s = worlds.get(i);
                 FaviconTexture icon = icons.get(s.getLevelId());

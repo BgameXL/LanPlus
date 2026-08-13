@@ -58,21 +58,24 @@ import java.util.UUID;
 
 public final class ProfileScreen extends Screen {
 
-    private static final int SURFACE = 0xF21E1F22;
-    private static final int SURFACE_RAISED = 0xFF2B2D31;
+    private static final int SURFACE = LanPlusUi.SURFACE;
+    private static final int SURFACE_RAISED = LanPlusUi.SURFACE_RAISED;
+    private static final int SLOT = LanPlusUi.SLOT;
     private static final int PANEL_BG = SURFACE;
     private static final int SIDEBAR_BG = SURFACE_RAISED;
-    private static final int BLURPLE = 0xFF5865F2;
-    private static final int BLURPLE_HOVER = 0xFF6B77F5;
-    private static final int GREEN = 0xFF3BA55D;
-    private static final int AMBER = 0xFFE8A317;
-    private static final int BORDER = 0x33FFFFFF;
-    private static final int DIVIDER = 0x18FFFFFF;
-    private static final int ACCENT_LINE = 0x804752C4;
-    private static final int HEADER_COLOR = 0xFFF2F3F5;
-    private static final int TEXT = 0xFFF2F3F5;
-    private static final int MUTED = 0xFFB5BAC1;
-    private static final int FAINT = 0xFF80848E;
+    private static final int ACCENT = LanPlusUi.ACCENT;
+    private static final int ACCENT_HOVER = LanPlusUi.ACCENT_HOVER;
+    private static final int ACCENT_TINT = LanPlusUi.ACCENT_TINT;
+    private static final int ONLINE = LanPlusUi.ONLINE;
+    private static final int AMBER = LanPlusUi.AMBER;
+    private static final int BORDER = LanPlusUi.BORDER;
+    private static final int DIVIDER = LanPlusUi.DIVIDER;
+    private static final int ACCENT_LINE = LanPlusUi.ACCENT_LINE;
+    private static final int LINK = LanPlusUi.LINK;
+    private static final int HEADER_COLOR = LanPlusUi.TEXT;
+    private static final int TEXT = LanPlusUi.TEXT;
+    private static final int MUTED = LanPlusUi.MUTED;
+    private static final int FAINT = LanPlusUi.FAINT;
     private static final int SECTION_GAP = 12;
     private static final int MARGIN = 10;
     private static final int MAX_LAYOUT_W = 620;
@@ -84,28 +87,24 @@ public final class ProfileScreen extends Screen {
     private static final String[] PRONOUN_CYCLE = {null, "he/him", "she/her", "they/them"};
     private static final int MAX_SLOTS = 3;
     private static final long[] TIER_THRESHOLDS = {150, 450, 1000, 2000};
-
     private static final int BG_DARK = 0;
     private static final int BG_SOLID = 1;
     private static final int BG_MINECRAFT = 2;
     private static final int BG_IMAGE = 3;
     private static final int[] BG_PALETTE =
-            {0x5865F2, 0x1E1F22, 0x2B2D31, 0x3BA55D, 0xE74C3C, 0x9B59B6, 0xF1A33C, 0x0A0C10};
+            {0x7B8CFF, 0x1A1C22, 0x262A33, 0x3BA55D, 0xE74C3C, 0x9B59B6, 0xF1A33C, 0x101216};
     private int bgStyle = BG_DARK;
-    private int bgColor = 0x0A0C10;
+    private int bgColor = 0x101216;
     private int bgOpacity = 92;
     private boolean bgDirty;
-
     private String bgImageId;
     private CatalogImage bgImage;
     private CatalogImage banner;
     private List<CatalogImage> bgCatalog = List.of();
     private List<CatalogImage> bannerCatalog = List.of();
-
     private final Screen parent;
     private final UUID uuid;
     private final boolean own;
-
     private static final long STATUS_DISPLAY_MS = 4000;
     private Profile profile;
     private boolean loaded;
@@ -113,22 +112,17 @@ public final class ProfileScreen extends Screen {
     private Component status;
     private long statusUntil;
     private List<Friend> profileFriends = List.of();
-
-    // scroll + manual hit testing
     private int scrollY;
     private int maxScroll;
     private int panelX, panelTop, panelRight, panelBottom;
     private int sbScrollY, sbMaxScroll, sbLeft, sbTop, sbBottom;
     private final List<Hit> hits = new ArrayList<>();
-
     private float modelYaw;
     private float modelPitch;
     private boolean draggingModel;
     private int cmBoxX, cmBoxY, cmBoxW, cmBoxH;
     private PlayerModel<LivingEntity> wideModel;
     private PlayerModel<LivingEntity> slimModel;
-
-    // edit widgets
     private EditBox bioBox;
     private Button pronounButton;
     private Button invisibleButton;
@@ -141,17 +135,17 @@ public final class ProfileScreen extends Screen {
     private boolean skinSlimToggle;
     private int pronounIndex;
     private boolean invisibleToggle;
-
     private static final class LinkRow {
         int platform;
         String value = "";
         EditBox box;
+
         LinkRow(int platform) {
             this.platform = platform;
         }
     }
-    private final List<LinkRow> linkRows = new ArrayList<>();
 
+    private final List<LinkRow> linkRows = new ArrayList<>();
     private static final int COL_GAP = 16;
     private int eL, eW, eR;
     private int colLX, colRX, colW;
@@ -159,12 +153,10 @@ public final class ProfileScreen extends Screen {
             aQHdrY, aQRowsY, aMpHdrY, aMpRowY, aBgHdrY, aBgRowY, aBannerHdrY, aBannerRowY,
             aSkinHdrY, aSkinRowY;
 
-    // edit: question slots
     private final String[] slotPromptId = new String[MAX_SLOTS];
     private final String[] slotFreeValue = new String[MAX_SLOTS];
     private final String[] slotChoiceToken = new String[MAX_SLOTS];
     private final EditBox[] slotFreeBox = new EditBox[MAX_SLOTS];
-
     private boolean favoriteVisibleToggle;
     private boolean playingVisibleToggle;
     private boolean recentlyPlayedVisibleToggle;
@@ -197,16 +189,13 @@ public final class ProfileScreen extends Screen {
     private int layoutWidth() {
         return Math.min(this.width - 2 * MARGIN, MAX_LAYOUT_W);
     }
-
     private int layoutLeft() {
         return (this.width - layoutWidth()) / 2;
     }
-
     private int linkRowCount() {
         return Math.max(1, linkRows.size());
     }
 
-    // left column: About (bio) + Links + Questions
     private int leftColHeight() {
         int n = linkRowCount();
         boolean addRow = linkRows.size() < PLATFORMS.length;
@@ -215,7 +204,6 @@ public final class ProfileScreen extends Screen {
                 + 16 + MAX_SLOTS * 24;
     }
 
-    // right column: Identity + Modpack + Background + Banner + Skin
     private int rightColHeight() {
         return 16 + 20 + 12
                 + 16 + 18 + 12
@@ -227,11 +215,9 @@ public final class ProfileScreen extends Screen {
     private int formContentHeight() {
         return 8 + Math.max(leftColHeight(), rightColHeight()) + 8;
     }
-
     private int computeEditTop() {
         return Math.max(CONTENT_TOP, (this.height - (formContentHeight() + 32)) / 2 + 8);
     }
-
     private int editFormBottom() {
         return editTop + formContentHeight();
     }
@@ -246,27 +232,40 @@ public final class ProfileScreen extends Screen {
         int n = linkRowCount();
         boolean addRow = linkRows.size() < PLATFORMS.length;
 
-        // left column
         int y = editTop + 8;
-        aAboutHdrY = y;       y += 16;
-        aBioY = y;            y += 18 + 10;
-        aLinksHdrY = y;       y += 16;
-        aLinksRowsY = y;      y += n * 24;
-        aAddLinkY = y;        y += (addRow ? 20 : 0) + 12;
-        aQHdrY = y;           y += 16;
+        aAboutHdrY = y;
+        y += 16;
+        aBioY = y;
+        y += 18 + 10;
+        aLinksHdrY = y;
+        y += 16;
+        aLinksRowsY = y;
+        y += n * 24;
+        aAddLinkY = y;
+        y += (addRow ? 20 : 0) + 12;
+        aQHdrY = y;
+        y += 16;
         aQRowsY = y;
 
-        // right column
         int ry = editTop + 8;
-        aIdentityHdrY = ry;   ry += 16;
-        aIdentityY = ry;      ry += 20 + 12;
-        aMpHdrY = ry;         ry += 16;
-        aMpRowY = ry;         ry += 18 + 12;
-        aBgHdrY = ry;         ry += 16;
-        aBgRowY = ry;         ry += 20 + 12;
-        aBannerHdrY = ry;     ry += 16;
-        aBannerRowY = ry;     ry += 20 + 12;
-        aSkinHdrY = ry;       ry += 16;
+        aIdentityHdrY = ry;
+        ry += 16;
+        aIdentityY = ry;
+        ry += 20 + 12;
+        aMpHdrY = ry;
+        ry += 16;
+        aMpRowY = ry;
+        ry += 18 + 12;
+        aBgHdrY = ry;
+        ry += 16;
+        aBgRowY = ry;
+        ry += 20 + 12;
+        aBannerHdrY = ry;
+        ry += 16;
+        aBannerRowY = ry;
+        ry += 20 + 12;
+        aSkinHdrY = ry;
+        ry += 16;
         aSkinRowY = ry;
     }
 
@@ -285,9 +284,13 @@ public final class ProfileScreen extends Screen {
             int by = Math.min(editFormBottom() + 10, this.height - 28);
             int bx = eL - 10;
             addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.save"), b -> doSave())
-                    .bounds(bx, by, 90, 20).build());
+                    .bounds(bx, by, 90, 20).primary().build());
             addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.cancel"),
-                            b -> { editing = false; status = null; rebuildWidgets(); })
+                            b -> {
+                                editing = false;
+                                status = null;
+                                rebuildWidgets();
+                            })
                     .bounds(bx + 96, by, 90, 20).build());
         } else {
             addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_DONE, b -> onClose())
@@ -297,7 +300,11 @@ public final class ProfileScreen extends Screen {
                         .bounds(left, 6, 80, 20).build());
                 if (own) {
                     addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.edit"),
-                                    b -> { editing = true; primeEdit(); rebuildWidgets(); })
+                                    b -> {
+                                        editing = true;
+                                        primeEdit();
+                                        rebuildWidgets();
+                                    })
                             .bounds(left, this.height - 28, 110, 20).build());
                 } else {
                     addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.report"),
@@ -549,7 +556,6 @@ public final class ProfileScreen extends Screen {
     }
 
     private void cycleBanner() {
-        // cycle none -> each catalog entry -> none
         List<CatalogImage> options = new ArrayList<>();
         options.add(null);
         options.addAll(bannerCatalog);
@@ -869,17 +875,17 @@ public final class ProfileScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         renderBackdrop(g);
-        g.drawCenteredString(this.font, this.title, this.width / 2, 12, 0xFFFFFFFF);
+        g.drawCenteredString(this.font, this.title, this.width / 2, 12, TEXT);
 
         if (!loaded) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.profile.loading"),
-                    this.width / 2, this.height / 2, 0xFF888888);
+                    this.width / 2, this.height / 2, FAINT);
             super.render(g, mouseX, mouseY, partialTick);
             return;
         }
         if (profile == null) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.profile.unavailable"),
-                    this.width / 2, this.height / 2, 0xFF888888);
+                    this.width / 2, this.height / 2, FAINT);
             super.render(g, mouseX, mouseY, partialTick);
             return;
         }
@@ -897,7 +903,7 @@ public final class ProfileScreen extends Screen {
 
         if (status != null) {
             if (System.currentTimeMillis() < statusUntil) {
-                g.drawString(this.font, status, layoutLeft() + 12, this.height - 52, 0xFFE0A030);
+                g.drawString(this.font, status, layoutLeft() + 12, this.height - 52, AMBER);
             } else {
                 status = null;
             }
@@ -918,7 +924,7 @@ public final class ProfileScreen extends Screen {
                 return;
             }
         }
-        int rgb = bgStyle == BG_SOLID ? (bgColor & 0xFFFFFF) : 0x05070B;
+        int rgb = bgStyle == BG_SOLID ? (bgColor & 0xFFFFFF) : 0x0C0D10;
         g.fill(0, 0, this.width, this.height, alpha(bgOpacity) | rgb);
     }
 
@@ -933,23 +939,21 @@ public final class ProfileScreen extends Screen {
         int ctop = editTop - 8;
         int cbot = editFormBottom() + 6;
         g.fill(cl, ctop, cr, cbot, PANEL_BG);
-        drawBorder(g, cl, ctop, cr, cbot, BORDER);
-        // divider between the two columns
+        LanPlusUi.bevelRaised(g, cl, ctop, cr, cbot);
         int dx = (colLX + colW + colRX) / 2;
         g.fill(dx, ctop + 8, dx + 1, cbot - 8, DIVIDER);
 
-        // left column headers
         editHeader(g, Component.translatable("gui.lanplus.profile.about"), colLX, colW, aAboutHdrY);
         editHeader(g, Component.translatable("gui.lanplus.profile.links"), colLX, colW, aLinksHdrY);
         editHeader(g, Component.translatable("gui.lanplus.profile.questions"), colLX, colW, aQHdrY);
-        // right column headers
+
         editHeader(g, Component.translatable("gui.lanplus.profile.identity"), colRX, colW, aIdentityHdrY);
         editHeader(g, Component.translatable("gui.lanplus.profile.modpack"), colRX, colW, aMpHdrY);
         editHeader(g, Component.translatable("gui.lanplus.profile.bg.header"), colRX, colW, aBgHdrY);
         editHeader(g, Component.translatable("gui.lanplus.profile.banner.header"), colRX, colW, aBannerHdrY);
         editHeader(g, Component.translatable("gui.lanplus.profile.skin.header"), colRX, colW, aSkinHdrY);
         g.drawString(this.font, Component.translatable("gui.lanplus.profile.skin.hint"),
-                colRX, aSkinRowY + 48, 0xFF8A8F98, false);
+                colRX, aSkinRowY + 48, FAINT, false);
 
         int gap = 6;
         int chipW = (colW - 2 * gap) / 3;
@@ -962,19 +966,19 @@ public final class ProfileScreen extends Screen {
     }
 
     private void editHeader(GuiGraphics g, Component label, int x, int w, int y) {
-        g.fill(x, y + 1, x + 2, y + 9, BLURPLE);
+        g.fill(x, y + 1, x + 2, y + 9, ACCENT);
         g.drawString(this.font, label, x + 6, y, HEADER_COLOR);
         g.fill(x, y + 12, x + w, y + 13, DIVIDER);
     }
 
     private void modpackChip(GuiGraphics g, int x, int y, int w, String key, boolean on, Runnable toggle) {
         int h = 18;
-        g.fill(x, y, x + w, y + h, on ? BLURPLE : SURFACE_RAISED);
+        g.fill(x, y, x + w, y + h, on ? ACCENT : SURFACE_RAISED);
         if (on) {
-            g.fill(x, y, x + w, y + 1, BLURPLE_HOVER);
+            g.fill(x, y, x + w, y + 1, ACCENT_HOVER);
         }
         Component label = Component.translatable(key);
-        g.drawString(this.font, label, x + (w - this.font.width(label)) / 2, y + 5, on ? 0xFFFFFFFF : MUTED);
+        g.drawString(this.font, label, x + (w - this.font.width(label)) / 2, y + 5, on ? TEXT : MUTED);
         hits.add(new Hit(x, y, w, h, toggle));
     }
 
@@ -986,7 +990,7 @@ public final class ProfileScreen extends Screen {
         sbTop = top;
         sbBottom = bottom;
         g.fill(left, top, left + SIDEBAR_W, bottom, SIDEBAR_BG);
-        drawBorder(g, left, top, left + SIDEBAR_W, bottom, BORDER);
+        LanPlusUi.bevelRaised(g, left, top, left + SIDEBAR_W, bottom);
 
         g.enableScissor(left + 1, top + 1, left + SIDEBAR_W - 1, bottom - 1);
         int l = left + 8;
@@ -999,30 +1003,30 @@ public final class ProfileScreen extends Screen {
         } else {
             drawAvatar(g, uuid, l, base, 36);
             int hx = left + 50;
-            g.drawString(this.font, profile.username() == null ? "?" : profile.username(), hx, base + 2, 0xFFFFFFFF);
+            g.drawString(this.font, profile.username() == null ? "?" : profile.username(), hx, base + 2, TEXT);
             if (profile.pronouns() != null) {
                 int pw = this.font.width(profile.pronouns()) + 6;
-                g.fill(hx, base + 14, hx + pw, base + 25, 0x405865F2);
-                g.drawString(this.font, profile.pronouns(), hx + 3, base + 16, 0xFFB9C7FF);
+                g.fill(hx, base + 14, hx + pw, base + 25, ACCENT_TINT);
+                g.drawString(this.font, profile.pronouns(), hx + 3, base + 16, 0xFFB9C2FF);
             }
             drawTierChip(g, r, base + 2);
             y = renderSidebarProgression(g, l, r, base + 38);
         }
 
         if (profile.friendCode() != null) {
-            g.drawString(this.font, profile.friendCode(), l, y, 0xFF9AA0A6);
+            g.drawString(this.font, profile.friendCode(), l, y, MUTED);
             hits.add(new Hit(l, y - 1, this.font.width(profile.friendCode()), 10, () -> copyText(profile.friendCode())));
         }
         if (profile.cached()) {
             int chipW = this.font.width(Component.translatable("gui.lanplus.profile.cached").getString()) + 8;
             int rx = r - chipW;
             int ry = y - 2;
-            g.fill(rx, ry, rx + chipW, ry + 11, 0x40E8A317);
-            g.drawString(this.font, Component.translatable("gui.lanplus.profile.cached"), rx + 4, ry + 1, 0xFFE8A317);
+            g.fill(rx, ry, rx + chipW, ry + 11, 0x40D8A43C);
+            g.drawString(this.font, Component.translatable("gui.lanplus.profile.cached"), rx + 4, ry + 1, AMBER);
         }
         int presX = r - this.font.width(presenceLabel());
-        g.fill(presX - 10, y + 1, presX - 4, y + 7, profile.online() ? 0xFF43B581 : 0xFF747F8D);
-        g.drawString(this.font, presenceLabel(), presX, y, profile.online() ? 0xFF55C46A : 0xFF9AA0A6);
+        g.fill(presX - 10, y + 1, presX - 4, y + 7, profile.online() ? ONLINE : FAINT);
+        g.drawString(this.font, presenceLabel(), presX, y, profile.online() ? ONLINE : MUTED);
         y += 18;
 
         y = renderSidebarAbout(g, l, r, y);
@@ -1056,7 +1060,7 @@ public final class ProfileScreen extends Screen {
         }
         boolean recentDup = recent != null
                 && ((headline != null && recent.modpackId().equals(headline.modpackId()))
-                        || (favOwnRow && isFav(favId, recent)));
+                || (favOwnRow && isFav(favId, recent)));
         if (recent != null && recent.name() != null && !recentDup) {
             y = renderSidebarModpack(g, left, y, "gui.lanplus.profile.recentplayed.label", recent, own, isFav(favId, recent));
         }
@@ -1076,7 +1080,7 @@ public final class ProfileScreen extends Screen {
             int barH = Math.max(20, viewport * viewport / contentH);
             int barY = top + (viewport - barH) * sbScrollY / sbMaxScroll;
             g.fill(left + SIDEBAR_W - 3, top, left + SIDEBAR_W, bottom, 0x40000000);
-            g.fill(left + SIDEBAR_W - 3, barY, left + SIDEBAR_W, barY + barH, 0xFF555B66);
+            g.fill(left + SIDEBAR_W - 3, barY, left + SIDEBAR_W, barY + barH, 0xFF3A3F4E);
         }
     }
 
@@ -1096,19 +1100,15 @@ public final class ProfileScreen extends Screen {
         int right = left + layoutWidth();
         int top = CONTENT_TOP;
         int bottom = top + bannerHeight();
-        g.fill(left, top, right, bottom, 0xFF15161A);
+        g.fill(left, top, right, bottom, SLOT);
         ProfileImages.Tex tex = ProfileImages.get(banner);
         if (tex != null) {
             ProfileImages.blitCover(g, tex, left, top, right - left, bottom - top);
         }
         g.fillGradient(left, bottom - 26, right, bottom, 0x00000000, 0xA0000000);
-        drawBorder(g, left, top, right, bottom, BORDER);
+        LanPlusUi.bevelInset(g, left, top, right, bottom);
     }
 
-    /**
-     * Identity over the banner, osu-style: the avatar overlaps the banner's bottom edge into the
-     * sidebar, the name sits on the scrim. Drawn after both columns so the overhang stays on top.
-     */
     private void renderBannerIdentity(GuiGraphics g) {
         if (banner == null) {
             return;
@@ -1119,21 +1119,21 @@ public final class ProfileScreen extends Screen {
         int av = 36;
         int ax = left + 10;
         int ay = bottom - av + 10;
-        g.fill(ax - 2, ay - 2, ax + av + 2, ay + av + 2, 0xFF15161A);
-        drawBorder(g, ax - 2, ay - 2, ax + av + 2, ay + av + 2, BORDER);
+        g.fill(ax - 2, ay - 2, ax + av + 2, ay + av + 2, SLOT);
+        LanPlusUi.bevelInset(g, ax - 2, ay - 2, ax + av + 2, ay + av + 2);
         drawAvatar(g, uuid, ax, ay, av);
         int hx = ax + av + 8;
         String name = profile.username() == null ? "?" : profile.username();
-        g.drawString(this.font, name, hx, bottom - 12, 0xFFFFFFFF);
+        g.drawString(this.font, name, hx, bottom - 12, TEXT);
         if (profile.cached()) {
             g.drawString(this.font, Component.translatable("gui.lanplus.profile.cached"),
-                    hx + this.font.width(name) + 6, bottom - 12, 0xFFE8A317);
+                    hx + this.font.width(name) + 6, bottom - 12, AMBER);
         }
         if (profile.pronouns() != null) {
             int px = hx + this.font.width(name) + 6;
             int pw = this.font.width(profile.pronouns()) + 6;
-            g.fill(px, bottom - 14, px + pw, bottom - 3, 0x605865F2);
-            g.drawString(this.font, profile.pronouns(), px + 3, bottom - 12, 0xFFB9C7FF);
+            g.fill(px, bottom - 14, px + pw, bottom - 3, 0x507B8CFF);
+            g.drawString(this.font, profile.pronouns(), px + 3, bottom - 12, 0xFFB9C2FF);
         }
         drawTierChip(g, right - 8, bottom - 17);
     }
@@ -1146,9 +1146,9 @@ public final class ProfileScreen extends Screen {
         Component label = Component.translatable("gui.lanplus.profile.tier", tier);
         int w = this.font.width(label) + 10;
         int x = rightX - w;
-        g.fill(x, y, x + w, y + 13, BLURPLE);
-        g.fill(x, y, x + w, y + 1, BLURPLE_HOVER);
-        g.drawString(this.font, label, x + 5, y + 3, 0xFFFFFFFF);
+        g.fill(x, y, x + w, y + 13, ACCENT);
+        g.fill(x, y, x + w, y + 1, ACCENT_HOVER);
+        g.drawString(this.font, label, x + 5, y + 3, TEXT);
     }
 
     private int renderSidebarProgression(GuiGraphics g, int l, int r, int y) {
@@ -1159,18 +1159,18 @@ public final class ProfileScreen extends Screen {
             int prev = tier <= 0 ? 0 : (int) TIER_THRESHOLDS[Math.min(tier, TIER_THRESHOLDS.length) - 1];
             int next = tier >= TIER_THRESHOLDS.length ? xp : (int) TIER_THRESHOLDS[tier];
             float frac = next <= prev ? 1f : Math.max(0f, Math.min(1f, (xp - prev) / (float) (next - prev)));
-            g.fill(l, y, l + barW, y + 4, 0xFF15161A);
-            g.fill(l, y, l + (int) (barW * frac), y + 4, BLURPLE);
+            g.fill(l, y, l + barW, y + 4, SLOT);
+            g.fill(l, y, l + (int) (barW * frac), y + 4, ACCENT);
             y += 7;
             Component line = tier >= TIER_THRESHOLDS.length
                     ? Component.translatable("gui.lanplus.profile.xp.max", xp)
                     : Component.translatable("gui.lanplus.profile.xp.next", xp,
-                            Math.max(0, (int) TIER_THRESHOLDS[tier] - xp), tier + 1);
-            g.drawString(this.font, line, l, y, 0xFF7A7F86);
+                    Math.max(0, (int) TIER_THRESHOLDS[tier] - xp), tier + 1);
+            g.drawString(this.font, line, l, y, FAINT);
             y += 13;
         } else {
             g.drawString(this.font, Component.translatable("gui.lanplus.profile.advancements", profile.advancements()),
-                    l, y, 0xFF7A7F86);
+                    l, y, FAINT);
             y += 13;
         }
         return y;
@@ -1180,11 +1180,11 @@ public final class ProfileScreen extends Screen {
         y = sectionHeader(g, l, y, r, Component.translatable("gui.lanplus.profile.about"));
         String bio = profile.bio();
         if (bio == null || bio.isBlank()) {
-            g.drawString(this.font, Component.translatable("gui.lanplus.profile.nobio"), l, y, 0xFF6A6E74);
+            g.drawString(this.font, Component.translatable("gui.lanplus.profile.nobio"), l, y, 0xFF5C616B);
             y += 12;
         } else {
             for (FormattedCharSequence line : this.font.split(Component.literal(bio), r - l)) {
-                g.drawString(this.font, line, l, y, 0xFFD0D3D8);
+                g.drawString(this.font, line, l, y, 0xFFD3D6DC);
                 y += 11;
             }
         }
@@ -1202,9 +1202,9 @@ public final class ProfileScreen extends Screen {
                 continue;
             }
             boolean tag = platform.equals("discord");
-            g.drawString(this.font, platformLabel(platform), l, y, 0xFFC0C4CA);
+            g.drawString(this.font, platformLabel(platform), l, y, MUTED);
             String at = "@" + handle;
-            g.drawString(this.font, at, r - this.font.width(at), y, tag ? 0xFF9AA0A6 : 0xFF6CA8FF);
+            g.drawString(this.font, at, r - this.font.width(at), y, tag ? MUTED : LINK);
             String finalHandle = handle;
             Runnable act = tag ? () -> copyText(finalHandle) : () -> openLink(linkUrl(platform, finalHandle));
             hits.add(new Hit(l, y - 1, r - l, 11, act));
@@ -1219,7 +1219,7 @@ public final class ProfileScreen extends Screen {
 
     private int renderSidebarModpack(GuiGraphics g, int left, int y, String headerKey, ModpackRef ref,
                                      boolean showStar, boolean starred) {
-        g.drawString(this.font, Component.translatable(headerKey), left + 6, y, 0xFF7A7F86);
+        g.drawString(this.font, Component.translatable(headerKey), left + 6, y, FAINT);
         y += 12;
         int icon = 32;
         drawModpackIcon(g, left + 6, y, icon, ref);
@@ -1228,14 +1228,14 @@ public final class ProfileScreen extends Screen {
         int reserve = showStar ? 18 : 0;
         String name = ellipsize(ref.name(), left + SIDEBAR_W - nameX - 6 - reserve);
         boolean link = ref.downloadUrl() != null && !ref.downloadUrl().isBlank();
-        g.drawString(this.font, name, nameX, nameY, link ? 0xFF6CA8FF : 0xFFE0E3E8);
+        g.drawString(this.font, name, nameX, nameY, link ? LINK : 0xFFD3D6DC);
         if (link) {
             hits.add(new Hit(nameX, nameY - 1, this.font.width(name), 10, () -> openLink(ref.downloadUrl())));
         }
         if (showStar) {
             String star = String.valueOf((char) (starred ? 0x2605 : 0x2606));
             int sx = left + SIDEBAR_W - 15;
-            g.drawString(this.font, star, sx, nameY, starred ? 0xFFE8C84A : 0xFF7A7F86);
+            g.drawString(this.font, star, sx, nameY, starred ? AMBER : FAINT);
             String id = ref.modpackId();
             hits.add(new Hit(sx - 2, nameY - 3, 16, 14, () -> toggleFavorite(starred ? null : id)));
         }
@@ -1243,17 +1243,17 @@ public final class ProfileScreen extends Screen {
     }
 
     private void drawModpackIcon(GuiGraphics g, int x, int y, int size, ModpackRef ref) {
-        g.fill(x, y, x + size, y + size, 0xFF15161A);
-        drawBorder(g, x, y, x + size, y + size, 0x40FFFFFF);
+        g.fill(x, y, x + size, y + size, SLOT);
+        LanPlusUi.bevelInset(g, x, y, x + size, y + size);
         int strip = Math.max(2, size / 9);
-        g.fill(x, y, x + size, y + strip, BLURPLE);
+        g.fill(x, y, x + size, y + strip, ACCENT);
         String name = ref.name() == null ? "" : ref.name().trim();
         String letter = name.isEmpty() ? "?" : String.valueOf(Character.toUpperCase(name.charAt(0)));
         float scale = size >= 28 ? 2.0f : 1.0f;
         g.pose().pushPose();
         g.pose().translate(x + size / 2f, y + (size + strip) / 2f, 0);
         g.pose().scale(scale, scale, 1f);
-        g.drawString(this.font, letter, -this.font.width(letter) / 2, -this.font.lineHeight / 2, 0xFFEDEFF3, false);
+        g.drawString(this.font, letter, -this.font.width(letter) / 2, -this.font.lineHeight / 2, TEXT, false);
         g.pose().popPose();
     }
 
@@ -1289,9 +1289,9 @@ public final class ProfileScreen extends Screen {
 
         int l = left + 8;
         int r = left + SIDEBAR_W - 8;
-        g.drawString(this.font, Component.translatable("gui.lanplus.profile.friends"), l, y, 0xFF7A7F86);
+        g.drawString(this.font, Component.translatable("gui.lanplus.profile.friends"), l, y, FAINT);
         Component count = Component.translatable("gui.lanplus.profile.friends.count", online, all.size());
-        g.drawString(this.font, count, r - this.font.width(count), y, 0xFF7A7F86);
+        g.drawString(this.font, count, r - this.font.width(count), y, FAINT);
         y += 14;
 
         int max = 5;
@@ -1311,17 +1311,17 @@ public final class ProfileScreen extends Screen {
                 Component lv = Component.translatable("gui.lanplus.profile.friends.level", f.tier());
                 int lw = this.font.width(lv) + 8;
                 int bx = r - lw;
-                g.fill(bx, y + 2, bx + lw, y + 13, 0x405865F2);
-                g.drawString(this.font, lv, bx + 4, y + 4, 0xFFB9C7FF);
+                g.fill(bx, y + 2, bx + lw, y + 13, ACCENT_TINT);
+                g.drawString(this.font, lv, bx + 4, y + 4, 0xFFB9C2FF);
                 nameRight = bx - 4;
             }
-            g.drawString(this.font, ellipsize(f.username(), nameRight - tx), tx, y + 2, 0xFFE0E3E8);
-            g.drawString(this.font, friendStatus(f), tx, y + 12, 0xFF7A7F86);
+            g.drawString(this.font, ellipsize(f.username(), nameRight - tx), tx, y + 2, 0xFFD3D6DC);
+            g.drawString(this.font, friendStatus(f), tx, y + 12, FAINT);
             y += 22;
         }
         if (all.size() > max) {
             g.drawString(this.font, Component.translatable("gui.lanplus.profile.friends.more", all.size() - max),
-                    l, y + 2, 0xFF7A7F86);
+                    l, y + 2, FAINT);
             y += 14;
         }
         return y;
@@ -1339,7 +1339,7 @@ public final class ProfileScreen extends Screen {
         panelBottom = this.height - 34;
         int textW = panelRight - panelX - 12;
         g.fill(panelX, panelTop, panelRight, panelBottom, PANEL_BG);
-        drawBorder(g, panelX, panelTop, panelRight, panelBottom, BORDER);
+        LanPlusUi.bevelRaised(g, panelX, panelTop, panelRight, panelBottom);
 
         g.enableScissor(panelX, panelTop, panelRight, panelBottom);
         int x = panelX + 8;
@@ -1358,17 +1358,17 @@ public final class ProfileScreen extends Screen {
             }
             anyPrompt = true;
             for (FormattedCharSequence line : this.font.split(p.question(), textW)) {
-                g.drawString(this.font, line, x, y, 0xFF8A8F96);
+                g.drawString(this.font, line, x, y, MUTED);
                 y += 10;
             }
             for (FormattedCharSequence line : this.font.split(ProfilePromptCatalog.answerText(p, answer), textW)) {
-                g.drawString(this.font, line, x, y, 0xFFE0E3E8);
+                g.drawString(this.font, line, x, y, 0xFFD3D6DC);
                 y += 11;
             }
             y += 6;
         }
         if (!anyPrompt) {
-            g.drawString(this.font, Component.translatable("gui.lanplus.profile.questions.empty"), x, y, 0xFF6A6E74);
+            g.drawString(this.font, Component.translatable("gui.lanplus.profile.questions.empty"), x, y, 0xFF5C616B);
             y += 12;
         }
         g.disableScissor();
@@ -1383,7 +1383,7 @@ public final class ProfileScreen extends Screen {
             int barH = Math.max(20, viewport * viewport / contentHeight);
             int barY = panelTop + (viewport - barH) * scrollY / maxScroll;
             g.fill(panelRight - 3, panelTop, panelRight, panelBottom, 0x40000000);
-            g.fill(panelRight - 3, barY, panelRight, barY + barH, 0xFF555B66);
+            g.fill(panelRight - 3, barY, panelRight, barY + barH, 0xFF3A3F4E);
         }
     }
 
@@ -1405,9 +1405,9 @@ public final class ProfileScreen extends Screen {
         cmBoxW = renderW;
         cmBoxH = renderH;
 
-        g.fill(x, y, x + renderW, y + renderH, 0xFF15161A);
-        drawBorder(g, x, y, x + renderW, y + renderH, 0x33FFFFFF);
-        g.fill(x, y, x + renderW, y + 2, BLURPLE);
+        g.fill(x, y, x + renderW, y + renderH, SLOT);
+        LanPlusUi.bevelInset(g, x, y, x + renderW, y + renderH);
+        g.fill(x, y, x + renderW, y + 2, ACCENT);
         g.flush();
         g.enableScissor(x + 1, y + 2, x + renderW - 1, y + renderH - 1);
         drawPlayerModel(g, x + renderW / 2, y + renderH - 16, 52);
@@ -1422,20 +1422,20 @@ public final class ProfileScreen extends Screen {
         for (int i = 0; i < COSMETIC_SLOTS.length; i++) {
             int sy = y + i * (slotH + slotGap);
             g.fill(sx, sy, sx + sw, sy + slotH, SURFACE_RAISED);
-            drawBorder(g, sx, sy, sx + sw, sy + slotH, 0x33FFFFFF);
-            g.fill(sx, sy, sx + 2, sy + slotH, BLURPLE);
+            drawBorder(g, sx, sy, sx + sw, sy + slotH, BORDER);
+            g.fill(sx, sy, sx + 2, sy + slotH, ACCENT);
             g.drawString(this.font, Component.translatable("gui.lanplus.profile.cosmetics." + COSMETIC_SLOTS[i]),
-                    sx + 7, sy + 5, 0xFFE0E3E8);
+                    sx + 7, sy + 5, 0xFFD3D6DC);
             Component sub = soon;
             if (COSMETIC_SLOTS[i].equals("background")) {
                 sub = bgStyle == BG_IMAGE && bgImageId != null
                         ? Component.literal(bgImageId)
                         : Component.translatable(switch (bgStyle) {
-                            case BG_SOLID -> "gui.lanplus.profile.bg.solid";
-                            case BG_MINECRAFT -> "gui.lanplus.profile.bg.minecraft";
-                            case BG_IMAGE -> "gui.lanplus.profile.bg.image";
-                            default -> "gui.lanplus.profile.bg.dark";
-                        });
+                    case BG_SOLID -> "gui.lanplus.profile.bg.solid";
+                    case BG_MINECRAFT -> "gui.lanplus.profile.bg.minecraft";
+                    case BG_IMAGE -> "gui.lanplus.profile.bg.image";
+                    default -> "gui.lanplus.profile.bg.dark";
+                });
             }
             g.drawString(this.font, sub, sx + 7, sy + 15, FAINT);
         }
@@ -1818,10 +1818,10 @@ public final class ProfileScreen extends Screen {
 
     private static int friendDotColor(Connectivity connectivity) {
         return switch (connectivity) {
-            case ONLINE -> 0xFF43B581;
-            case STALE -> 0xFFFAA61A;
-            case OFFLINE -> 0xFF747F8D;
-            case UNKNOWN -> 0xFF4F545C;
+            case ONLINE -> LanPlusUi.ONLINE;
+            case STALE -> LanPlusUi.AMBER;
+            case OFFLINE -> LanPlusUi.FAINT;
+            case UNKNOWN -> 0xFF4A4E57;
         };
     }
 

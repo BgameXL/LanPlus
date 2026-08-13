@@ -14,11 +14,6 @@ public interface PresenceManager {
 
     void updateState(GameplayState state, String worldName, String address);
 
-    /**
-     * Sets the host join code plus the access policy so presence can carry it to the backend. The
-     * backend uses {@code accessMode}+{@code allowedUuids} to mask the join code to non-invited
-     * friends in INVITED mode. Pass {@code (null, null, Set.of())} to clear when hosting stops.
-     */
     void setJoinCode(String joinCode, HostAccessMode accessMode, Set<UUID> allowedUuids);
 
     void updateSkin(SkinRef skin);

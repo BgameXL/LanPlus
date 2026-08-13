@@ -17,11 +17,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Small overlay shown after picking a world to host with INVITED access: tick the friends to invite
- * (only they may join, and each gets a "Join" notification), then "Host now". Optional - closing it
- * (Esc or the X) still hosts the world.
- */
 public final class InviteOverlayScreen extends Screen {
 
     private static final int PANEL_W = 240;
@@ -89,11 +84,11 @@ public final class InviteOverlayScreen extends Screen {
                 boolean on = picked.contains(f.uuid());
                 boolean hover = mouseX >= panelX + 6 && mouseX <= panelX + PANEL_W - 6 && mouseY >= y && mouseY < y + ROW_H;
                 if (hover) {
-                    g.fill(panelX + 6, y, panelX + PANEL_W - 6, y + ROW_H, 0x14FFFFFF);
+                    g.fill(panelX + 6, y, panelX + PANEL_W - 6, y + ROW_H, LanPlusUi.DIVIDER);
                 }
                 int bx = panelX + 10;
                 int by = y + 5;
-                g.fill(bx, by, bx + 9, by + 9, on ? LanPlusUi.BLURPLE : LanPlusUi.SURFACE_RAISED);
+                g.fill(bx, by, bx + 9, by + 9, on ? LanPlusUi.ACCENT : LanPlusUi.SURFACE_RAISED);
                 LanPlusUi.border(g, bx, by, bx + 9, by + 9);
                 g.drawString(this.font, f.username(), panelX + 26, y + 5,
                         on ? LanPlusUi.TEXT : LanPlusUi.MUTED, false);

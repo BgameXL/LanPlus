@@ -22,8 +22,7 @@ import java.util.function.Supplier;
 
 /**
  * {@link DiscordPresence} backed by Discord's local IPC (see {@link DiscordIpc}). Maps the local
- * {@link PresenceSnapshot} to a Rich Presence activity ("Hosting Test Modpack", world name, party
- * size, per-world elapsed time) and, while hosting, carries the LAN+ invite code as the activity
+ * {@link PresenceSnapshot} to a Rich Presence activity and, while hosting, carries the LAN+ invite code as the activity
  * join secret so friends can join straight from Discord.
  */
 public final class DiscordRichPresence implements DiscordPresence {
@@ -32,7 +31,6 @@ public final class DiscordRichPresence implements DiscordPresence {
     private static final long RETRY_MS = 30_000;
     private static final long REFRESH_SECONDS = 60;
     private static final int MAX_TEXT = 128;
-
     private final String appId;
     private final boolean enabled;
     private final long pid = ProcessHandle.current().pid();
@@ -40,7 +38,6 @@ public final class DiscordRichPresence implements DiscordPresence {
     private final ScheduledExecutorService exec;
     private final Supplier<int[]> partySize;
     private final Consumer<String> joinHandler;
-
     private final Object writeLock = new Object();
     private DiscordIpc ipc;
     private volatile boolean connected;
@@ -167,10 +164,12 @@ public final class DiscordRichPresence implements DiscordPresence {
             while (connected && mine == ipc) {
                 DiscordIpc.Frame frame = mine.read();
                 switch (frame.opcode()) {
-                    case DiscordIpc.OP_PING -> sendFrame(DiscordIpc.OP_PONG, new String(frame.data(), StandardCharsets.UTF_8));
+                    case DiscordIpc.OP_PING ->
+                            sendFrame(DiscordIpc.OP_PONG, new String(frame.data(), StandardCharsets.UTF_8));
                     case DiscordIpc.OP_CLOSE -> throw new IOException("discord closed the connection");
                     case DiscordIpc.OP_FRAME -> handleEvent(new String(frame.data(), StandardCharsets.UTF_8));
-                    default -> { }
+                    default -> {
+                    }
                 }
             }
         } catch (IOException | RuntimeException e) {
@@ -224,7 +223,8 @@ public final class DiscordRichPresence implements DiscordPresence {
                     }
                 }
             }
-            default -> { }
+            default -> {
+            }
         }
     }
 

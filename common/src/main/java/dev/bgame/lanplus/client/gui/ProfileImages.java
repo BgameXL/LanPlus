@@ -18,12 +18,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 final class ProfileImages {
 
-    record Tex(ResourceLocation location, int width, int height) {}
+    record Tex(ResourceLocation location, int width, int height) {
+    }
 
     private static final ConcurrentHashMap<String, Tex> TEXTURES = new ConcurrentHashMap<>();
     private static final Set<String> PENDING = ConcurrentHashMap.newKeySet();
 
-    private ProfileImages() {}
+    private ProfileImages() {
+    }
 
     static Tex get(CatalogImage image) {
         if (image == null || image.url() == null) {

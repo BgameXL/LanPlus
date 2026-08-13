@@ -9,16 +9,12 @@ import java.util.UUID;
 /**
  * Loader-agnostic detector for local-player advancements. Each loader is responsible for
  * firing {@link #onAdvancementEarn(String, boolean)} when the local player earns an
- * advancement (Fabric typically requires a Mixin; Forge has a native event).
+ * advancement.
  */
 public final class ClientAdvancementDetector {
 
     private ClientAdvancementDetector() {}
 
-    /**
-     * @param advancementId the advancement ID, e.g. "minecraft:story/mine_stone".
-     * @param hasDisplay    false for recipe/hidden advancements that should be ignored.
-     */
     public static void onAdvancementEarn(String advancementId, boolean hasDisplay) {
         if (!hasDisplay) {
             return; // recipe/hidden advancements have no display info; ignore them (they would spam XP)

@@ -41,7 +41,7 @@ public final class DefaultProfilesService implements ProfilesService {
     });
 
     public DefaultProfilesService(LanPlusNetwork network, Supplier<PlayerIdentity> identity, AssetCache assets,
-                                   ProfileCache profileCache) {
+                                  ProfileCache profileCache) {
         this.network = network;
         this.identity = identity;
         this.assets = assets;

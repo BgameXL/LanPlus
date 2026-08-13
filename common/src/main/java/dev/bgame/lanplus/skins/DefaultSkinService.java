@@ -21,10 +21,7 @@ import java.net.http.HttpClient;
 
 /**
  * Resolves skin references into PNG bytes off the game thread and hands them to a {@link
- * SkinTextureSink} for client-side binding. MOJANG refs are resolved via the session server (which
- * also carries the slim/classic model); CUSTOM refs are fetched directly behind {@link SkinUrlGuard}.
- * Bytes are cached by key (hash or URL) in the shared {@link AssetCache} (memory + disk), so a
- * shared URL or a reconnecting player is not re-downloaded, across sessions too.
+ * SkinTextureSink} for client-side binding.
  */
 public final class DefaultSkinService implements SkinService {
 
@@ -104,7 +101,7 @@ public final class DefaultSkinService implements SkinService {
                 return null;
             }
             JsonObject textures = JsonParser.parseString(
-                    new String(Base64.getDecoder().decode(texturesB64), StandardCharsets.UTF_8))
+                            new String(Base64.getDecoder().decode(texturesB64), StandardCharsets.UTF_8))
                     .getAsJsonObject().getAsJsonObject("textures");
             if (textures == null) {
                 return null;
@@ -149,5 +146,6 @@ public final class DefaultSkinService implements SkinService {
         };
     }
 
-    private record Loaded(String key, byte[] png, String model) {}
+    private record Loaded(String key, byte[] png, String model) {
+    }
 }

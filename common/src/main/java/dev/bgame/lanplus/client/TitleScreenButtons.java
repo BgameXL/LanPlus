@@ -12,19 +12,13 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.ResourceLocation;
 
-/**
- * Adds two small icon buttons next to the title screen's "Singleplayer" button: a gear that opens
- * {@link HostScreen} ("Host a world") and a people icon that opens {@link FriendsScreen}. The friends
- * overlay is otherwise only reachable in-game via the O keybind; this makes it usable from the menu.
- *
- * Loader-agnostic: each loader calls {@link #tryAddButtons(Screen)} from its screen-init hook.
- */
 public final class TitleScreenButtons {
 
     static final ResourceLocation HOST_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/host.png");
     private static final ResourceLocation FRIENDS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/friends.png");
 
-    private TitleScreenButtons() {}
+    private TitleScreenButtons() {
+    }
 
     public static void tryAddButtons(Screen screen) {
         if (!(screen instanceof TitleScreen title)) {

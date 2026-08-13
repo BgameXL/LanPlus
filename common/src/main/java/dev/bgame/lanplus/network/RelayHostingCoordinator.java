@@ -16,10 +16,6 @@ import java.util.function.Supplier;
  * When the local player starts HOSTING, it requests a ticket, opens the tunnel, and republishes the assigned
  * public domain as the presence address - so {@code invites/} mints a join code that points at the
  * relay instead of the unreachable {@code localhost} address. When hosting stops, it closes the tunnel.
- *
- * Detection stays dumb: this only reacts to the gameplay state the detector
- * reports. Fail-soft : if no ticket/tunnel is available, the loopback address is left
- * untouched and hosting is LAN-only.
  */
 public final class RelayHostingCoordinator implements PresenceManager.PresenceListener {
 

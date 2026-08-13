@@ -56,7 +56,8 @@ public final class LanPlusClient {
     private static DiscordPresence discord;
     private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
 
-    private LanPlusClient() {}
+    private LanPlusClient() {
+    }
 
     public static void init() {
         if (presence != null) {

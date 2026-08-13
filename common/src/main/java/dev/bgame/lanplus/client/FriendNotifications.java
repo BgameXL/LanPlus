@@ -9,7 +9,8 @@ public final class FriendNotifications {
 
     private static final Set<UUID> unreadInvites = ConcurrentHashMap.newKeySet();
 
-    private FriendNotifications() {}
+    private FriendNotifications() {
+    }
 
     public static void invited(UUID uuid) {
         if (uuid != null) {

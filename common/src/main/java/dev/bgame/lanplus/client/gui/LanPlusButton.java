@@ -10,9 +10,12 @@ import net.minecraft.network.chat.Component;
  */
 public final class LanPlusButton extends Button {
 
+    private final boolean primary;
+
     private LanPlusButton(Builder builder) {
         super(builder.x, builder.y, builder.width, builder.height,
                 builder.message, builder.onPress, DEFAULT_NARRATION);
+        this.primary = builder.primary;
     }
 
     public static Builder create(Component message, OnPress onPress) {
@@ -26,16 +29,19 @@ public final class LanPlusButton extends Button {
         int w = getWidth();
         int h = getHeight();
         int bg;
+        int color;
         if (!isActive()) {
-            bg = 0xFF232428;
-        } else if (isHovered()) {
-            bg = 0xFF35373C;
+            bg = LanPlusUi.SURFACE_DISABLED;
+            color = LanPlusUi.FAINT;
+        } else if (primary) {
+            bg = isHovered() ? LanPlusUi.ACCENT_HOVER : LanPlusUi.ACCENT_STRONG;
+            color = LanPlusUi.TEXT;
         } else {
-            bg = LanPlusUi.SURFACE_RAISED;
+            bg = isHovered() ? LanPlusUi.SURFACE_HOVER : LanPlusUi.SURFACE_RAISED;
+            color = isHovered() ? LanPlusUi.TEXT : LanPlusUi.MUTED;
         }
         g.fill(x, y, x + w, y + h, bg);
-        LanPlusUi.border(g, x, y, x + w, y + h);
-        int color = !isActive() ? LanPlusUi.FAINT : isHovered() ? LanPlusUi.TEXT : LanPlusUi.MUTED;
+        LanPlusUi.bevelRaised(g, x, y, x + w, y + h);
         int tx = x + (w - Minecraft.getInstance().font.width(getMessage())) / 2;
         g.drawString(Minecraft.getInstance().font, getMessage(), tx, y + (h - 8) / 2, color, false);
     }
@@ -47,10 +53,16 @@ public final class LanPlusButton extends Button {
         private int y;
         private int height = 20;
         private int width = 150;
+        private boolean primary;
 
         private Builder(Component message, OnPress onPress) {
             this.message = message;
             this.onPress = onPress;
+        }
+
+        public Builder primary() {
+            this.primary = true;
+            return this;
         }
 
         public Builder bounds(int x, int y, int width, int height) {

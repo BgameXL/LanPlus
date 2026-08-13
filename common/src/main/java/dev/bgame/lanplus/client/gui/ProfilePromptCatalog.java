@@ -5,13 +5,11 @@ import net.minecraft.network.chat.Component;
 import java.util.List;
 
 /**
- * The fixed catalog of "Questions about yourself" prompts. Predefined by LAN+ (the player never invents a
- * question, only answers one of these). The backend keeps a mirror whitelist of just the IDs (Store.PROMPT_IDS);
- * the prompt text and choices live here, client-side, localized via lang.
+ * The fixed catalog of "Questions about yourself" prompts.
  */
 public final class ProfilePromptCatalog {
 
-    public enum Type { FREE, CHOICE }
+    public enum Type {FREE, CHOICE}
 
     public record Prompt(String id, Type type, List<String> choices) {
         public Component question() {

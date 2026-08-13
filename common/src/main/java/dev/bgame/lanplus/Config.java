@@ -13,11 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * Loader-agnostic configuration for LAN+. Values are stored in
- * {@code <configDir>/lanplus.json}. The file is created automatically with the
- * default values on first load.
- */
 public final class Config {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -35,9 +30,9 @@ public final class Config {
     public static boolean discordEnabled = true;
     public static String discordAppId = "1516914761626030170";
 
-    private Config() {}
+    private Config() {
+    }
 
-    /** Call once from the loader-specific entry point. */
     public static void load() {
         Path file = PlatformHolder.get().getConfigDir().resolve(FILE_NAME);
         if (Files.isRegularFile(file)) {
@@ -55,13 +50,11 @@ public final class Config {
                 discordEnabled = getBool(json, "discordEnabled", discordEnabled);
                 discordAppId = getString(json, "discordAppId", discordAppId);
             } catch (Exception e) {
-                // If the file is malformed, keep the defaults and overwrite on save.
             }
         }
         save();
     }
 
-    /** Persists the current configuration values to disk. */
     public static void save() {
         Path file = PlatformHolder.get().getConfigDir().resolve(FILE_NAME);
         JsonObject json = new JsonObject();
@@ -83,7 +76,6 @@ public final class Config {
                 GSON.toJson(json, writer);
             }
         } catch (IOException e) {
-            // Best-effort: if we can't write, the game can still run with in-memory defaults.
         }
     }
 

@@ -40,7 +40,7 @@ import java.util.UUID;
 
 public final class FriendsScreen extends Screen {
 
-    private enum Tab { FRIENDS, JOIN, ADD, DETAILS }
+    private enum Tab {FRIENDS, JOIN, ADD, DETAILS}
 
     private static final Tab[] TABS = Tab.values();
     private static final int MARGIN = 20;
@@ -80,7 +80,8 @@ public final class FriendsScreen extends Screen {
     private int contextY;
     private List<ContextEntry> contextEntries = List.of();
 
-    private record ContextEntry(Component label, Runnable action, boolean enabled) {}
+    private record ContextEntry(Component label, Runnable action, boolean enabled) {
+    }
 
     public FriendsScreen(Screen parent) {
         super(Component.translatable("gui.lanplus.title"));
@@ -127,23 +128,29 @@ public final class FriendsScreen extends Screen {
             addBox.setHint(Component.translatable("gui.lanplus.add.hint"));
             addRenderableWidget(addBox);
             addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.add.button"), b -> doAdd())
-                    .bounds(rightX + rightW - 72, paneTop + 22, 66, 20).build());
+                    .bounds(rightX + rightW - 72, paneTop + 22, 66, 20).primary().build());
         } else if (tab == Tab.JOIN) {
             joinBox = new EditBox(this.font, rightX + 6, paneTop + 22, rightW - 84, 20,
                     Component.translatable("gui.lanplus.join.hint"));
             joinBox.setHint(Component.translatable("gui.lanplus.join.hint"));
             addRenderableWidget(joinBox);
             addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.join.button"), b -> doJoinByCode())
-                    .bounds(rightX + rightW - 72, paneTop + 22, 66, 20).build());
+                    .bounds(rightX + rightW - 72, paneTop + 22, 66, 20).primary().build());
         } else if (tab == Tab.DETAILS) {
             HostInfo info = hostInfo();
             if (info != null) {
                 int bx = rightX + rightW - 116;
-                addRenderableWidget(LanPlusButton.create(showLabel(showAddress), b -> { showAddress = !showAddress; rebuildWidgets(); })
+                addRenderableWidget(LanPlusButton.create(showLabel(showAddress), b -> {
+                            showAddress = !showAddress;
+                            rebuildWidgets();
+                        })
                         .bounds(bx, paneTop + 62, 52, 18).build());
                 addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.address()))
                         .bounds(bx + 56, paneTop + 62, 52, 18).build());
-                addRenderableWidget(LanPlusButton.create(showLabel(showCode), b -> { showCode = !showCode; rebuildWidgets(); })
+                addRenderableWidget(LanPlusButton.create(showLabel(showCode), b -> {
+                            showCode = !showCode;
+                            rebuildWidgets();
+                        })
                         .bounds(bx, paneTop + 94, 52, 18).build());
                 addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.code()))
                         .bounds(bx + 56, paneTop + 94, 52, 18).build());
@@ -152,7 +159,7 @@ public final class FriendsScreen extends Screen {
             Friend sel = selectedFriend();
             if (sel != null && sel.state() == GameplayState.HOSTING && sel.joinCode() != null) {
                 addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.action.join"), b -> doJoin())
-                        .bounds(rightX + 8, paneTop + 74, 80, 20).build());
+                        .bounds(rightX + 8, paneTop + 74, 80, 20).primary().build());
             }
         }
 
@@ -173,7 +180,7 @@ public final class FriendsScreen extends Screen {
         Component conn = online ? Component.translatable("gui.lanplus.status.connected")
                 : Component.translatable("gui.lanplus.status.local");
         g.drawString(this.font, conn, contentRight - this.font.width(conn), headerTop + 2,
-                online ? LanPlusUi.GREEN : LanPlusUi.FAINT);
+                online ? LanPlusUi.ONLINE : LanPlusUi.FAINT);
 
         renderTabs(g, mouseX, mouseY);
         LanPlusUi.panel(g, leftX, paneTop, leftX + LEFT_W, paneBottom);
@@ -182,7 +189,8 @@ public final class FriendsScreen extends Screen {
         switch (tab) {
             case FRIENDS -> renderFriendList(g, mouseX, mouseY, paneBottom);
             case ADD -> renderRequests(g, paneBottom);
-            case JOIN, DETAILS -> { /* list pane unused on these tabs */ }
+            case JOIN, DETAILS -> {
+            }
         }
         renderDetail(g, rightX, rightW);
 
@@ -219,7 +227,7 @@ public final class FriendsScreen extends Screen {
             g.drawString(this.font, label, x, tabsTop, active ? LanPlusUi.TEXT
                     : hover ? LanPlusUi.MUTED : LanPlusUi.FAINT);
             if (active) {
-                g.fill(x, tabsTop + 11, x + w, tabsTop + 12, LanPlusUi.BLURPLE);
+                g.fill(x, tabsTop + 11, x + w, tabsTop + 12, LanPlusUi.ACCENT);
             }
             int count = badgeCount(TABS[i]);
             if (count > 0) {
@@ -241,11 +249,11 @@ public final class FriendsScreen extends Screen {
         float scale = 0.85f;
         int tw = Math.round(this.font.width(s) * scale);
         int w = tw + 4;
-        g.fill(x, y - 1, x + w, y + 8, LanPlusUi.BLURPLE);
+        g.fill(x, y - 1, x + w, y + 8, LanPlusUi.ACCENT);
         g.pose().pushPose();
         g.pose().translate(x + (w - tw) / 2.0f, y + 0.5f, 0);
         g.pose().scale(scale, scale, 1f);
-        g.drawString(this.font, s, 0, 0, 0xFFFFFFFF, false);
+        g.drawString(this.font, s, 0, 0, LanPlusUi.TEXT, false);
         g.pose().popPose();
     }
 
@@ -280,12 +288,12 @@ public final class FriendsScreen extends Screen {
             boolean unread = isInviteUnread(f);
             if (selected || hover) {
                 g.fill(leftX + 1, y, leftX + LEFT_W - 1, y + ROW_H,
-                        selected ? LanPlusUi.BLURPLE_TINT : 0x14FFFFFF);
+                        selected ? LanPlusUi.ACCENT_TINT : LanPlusUi.DIVIDER);
             } else if (unread) {
-                g.fill(leftX + 1, y, leftX + LEFT_W - 1, y + ROW_H, LanPlusUi.BLURPLE_TINT);
+                g.fill(leftX + 1, y, leftX + LEFT_W - 1, y + ROW_H, LanPlusUi.ACCENT_TINT);
             }
             if (selected) {
-                g.fill(leftX + 1, y, leftX + 3, y + ROW_H, LanPlusUi.BLURPLE);
+                g.fill(leftX + 1, y, leftX + 3, y + ROW_H, LanPlusUi.ACCENT);
             }
             drawAvatar(g, f.uuid(), leftX + 6, y + 3, 18);
             g.fill(leftX + 28, y + ROW_H / 2 - 3, leftX + 34, y + ROW_H / 2 + 3, statusColor(f.connectivity()));
@@ -294,7 +302,7 @@ public final class FriendsScreen extends Screen {
             if (unread) {
                 int bx = leftX + LEFT_W - 12;
                 int by = y + ROW_H / 2 - 3;
-                g.fill(bx, by, bx + 6, by + 6, LanPlusUi.BLURPLE);
+                g.fill(bx, by, bx + 6, by + 6, LanPlusUi.ACCENT);
             }
             y += ROW_H;
         }
@@ -324,7 +332,7 @@ public final class FriendsScreen extends Screen {
             g.drawString(this.font, r.username(), leftX + 6, y + 5, LanPlusUi.TEXT, false);
             int ax = leftX + LEFT_W - 42;
             int dx = leftX + LEFT_W - 20;
-            g.fill(ax, y + 2, ax + 18, y + 16, LanPlusUi.GREEN);
+            g.fill(ax, y + 2, ax + 18, y + 16, LanPlusUi.ONLINE);
             g.drawString(this.font, "+", ax + 6, y + 5, LanPlusUi.TEXT, false);
             g.fill(dx, y + 2, dx + 18, y + 16, LanPlusUi.RED);
             g.drawString(this.font, "x", dx + 6, y + 5, LanPlusUi.TEXT, false);
@@ -340,7 +348,7 @@ public final class FriendsScreen extends Screen {
             Component code = self != null && self.friendCode() != null
                     ? Component.translatable("gui.lanplus.add.yourcode", self.friendCode())
                     : Component.translatable("gui.lanplus.add.yourcode.unknown");
-            g.drawString(this.font, code, x + 6, paneTop + 64, LanPlusUi.GREEN, false);
+            g.drawString(this.font, code, x + 6, paneTop + 64, LanPlusUi.ONLINE, false);
             return;
         }
         if (tab == Tab.JOIN) {
@@ -366,7 +374,7 @@ public final class FriendsScreen extends Screen {
         g.drawString(this.font, secondaryText(f), x + 8, paneTop + 46, LanPlusUi.MUTED, false);
         if (f.state() == GameplayState.HOSTING && f.joinCode() != null) {
             g.drawString(this.font, Component.translatable("gui.lanplus.notif.invitedyou"),
-                    x + 8, paneTop + 60, LanPlusUi.BLURPLE, false);
+                    x + 8, paneTop + 60, LanPlusUi.ACCENT, false);
         }
     }
 
@@ -383,9 +391,9 @@ public final class FriendsScreen extends Screen {
         g.drawString(this.font, Component.translatable("gui.lanplus.details.access", modeName(info.mode())),
                 x + 6, paneTop + 38, LanPlusUi.MUTED, false);
         g.drawString(this.font, Component.translatable("gui.lanplus.details.address"), x + 6, paneTop + 54, LanPlusUi.FAINT, false);
-        g.drawString(this.font, showAddress ? safe(info.address()) : mask(info.address()), x + 6, paneTop + 66, LanPlusUi.GREEN, false);
+        g.drawString(this.font, showAddress ? safe(info.address()) : mask(info.address()), x + 6, paneTop + 66, LanPlusUi.ONLINE, false);
         g.drawString(this.font, Component.translatable("gui.lanplus.details.code"), x + 6, paneTop + 86, LanPlusUi.FAINT, false);
-        g.drawString(this.font, showCode ? safe(info.code()) : mask(info.code()), x + 6, paneTop + 98, LanPlusUi.GREEN, false);
+        g.drawString(this.font, showCode ? safe(info.code()) : mask(info.code()), x + 6, paneTop + 98, LanPlusUi.ONLINE, false);
     }
 
     @Override
@@ -559,7 +567,7 @@ public final class FriendsScreen extends Screen {
         for (ContextEntry e : contextEntries) {
             boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= ey && mouseY < ey + MENU_ROW_H;
             if (hover && e.enabled()) {
-                g.fill(x + 1, ey, x + w - 1, ey + MENU_ROW_H, LanPlusUi.BLURPLE_TINT);
+                g.fill(x + 1, ey, x + w - 1, ey + MENU_ROW_H, LanPlusUi.ACCENT_TINT);
             }
             int color = !e.enabled() ? LanPlusUi.FAINT : (hover ? LanPlusUi.TEXT : LanPlusUi.MUTED);
             g.drawString(this.font, e.label(), x + 6, ey + 3, color, false);
@@ -739,7 +747,8 @@ public final class FriendsScreen extends Screen {
         return friends == null ? null : friends.localProfile();
     }
 
-    private record HostInfo(String world, HostAccessMode mode, String address, String code) {}
+    private record HostInfo(String world, HostAccessMode mode, String address, String code) {
+    }
 
     private HostInfo hostInfo() {
         PresenceManager presence = LanPlusClient.presence();
@@ -851,10 +860,10 @@ public final class FriendsScreen extends Screen {
 
     private int statusColor(Connectivity connectivity) {
         return switch (connectivity) {
-            case ONLINE -> LanPlusUi.GREEN;
+            case ONLINE -> LanPlusUi.ONLINE;
             case STALE -> LanPlusUi.AMBER;
             case OFFLINE -> LanPlusUi.FAINT;
-            case UNKNOWN -> 0xFF4F545C;
+            case UNKNOWN -> 0xFF4A4E57;
         };
     }
 }

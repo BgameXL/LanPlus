@@ -20,7 +20,8 @@ final class Wire {
 
     private static final com.google.gson.Gson GSON = new com.google.gson.Gson();
 
-    private Wire() {}
+    private Wire() {
+    }
 
     record Skin(String type, String id, String hash, String model) {
         static Skin from(SkinRef ref) {
@@ -44,7 +45,8 @@ final class Wire {
             List<String> allowedUuids,
             Skin skin,
             long timestamp
-    ) {}
+    ) {
+    }
 
     record Friend(
             String uuid,
@@ -73,19 +75,26 @@ final class Wire {
         }
     }
 
-    record FriendAdd(String uuid, String friendUuid) {}
+    record FriendAdd(String uuid, String friendUuid) {
+    }
 
-    record FriendRelation(String uuid, String targetUuid) {}
+    record FriendRelation(String uuid, String targetUuid) {
+    }
 
-    record Success(boolean success) {}
+    record Success(boolean success) {
+    }
 
-    record InviteCreate(String hostUuid, String address, String worldName, boolean gated) {}
+    record InviteCreate(String hostUuid, String address, String worldName, boolean gated) {
+    }
 
-    record InviteCreated(String code, String address, int expiresIn) {}
+    record InviteCreated(String code, String address, int expiresIn) {
+    }
 
-    record InviteResolved(String address, String worldName) {}
+    record InviteResolved(String address, String worldName) {
+    }
 
-    record RelayTicketRequest(String uuid, boolean gated) {}
+    record RelayTicketRequest(String uuid, boolean gated) {
+    }
 
     record RelayTicketDto(String ticket, String relayHost, int relayPort, String domain, int expiresIn) {
         RelayTicket toApi() {
@@ -150,7 +159,8 @@ final class Wire {
         }
     }
 
-    record ProgressionDto(Integer tier, Integer advancements, Integer xp, Map<String, Integer> sources) {}
+    record ProgressionDto(Integer tier, Integer advancements, Integer xp, Map<String, Integer> sources) {
+    }
 
     record ModpackDto(String modpackId, String name, String downloadUrl) {
         ModpackRef toApi() {
@@ -190,32 +200,45 @@ final class Wire {
         return absolute + "?v=" + hash.substring(0, Math.min(16, hash.length()));
     }
 
-    record BackgroundUpdateDto(String style, Integer color, Integer opacity, String imageId) {}
+    record BackgroundUpdateDto(String style, Integer color, Integer opacity, String imageId) {
+    }
 
-    record BackgroundUpdate(String uuid, BackgroundUpdateDto background) {}
+    record BackgroundUpdate(String uuid, BackgroundUpdateDto background) {
+    }
 
-    record BannerUpdate(String uuid, String bannerId) {}
+    record BannerUpdate(String uuid, String bannerId) {
+    }
 
-    record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {}
+    record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {
+    }
 
     record ProfileUpdate(String uuid, String bio, String pronouns, Map<String, String> links,
                          Map<String, String> prompts, Boolean invisible,
                          Boolean favoriteVisible,
-                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {}
+                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {
+    }
 
-    record FavoriteUpdate(String uuid, String favoriteModpackId) {}
+    record FavoriteUpdate(String uuid, String favoriteModpackId) {
+    }
 
-    record UpdateResult(boolean success, String error) {}
+    record UpdateResult(boolean success, String error) {
+    }
 
-    record AdvancementReport(String uuid, String advancementId) {}
+    record AdvancementReport(String uuid, String advancementId) {
+    }
 
-    record ReportUser(String targetUuid, String reason) {}
+    record ReportUser(String targetUuid, String reason) {
+    }
 
-    record SkinUpload(String png, String model) {}
+    record SkinUpload(String png, String model) {
+    }
 
-    record SkinUploadResponse(String error, String url, String hash) {}
+    record SkinUploadResponse(String error, String url, String hash) {
+    }
 
-    record ChallengeResponse(String serverId) {}
+    record ChallengeResponse(String serverId) {
+    }
 
-    record AuthResponse(String token, String uuid, boolean verified, long expiresIn) {}
+    record AuthResponse(String token, String uuid, boolean verified, long expiresIn) {
+    }
 }

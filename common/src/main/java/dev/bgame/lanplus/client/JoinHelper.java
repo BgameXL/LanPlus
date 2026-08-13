@@ -15,7 +15,8 @@ import net.minecraft.network.chat.Component;
  */
 public final class JoinHelper {
 
-    private JoinHelper() {}
+    private JoinHelper() {
+    }
 
     public static void connect(Minecraft mc, String address) {
         if (address == null || address.isBlank()) {

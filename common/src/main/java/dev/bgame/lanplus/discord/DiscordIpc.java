@@ -15,22 +15,19 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Low-level Discord IPC transport + framing (no Minecraft, no Discord library).
- *
- * Discord exposes a local socket named {@code discord-ipc-N}: a Unix domain socket
- * on Linux/macOS, a named pipe on Windows. Frames are {@code int32 opcode | int32 length | UTF-8
- * payload}, all little-endian. This class only moves bytes; the activity protocol lives in
- * {@link DiscordRichPresence}.
+ * Low-level Discord IPC transport + framing.
+ * This class only moves bytes; the activity protocol lives in {@link DiscordRichPresence}.
  */
 final class DiscordIpc implements Closeable {
-    
+
     static final int OP_HANDSHAKE = 0;
     static final int OP_FRAME = 1;
     static final int OP_CLOSE = 2;
     static final int OP_PING = 3;
     static final int OP_PONG = 4;
 
-    record Frame(int opcode, byte[] data) {}
+    record Frame(int opcode, byte[] data) {
+    }
 
     private final Transport transport;
 

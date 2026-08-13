@@ -69,7 +69,7 @@ public final class TcpRelayTunnel implements RelayTunnel {
         return open && c != null && !c.isClosed();
     }
 
-    // --- control connection -----------------------------------------------------------------------
+    // control connection
     private void runControl(RelayTicket ticket, CompletableFuture<String> result) {
         try {
             Socket c = connect(ticket.relayHost(), ticket.relayPort());
@@ -113,8 +113,7 @@ public final class TcpRelayTunnel implements RelayTunnel {
         }
     }
 
-    // --- per-player data connection ---------------------------------------------------------------
-
+    // per-player data connection
     private void proxySession(RelayTicket ticket, String id) {
         Socket data = null;
         Socket local = null;

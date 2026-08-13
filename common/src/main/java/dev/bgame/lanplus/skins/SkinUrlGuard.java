@@ -13,14 +13,15 @@ import java.time.Duration;
 
 /**
  * Fetches skin bytes from an untrusted URL with SSRF and size guards. Custom skin URLs are supplied
- * by other players, so the resolver (us) must not be tricked into hitting localhost / internal hosts.
+ * by other players, so the resolver (us) must not be tricked into hitting localhost/internal hosts.
  */
 final class SkinUrlGuard {
 
     static final int MAX_BYTES = 256 * 1024;
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
 
-    private SkinUrlGuard() {}
+    private SkinUrlGuard() {
+    }
 
     static boolean isSafe(String url) {
         URI uri;
@@ -59,11 +60,9 @@ final class SkinUrlGuard {
             return false;
         }
         byte[] b = a.getAddress();
-        // IPv6 unique-local fc00::/7 is not covered by isSiteLocalAddress.
         return !(b.length == 16 && (b[0] & 0xFE) == 0xFC);
     }
 
-    /** Download up to MAX_BYTES, aborting while reading if the body grows past it. Null on any failure. */
     static byte[] fetch(HttpClient http, String url) {
         if (!isSafe(url)) {
             return null;

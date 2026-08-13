@@ -20,10 +20,6 @@ import java.util.UUID;
  * Opens the active singleplayer world to LAN once it has loaded and applies the chosen
  * {@link HostAccessMode}. The {@link dev.bgame.lanplus.client.gui.HostScreen}
  * arms a request, then this watcher publishes the integrated server on the server thread when it is up.
- *
- * Detection only: the access decision lives in {@link HostAccessControl}.
- * Publishing flips {@code isPublished()}, which {@link ClientPresenceDetector} already turns into
- * HOSTING presence → relay tunnel → join code, so nothing else needs wiring here.
  */
 public final class HostController {
 
@@ -34,7 +30,8 @@ public final class HostController {
     private static volatile long pendingAt;
     private static volatile boolean offlineHosting;
 
-    private HostController() {}
+    private HostController() {
+    }
 
     public record HostSettings(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium,
                                GameType gameType, Difficulty difficulty, boolean allowCommands) {
@@ -48,12 +45,6 @@ public final class HostController {
         return offlineHosting;
     }
 
-    /**
-     * Called right before loading the world: publish to LAN with this mode once up.
-     * {@code preInvited} seeds the allow list (friends picked in the invite overlay).
-     * {@code allowNonPremium} opens the integrated server in offline-mode so non-premium clients can
-     * join, independent of the access mode (the whitelist also admits each allowed friend's offline uuid).
-     */
     public static void requestHost(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium) {
         requestHost(HostSettings.defaults(mode, preInvited, allowNonPremium));
     }
@@ -134,7 +125,7 @@ public final class HostController {
         }
         return set;
     }
-    
+
     public static UUID offlineUuid(String username) {
         return UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }

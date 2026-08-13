@@ -7,11 +7,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
-/**
- * Loader-agnostic keybinds for LAN+. Each loader registers {@link #OPEN_FRIENDS}
- * with its own keybinding registry and calls {@link #onClientTick()} from its
- * client tick event.
- */
 public final class LanPlusKeybinds {
 
     public static final String CATEGORY = "key.categories." + LanplusCommon.MODID;
@@ -24,7 +19,6 @@ public final class LanPlusKeybinds {
 
     private LanPlusKeybinds() {}
 
-    /** Call from each loader's client tick event at the END phase. */
     public static void onClientTick() {
         Minecraft mc = Minecraft.getInstance();
         while (OPEN_FRIENDS.consumeClick()) {

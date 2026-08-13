@@ -20,11 +20,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * LAN+ in-game notification toasts. Loader modules are responsible for calling
- * {@link #onRenderGui(GuiGraphics)}, {@link #onScreenRender(GuiGraphics, double, double)}
- * and {@link #onMouseClick(double, double, int)} from their respective events.
- */
 public final class LanPlusNotifications {
 
     private static final int W = 196;
@@ -38,7 +33,8 @@ public final class LanPlusNotifications {
 
     private static final CopyOnWriteArrayList<Notif> active = new CopyOnWriteArrayList<>();
 
-    private LanPlusNotifications() {}
+    private LanPlusNotifications() {
+    }
 
     public static void friendHosting(UUID friend, String name, String joinCode) {
         boolean invited = joinCode != null && !joinCode.isBlank();
@@ -76,12 +72,10 @@ public final class LanPlusNotifications {
         });
     }
 
-    /** Called from the loader's HUD render event. */
     public static void onRenderGui(GuiGraphics g) {
         renderAll(g, -1, -1);
     }
 
-    /** Called from the loader's screen render event. */
     public static void onScreenRender(GuiGraphics g, double mouseX, double mouseY) {
         if (hiddenOnCurrentScreen()) {
             return;
@@ -89,7 +83,6 @@ public final class LanPlusNotifications {
         renderAll(g, mouseX, mouseY);
     }
 
-    /** Called from the loader's screen mouse-click event. Returns true if the click was consumed. */
     public static boolean onMouseClick(double mouseX, double mouseY, int button) {
         if (hiddenOnCurrentScreen()) {
             return false;
@@ -155,7 +148,7 @@ public final class LanPlusNotifications {
         n.y = y;
         g.fill(x, y, x + W, y + H, col(LanPlusUi.SURFACE, alpha * 0.95f));
         borderAlpha(g, x, y, x + W, y + H, alpha);
-        g.fill(x, y, x + 2, y + H, col(LanPlusUi.BLURPLE, alpha));
+        g.fill(x, y, x + 2, y + H, col(LanPlusUi.ACCENT, alpha));
 
         Font font = Minecraft.getInstance().font;
         int textX = x + 8;
@@ -185,9 +178,9 @@ public final class LanPlusNotifications {
         if (hasAction) {
             boolean hover = mx >= n.btnX && mx < n.btnX + n.btnW && my >= n.btnY && my < n.btnY + n.btnH;
             g.fill(n.btnX, n.btnY, n.btnX + n.btnW, n.btnY + n.btnH,
-                    col(hover ? LanPlusUi.BLURPLE_HOVER : LanPlusUi.BLURPLE, alpha));
+                    col(hover ? LanPlusUi.ACCENT_HOVER : LanPlusUi.ACCENT, alpha));
             int tw = font.width(n.action);
-            g.drawString(font, n.action, n.btnX + (n.btnW - tw) / 2, n.btnY + 5, col(0xFFFFFFFF, alpha), false);
+            g.drawString(font, n.action, n.btnX + (n.btnW - tw) / 2, n.btnY + 5, col(LanPlusUi.TEXT, alpha), false);
         }
     }
 

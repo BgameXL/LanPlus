@@ -114,7 +114,8 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 Wire.Skin.from(snapshot.skin()),
                 System.currentTimeMillis());
         return post("/presence", body)
-                .thenAccept(resp -> { })
+                .thenAccept(resp -> {
+                })
                 .exceptionally(this::onErrorVoid);
     }
 
@@ -448,7 +449,8 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return CompletableFuture.completedFuture(null);
         }
         return post("/profile/advancement", new Wire.AdvancementReport(uuid.toString(), advancementId))
-                .thenAccept(resp -> { })
+                .thenAccept(resp -> {
+                })
                 .exceptionally(this::onErrorVoid);
     }
 
@@ -458,7 +460,8 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return CompletableFuture.completedFuture(null);
         }
         return post("/report", new Wire.ReportUser(targetUuid.toString(), reason))
-                .thenAccept(resp -> { })
+                .thenAccept(resp -> {
+                })
                 .exceptionally(this::onErrorVoid);
     }
 
@@ -848,7 +851,8 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                     case "INVITE_REDEEMED" -> listener.onInviteRedeemed(
                             UUID.fromString(obj.get("guestUuid").getAsString()));
                     case "PING" -> webSocket.sendText(GSON.toJson(Map.of("type", "PONG")), true);
-                    default -> {}
+                    default -> {
+                    }
                 }
             } catch (RuntimeException e) {
                 LOGGER.warn("LAN+ failed to handle WebSocket message: {}", e.toString());

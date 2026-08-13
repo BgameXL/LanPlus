@@ -12,7 +12,8 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 public final class
 PauseMenuButtons {
 
-    private PauseMenuButtons() {}
+    private PauseMenuButtons() {
+    }
 
     private static boolean hostedInWorld;
 

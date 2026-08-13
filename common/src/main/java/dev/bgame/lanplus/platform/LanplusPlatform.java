@@ -9,12 +9,8 @@ import java.nio.file.Path;
  */
 public interface LanplusPlatform {
 
-    /** @return directory where mod configuration files should be stored. */
     Path getConfigDir();
 
-    /** @return root game directory (e.g. .minecraft). */
     Path getGameDir();
-
-    /** @return true when running on the physical client. */
     boolean isClient();
 }

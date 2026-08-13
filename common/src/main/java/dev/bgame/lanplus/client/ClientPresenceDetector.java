@@ -28,7 +28,6 @@ import java.util.UUID;
 public final class ClientPresenceDetector {
 
     private static final String MODPACK_CONFIG_FILE = "lanplus-modpack.json";
-
     private static int tickCounter = 0;
     private static GameplayState lastState = null;
     private static SkinRef lastSkin = null;
@@ -36,9 +35,9 @@ public final class ClientPresenceDetector {
     private static boolean modpackCached = false;
     private static String cachedModpack = null;
 
-    private ClientPresenceDetector() {}
+    private ClientPresenceDetector() {
+    }
 
-    /** Called from each loader's client tick event at the END phase. */
     public static void onClientTick() {
         PresenceManager presence = LanPlusClient.presence();
         if (presence == null) {
@@ -63,7 +62,6 @@ public final class ClientPresenceDetector {
         }
     }
 
-    /** Called from each loader's logout/disconnect event. */
     public static void onLogout() {
         PresenceManager presence = LanPlusClient.presence();
         if (presence == null) {
