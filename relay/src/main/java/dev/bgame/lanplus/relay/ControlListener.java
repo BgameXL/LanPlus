@@ -58,7 +58,6 @@ final class ControlListener {
                 + " (" + socket.getRemoteSocketAddress() + ")");
         try {
             while (Io.readLine(in) != null) {
-                // no client-initiated control messages handled yet
             }
         } finally {
             table.unregister(domain, session);
@@ -74,9 +73,9 @@ final class ControlListener {
             return;
         }
         OutputStream out = socket.getOutputStream();
-        out.write(pending.handshake); // replay the player's handshake to the host first
+        out.write(pending.handshake);
         out.flush();
-        Pump.bidirectional(pending.player, socket, pool); // player <-> host(data)
+        Pump.bidirectional(pending.player, socket, pool);
     }
 
     private static void reject(OutputStream out, String reason) {

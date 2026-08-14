@@ -59,11 +59,20 @@ public final class BackendServer {
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             BackendServer.log("shutdown signal received");
-            try { server.close(); } catch (IOException ignored) {}
+            try {
+                server.close();
+            } catch (IOException ignored) {
+            }
             pool.shutdownNow();
             sched.shutdownNow();
-            try { pool.awaitTermination(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
-            try { sched.awaitTermination(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+            try {
+                pool.awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+            }
+            try {
+                sched.awaitTermination(5, TimeUnit.SECONDS);
+            } catch (InterruptedException ignored) {
+            }
             store.close();
         }, "backend-close"));
 
@@ -686,7 +695,6 @@ public final class BackendServer {
         return png == null ? NOT_FOUND : new Resp(200, null, png, "image/png");
     }
 
-    /** Width/height from the PNG IHDR (no image decoding), or null if not a well-formed PNG header. */
     private static int[] pngDimensions(byte[] png) {
         byte[] sig = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
         if (png.length < 24) {

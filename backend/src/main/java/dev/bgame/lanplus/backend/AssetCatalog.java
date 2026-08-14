@@ -21,7 +21,8 @@ final class AssetCatalog {
     private final String urlPrefix;
     private final Map<String, CachedHash> hashes = new HashMap<>();
 
-    private record CachedHash(String hash, long mtime, long size) {}
+    private record CachedHash(String hash, long mtime, long size) {
+    }
 
     AssetCatalog(Path dir, String urlPrefix) {
         this.dir = dir;

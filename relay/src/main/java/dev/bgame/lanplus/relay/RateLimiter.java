@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 final class RateLimiter {
 
     private final int perMinute;
-    private final Map<String, long[]> windows = new ConcurrentHashMap<>(); // ip -> [windowStartMs, count]
+    private final Map<String, long[]> windows = new ConcurrentHashMap<>();
 
     RateLimiter(int perMinute) {
         this.perMinute = perMinute;

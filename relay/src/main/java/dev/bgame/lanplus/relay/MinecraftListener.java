@@ -37,7 +37,7 @@ final class MinecraftListener {
             }
             HostSession host = route(hs.serverAddress);
             if (host == null) {
-                return; // unknown domain / invalid token / host offline
+                return;
             }
             String sid = table.addPending(player, hs.raw);
             if (!host.send(Json.obj("type", "SESSION", "id", sid))) {

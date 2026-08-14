@@ -11,7 +11,6 @@ import java.util.Base64;
 final class WebSocket {
 
     private static final String MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-
     private final Socket socket;
     private final InputStream in;
     private final OutputStream out;
@@ -78,7 +77,8 @@ final class WebSocket {
                     return null;
                 }
                 case 0x9 -> sendFrame(0xA, payload);
-                default -> { /* pong / continuation: ignore */ }
+                default -> {
+                }
             }
         }
     }
@@ -95,7 +95,7 @@ final class WebSocket {
     }
 
     private synchronized void sendFrame(int opcode, byte[] payload) throws IOException {
-        out.write(0x80 | opcode); // FIN + opcode
+        out.write(0x80 | opcode);
         int n = payload.length;
         if (n < 126) {
             out.write(n);

@@ -30,11 +30,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Backend state. Durable identity and social graph (users, friends, friend_requests, relationships)
  * lives in SQLite; presence, invites, and relay tickets stay in memory because they are ephemeral
  * (TTL-bounded) and correct to lose on restart.
- *
  * Concurrency: a single shared JDBC Connection guarded by {@link #lock} (SQLite admits one writer;
  * WAL allows concurrent readers, but a single Connection is not thread-safe, so all DB access is
  * serialized). Presence/invite/ticket maps are concurrent and need no lock.
- *
  * Simplifications vs a real backend: users auto-register on first contact; adding a friend sends a
  * request the other side must accept (auto-accepted if mutual); there is no authentication.
  */
@@ -78,12 +76,22 @@ final class Store {
         volatile boolean disconnectRecorded;
     }
 
-    record Ticket(UUID uuid, String domain, boolean requireToken, long expiresAt) {}
-    record Invite(UUID hostUuid, String address, String worldName, long expiresAt) {}
-    record GuestToken(String hostDomain, long expiresAt) {}
-    record Session(UUID uuid, boolean verified) {}
-    record AuthResult(String token, UUID uuid, boolean verified, long expiresInSeconds) {}
-    enum AddResult { ACCEPTED, REQUESTED, BLOCKED }
+    record Ticket(UUID uuid, String domain, boolean requireToken, long expiresAt) {
+    }
+
+    record Invite(UUID hostUuid, String address, String worldName, long expiresAt) {
+    }
+
+    record GuestToken(String hostDomain, long expiresAt) {
+    }
+
+    record Session(UUID uuid, boolean verified) {
+    }
+
+    record AuthResult(String token, UUID uuid, boolean verified, long expiresInSeconds) {
+    }
+
+    enum AddResult {ACCEPTED, REQUESTED, BLOCKED}
 
     private static final long CHALLENGE_TTL_MS = 60_000;
 
@@ -339,7 +347,7 @@ final class Store {
         return out;
     }
 
-    // presence (in-memory: ephemeral, derived connectivity)
+    // presence
     boolean upsertPresence(UUID uuid, String username, String state, String worldName,
                            String address, String joinCode, Object skin, String modpackId,
                            String accessMode, Set<UUID> allowedUuids) {
@@ -944,7 +952,7 @@ final class Store {
     static final int MAX_PROMPTS = 3;
     private static final String[] PROMPT_IDS =
             {"delete_block", "first_night", "build_first", "useless_item",
-             "difficulty", "travel", "armor", "playstyle"};
+                    "difficulty", "travel", "armor", "playstyle"};
 
     boolean isPromptId(String id) {
         for (String p : PROMPT_IDS) {
@@ -1814,7 +1822,7 @@ final class Store {
         }
     }
 
-    // invites (in-memory)
+    // invites
     String createInvite(UUID hostUuid, String address, String worldName, boolean gated) {
         long expiresAt = System.currentTimeMillis() + 3_600_000;
         String guestAddress = address;
@@ -1852,7 +1860,7 @@ final class Store {
         return i == null ? null : ordered("address", i.address(), "worldName", i.worldName());
     }
 
-    // relay tickets (in-memory)
+    // relay tickets
     Object[] mintTicketToken(UUID uuid, boolean gated) {
         User u = ensureUser(uuid, null);
         String token = randomHex(32);
@@ -2067,9 +2075,6 @@ final class Store {
     }
 
     private String uniqueDomain() throws SQLException {
-        // Two-word combinations (30*30=900) may be exhausted in production.
-        // Try them briefly, then fall back to three-word combinations,
-        // and finally to a UUID-based domain.
         for (int i = 0; i < 200; i++) {
             String domain = WORDS[RNG.nextInt(WORDS.length)] + "-" + WORDS[RNG.nextInt(WORDS.length)] + "." + baseDomain;
             if (!domainTaken(domain)) {
@@ -2084,7 +2089,6 @@ final class Store {
                 return domain;
             }
         }
-        // Fallback to a UUID-based domain that is effectively guaranteed to be unique.
         return UUID.randomUUID().toString().replace("-", "").substring(0, 16) + "." + baseDomain;
     }
 

@@ -7,7 +7,8 @@ import java.nio.charset.StandardCharsets;
 
 final class Io {
 
-    private Io() {}
+    private Io() {
+    }
 
     static String readLine(InputStream in) throws IOException {
         ByteArrayOutputStream buf = new ByteArrayOutputStream(64);

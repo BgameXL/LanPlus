@@ -7,7 +7,8 @@ import java.util.Map;
 
 final class Json {
 
-    private Json() {}
+    private Json() {
+    }
 
     // write
     static String write(Object value) {
@@ -101,7 +102,6 @@ final class Json {
         }
     }
 
-    /** Convenience: parse and cast to a string-keyed map (empty map if not an object). */
     @SuppressWarnings("unchecked")
     static Map<String, Object> parseObject(String s) {
         Object v = parse(s);
@@ -123,7 +123,7 @@ final class Json {
 
     private static Map<String, Object> parseObject(String s, int[] pos) {
         Map<String, Object> map = new LinkedHashMap<>();
-        pos[0]++; // {
+        pos[0]++;
         skipWs(s, pos);
         if (s.charAt(pos[0]) == '}') {
             pos[0]++;
@@ -203,7 +203,7 @@ final class Json {
     }
 
     private static Object parseNull(String s, int[] pos) {
-        pos[0] += 4; // null
+        pos[0] += 4;
         return null;
     }
 

@@ -4,7 +4,8 @@ import java.util.concurrent.ThreadLocalRandom;
 
 final class Wordlist {
 
-    private Wordlist() {}
+    private Wordlist() {
+    }
 
     private static final String[] WORDS = {
             "amber", "brisk", "calm", "dawn", "ember", "fern", "glow", "hazel", "iris", "jade",

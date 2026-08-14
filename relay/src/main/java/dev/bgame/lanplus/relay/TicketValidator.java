@@ -10,7 +10,8 @@ import java.time.Duration;
 
 final class TicketValidator {
 
-    record Result(String domain, boolean requireToken) {}
+    record Result(String domain, boolean requireToken) {
+    }
 
     private final RelayConfig cfg;
     private final HttpClient http = HttpClient.newBuilder()

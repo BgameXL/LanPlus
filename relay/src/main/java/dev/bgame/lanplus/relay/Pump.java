@@ -9,9 +9,9 @@ import java.util.concurrent.Future;
 
 final class Pump {
 
-    private Pump() {}
+    private Pump() {
+    }
 
-    /** Copies {@code a↔b} until either side ends, closes both, then returns. Blocks the caller. */
     static void bidirectional(Socket a, Socket b, ExecutorService pool) {
         Future<?> other = pool.submit(() -> copy(a, b));
         copy(b, a);
@@ -44,7 +44,6 @@ final class Pump {
             try {
                 s.close();
             } catch (IOException ignored) {
-                // nothing to do
             }
         }
     }

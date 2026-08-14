@@ -19,7 +19,8 @@ public final class RelayServer {
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-    private RelayServer() {}
+    private RelayServer() {
+    }
 
     public static void main(String[] args) throws Exception {
         RelayConfig cfg = RelayConfig.fromEnv();
@@ -51,8 +52,8 @@ public final class RelayServer {
         log("LAN+ relay up — control " + cfg.relayBind + (cfg.tls ? " (TLS)" : " (PLAINTEXT)")
                 + ", minecraft " + cfg.mcBind
                 + (cfg.noAuth ? ", NO_AUTH dev mode, base domain " + cfg.baseDomain
-                              : ", backend " + cfg.backendUrl));
-        Thread.currentThread().join(); // run forever
+                : ", backend " + cfg.backendUrl));
+        Thread.currentThread().join();
     }
 
     private static ServerSocket openRelaySocket(RelayConfig cfg) throws Exception {

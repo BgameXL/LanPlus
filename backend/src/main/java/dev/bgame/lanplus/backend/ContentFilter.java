@@ -9,10 +9,11 @@ import java.util.regex.Pattern;
  * Hard-block filter for hate speech in free-text profile fields.
  * Scope is slurs only, not general profanity, and what slips through
  * is caught by user reports + admin.
-*/
+ */
 final class ContentFilter {
 
-    private ContentFilter() {}
+    private ContentFilter() {
+    }
 
     private static final List<String> ROOTS = List.of(
             "nigger", "nigga", "niglet", "jigaboo", "spearchucker", "porchmonkey",
@@ -73,7 +74,7 @@ final class ContentFilter {
         };
     }
 
-   // a nice regex
+    // a nice regex
     private static Pattern toRepeatPattern(String root) {
         StringBuilder sb = new StringBuilder(root.length() * 2);
         for (int i = 0; i < root.length(); i++) {

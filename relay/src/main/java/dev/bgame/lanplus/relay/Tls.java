@@ -18,7 +18,8 @@ import java.util.List;
 
 final class Tls {
 
-    private Tls() {}
+    private Tls() {
+    }
 
     static SSLContext fromPem(RelayConfig cfg) throws Exception {
         List<X509Certificate> chain = new ArrayList<>();

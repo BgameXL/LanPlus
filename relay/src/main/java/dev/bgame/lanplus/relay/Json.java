@@ -5,7 +5,8 @@ import java.util.Map;
 
 final class Json {
 
-    private Json() {}
+    private Json() {
+    }
 
     static String obj(String... kv) {
         StringBuilder sb = new StringBuilder("{");
@@ -33,7 +34,7 @@ final class Json {
         while (true) {
             i = skipWs(s, i);
             if (i >= n || s.charAt(i) != '"') {
-                break; // '}' or malformed
+                break;
             }
             StringBuilder key = new StringBuilder();
             i = readString(s, i, key);
@@ -93,7 +94,7 @@ final class Json {
                         out.append((char) Integer.parseInt(s.substring(i, i + 4), 16));
                         i += 4;
                     }
-                    default -> out.append(e); // " \ /
+                    default -> out.append(e);
                 }
             } else {
                 out.append(c);

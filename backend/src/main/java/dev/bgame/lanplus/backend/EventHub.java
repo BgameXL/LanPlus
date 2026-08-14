@@ -37,7 +37,6 @@ final class EventHub {
         }
         String json = Json.write(event);
         for (WebSocket ws : set) {
-            // Offload to avoid blocking REST/WebSocket worker threads on a dead peer.
             ForkJoinPool.commonPool().execute(() -> sendOne(ws, json));
         }
     }

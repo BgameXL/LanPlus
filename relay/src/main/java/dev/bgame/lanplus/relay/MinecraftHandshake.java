@@ -28,7 +28,7 @@ final class MinecraftHandshake {
             return null;
         }
         if (first == 0xFE) {
-            return null; // legacy server-list ping — unsupported
+            return null;
         }
         pin.unread(first);
 
@@ -46,10 +46,10 @@ final class MinecraftHandshake {
         ByteArrayInputStream b = new ByteArrayInputStream(body);
         String addr = null;
         int nextState = -1;
-        if (readVarInt(b, null) == 0x00) { // packet id 0x00 = handshake
-            readVarInt(b, null);           // protocol version (ignored)
+        if (readVarInt(b, null) == 0x00) {
+            readVarInt(b, null);
             addr = normalize(readString(b));
-            skipFully(b, 2);               // server port (unsigned short, ignored)
+            skipFully(b, 2);
             nextState = readVarInt(b, null);
         }
         return new MinecraftHandshake(raw.toByteArray(), addr, nextState);

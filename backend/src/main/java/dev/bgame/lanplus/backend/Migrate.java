@@ -14,7 +14,8 @@ import java.util.Map;
 
 public final class Migrate {
 
-    private Migrate() {}
+    private Migrate() {
+    }
 
     public static void main(String[] args) throws Exception {
         if (args.length != 2) {
