@@ -21,14 +21,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.ConnectScreen;
-import net.minecraft.client.gui.screens.GenericDirtMessageScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.gui.screens.TitleScreen;
-import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
-import net.minecraft.client.multiplayer.ServerData;
-import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
@@ -172,19 +165,19 @@ public final class FriendsScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         renderBackground(g);
-        LanPlusUi.backdrop(g, this.width, this.height);
+        LanPlusUI.backdrop(g, this.width, this.height);
         layout();
 
-        g.drawString(this.font, this.title, leftX, headerTop, LanPlusUi.TEXT);
+        g.drawString(this.font, this.title, leftX, headerTop, LanPlusUI.TEXT);
         boolean online = isOnline();
         Component conn = online ? Component.translatable("gui.lanplus.status.connected")
                 : Component.translatable("gui.lanplus.status.local");
         g.drawString(this.font, conn, contentRight - this.font.width(conn), headerTop + 2,
-                online ? LanPlusUi.ONLINE : LanPlusUi.FAINT);
+                online ? LanPlusUI.ONLINE : LanPlusUI.FAINT);
 
         renderTabs(g, mouseX, mouseY);
-        LanPlusUi.panel(g, leftX, paneTop, leftX + LEFT_W, paneBottom);
-        LanPlusUi.panel(g, rightX, paneTop, rightX + rightW, paneBottom);
+        LanPlusUI.panel(g, leftX, paneTop, leftX + LEFT_W, paneBottom);
+        LanPlusUI.panel(g, rightX, paneTop, rightX + rightW, paneBottom);
 
         switch (tab) {
             case FRIENDS -> renderFriendList(g, mouseX, mouseY, paneBottom);
@@ -196,7 +189,7 @@ public final class FriendsScreen extends Screen {
 
         if (status != null) {
             if (System.currentTimeMillis() < statusUntil) {
-                g.drawString(this.font, status, leftX, paneBottom + 13, LanPlusUi.MUTED);
+                g.drawString(this.font, status, leftX, paneBottom + 13, LanPlusUI.MUTED);
             } else {
                 status = null;
             }
@@ -224,10 +217,10 @@ public final class FriendsScreen extends Screen {
             int w = this.font.width(label);
             boolean active = tab == TABS[i];
             boolean hover = mouseX >= x - 2 && mouseX < x + w + 4 && mouseY >= tabsTop - 3 && mouseY < tabsTop + 12;
-            g.drawString(this.font, label, x, tabsTop, active ? LanPlusUi.TEXT
-                    : hover ? LanPlusUi.MUTED : LanPlusUi.FAINT);
+            g.drawString(this.font, label, x, tabsTop, active ? LanPlusUI.TEXT
+                    : hover ? LanPlusUI.MUTED : LanPlusUI.FAINT);
             if (active) {
-                g.fill(x, tabsTop + 11, x + w, tabsTop + 12, LanPlusUi.ACCENT);
+                g.fill(x, tabsTop + 11, x + w, tabsTop + 12, LanPlusUI.ACCENT);
             }
             int count = badgeCount(TABS[i]);
             if (count > 0) {
@@ -249,11 +242,11 @@ public final class FriendsScreen extends Screen {
         float scale = 0.85f;
         int tw = Math.round(this.font.width(s) * scale);
         int w = tw + 4;
-        g.fill(x, y - 1, x + w, y + 8, LanPlusUi.ACCENT);
+        g.fill(x, y - 1, x + w, y + 8, LanPlusUI.ACCENT);
         g.pose().pushPose();
         g.pose().translate(x + (w - tw) / 2.0f, y + 0.5f, 0);
         g.pose().scale(scale, scale, 1f);
-        g.drawString(this.font, s, 0, 0, LanPlusUi.TEXT, false);
+        g.drawString(this.font, s, 0, 0, LanPlusUI.TEXT, false);
         g.pose().popPose();
     }
 
@@ -275,7 +268,7 @@ public final class FriendsScreen extends Screen {
         List<Friend> list = friends();
         if (list.isEmpty()) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.friends.empty"),
-                    leftX + LEFT_W / 2, paneTop + 30, LanPlusUi.FAINT);
+                    leftX + LEFT_W / 2, paneTop + 30, LanPlusUI.FAINT);
             return;
         }
         int y = paneTop + 2;
@@ -288,21 +281,21 @@ public final class FriendsScreen extends Screen {
             boolean unread = isInviteUnread(f);
             if (selected || hover) {
                 g.fill(leftX + 1, y, leftX + LEFT_W - 1, y + ROW_H,
-                        selected ? LanPlusUi.ACCENT_TINT : LanPlusUi.DIVIDER);
+                        selected ? LanPlusUI.ACCENT_TINT : LanPlusUI.DIVIDER);
             } else if (unread) {
-                g.fill(leftX + 1, y, leftX + LEFT_W - 1, y + ROW_H, LanPlusUi.ACCENT_TINT);
+                g.fill(leftX + 1, y, leftX + LEFT_W - 1, y + ROW_H, LanPlusUI.ACCENT_TINT);
             }
             if (selected) {
-                g.fill(leftX + 1, y, leftX + 3, y + ROW_H, LanPlusUi.ACCENT);
+                g.fill(leftX + 1, y, leftX + 3, y + ROW_H, LanPlusUI.ACCENT);
             }
             drawAvatar(g, f.uuid(), leftX + 6, y + 3, 18);
             g.fill(leftX + 28, y + ROW_H / 2 - 3, leftX + 34, y + ROW_H / 2 + 3, statusColor(f.connectivity()));
-            g.drawString(this.font, f.username(), leftX + 40, y + 4, LanPlusUi.TEXT, false);
-            g.drawString(this.font, secondaryText(f), leftX + 40, y + 14, LanPlusUi.MUTED, false);
+            g.drawString(this.font, f.username(), leftX + 40, y + 4, LanPlusUI.TEXT, false);
+            g.drawString(this.font, secondaryText(f), leftX + 40, y + 14, LanPlusUI.MUTED, false);
             if (unread) {
                 int bx = leftX + LEFT_W - 12;
                 int by = y + ROW_H / 2 - 3;
-                g.fill(bx, by, bx + 6, by + 6, LanPlusUi.ACCENT);
+                g.fill(bx, by, bx + 6, by + 6, LanPlusUI.ACCENT);
             }
             y += ROW_H;
         }
@@ -317,11 +310,11 @@ public final class FriendsScreen extends Screen {
 
     private void renderRequests(GuiGraphics g, int paneBottom) {
         g.drawString(this.font, Component.translatable("gui.lanplus.requests.title"),
-                leftX + 6, paneTop + 4, LanPlusUi.TEXT, false);
+                leftX + 6, paneTop + 4, LanPlusUI.TEXT, false);
         List<ResolvedUser> reqs = requests();
         if (reqs.isEmpty()) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.requests.empty"),
-                    leftX + LEFT_W / 2, paneTop + 34, LanPlusUi.FAINT);
+                    leftX + LEFT_W / 2, paneTop + 34, LanPlusUI.FAINT);
             return;
         }
         int y = paneTop + 18;
@@ -329,31 +322,31 @@ public final class FriendsScreen extends Screen {
             if (y + 20 > paneBottom) {
                 break;
             }
-            g.drawString(this.font, r.username(), leftX + 6, y + 5, LanPlusUi.TEXT, false);
+            g.drawString(this.font, r.username(), leftX + 6, y + 5, LanPlusUI.TEXT, false);
             int ax = leftX + LEFT_W - 42;
             int dx = leftX + LEFT_W - 20;
-            g.fill(ax, y + 2, ax + 18, y + 16, LanPlusUi.ONLINE);
-            g.drawString(this.font, "+", ax + 6, y + 5, LanPlusUi.TEXT, false);
-            g.fill(dx, y + 2, dx + 18, y + 16, LanPlusUi.RED);
-            g.drawString(this.font, "x", dx + 6, y + 5, LanPlusUi.TEXT, false);
+            g.fill(ax, y + 2, ax + 18, y + 16, LanPlusUI.ONLINE);
+            g.drawString(this.font, "+", ax + 6, y + 5, LanPlusUI.TEXT, false);
+            g.fill(dx, y + 2, dx + 18, y + 16, LanPlusUI.RED);
+            g.drawString(this.font, "x", dx + 6, y + 5, LanPlusUI.TEXT, false);
             y += 20;
         }
     }
 
     private void renderDetail(GuiGraphics g, int x, int w) {
         if (tab == Tab.ADD) {
-            LanPlusUi.header(g, this.font, Component.translatable("gui.lanplus.add.title"), x + 6, paneTop + 6, w - 12);
-            g.drawString(this.font, Component.translatable("gui.lanplus.add.note"), x + 6, paneTop + 48, LanPlusUi.FAINT, false);
+            LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.add.title"), x + 6, paneTop + 6, w - 12);
+            g.drawString(this.font, Component.translatable("gui.lanplus.add.note"), x + 6, paneTop + 48, LanPlusUI.FAINT, false);
             UserProfile self = localProfile();
             Component code = self != null && self.friendCode() != null
                     ? Component.translatable("gui.lanplus.add.yourcode", self.friendCode())
                     : Component.translatable("gui.lanplus.add.yourcode.unknown");
-            g.drawString(this.font, code, x + 6, paneTop + 64, LanPlusUi.ONLINE, false);
+            g.drawString(this.font, code, x + 6, paneTop + 64, LanPlusUI.ONLINE, false);
             return;
         }
         if (tab == Tab.JOIN) {
-            LanPlusUi.header(g, this.font, Component.translatable("gui.lanplus.join.title"), x + 6, paneTop + 6, w - 12);
-            g.drawString(this.font, Component.translatable("gui.lanplus.join.note"), x + 6, paneTop + 48, LanPlusUi.FAINT, false);
+            LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.join.title"), x + 6, paneTop + 6, w - 12);
+            g.drawString(this.font, Component.translatable("gui.lanplus.join.note"), x + 6, paneTop + 48, LanPlusUI.FAINT, false);
             return;
         }
         if (tab == Tab.DETAILS) {
@@ -363,37 +356,37 @@ public final class FriendsScreen extends Screen {
         Friend f = selectedFriend();
         if (f == null) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.detail.none"),
-                    x + w / 2, paneTop + 30, LanPlusUi.FAINT);
+                    x + w / 2, paneTop + 30, LanPlusUI.FAINT);
             return;
         }
         drawAvatar(g, f.uuid(), x + 8, paneTop + 8, 24);
-        g.drawString(this.font, f.username(), x + 40, paneTop + 10, LanPlusUi.TEXT, false);
+        g.drawString(this.font, f.username(), x + 40, paneTop + 10, LanPlusUI.TEXT, false);
         g.fill(x + 40, paneTop + 22, x + 46, paneTop + 28, statusColor(f.connectivity()));
-        g.drawString(this.font, connectivityText(f), x + 50, paneTop + 22, LanPlusUi.MUTED, false);
-        g.fill(x + 8, paneTop + 38, x + w - 8, paneTop + 39, LanPlusUi.DIVIDER);
-        g.drawString(this.font, secondaryText(f), x + 8, paneTop + 46, LanPlusUi.MUTED, false);
+        g.drawString(this.font, connectivityText(f), x + 50, paneTop + 22, LanPlusUI.MUTED, false);
+        g.fill(x + 8, paneTop + 38, x + w - 8, paneTop + 39, LanPlusUI.DIVIDER);
+        g.drawString(this.font, secondaryText(f), x + 8, paneTop + 46, LanPlusUI.MUTED, false);
         if (f.state() == GameplayState.HOSTING && f.joinCode() != null) {
             g.drawString(this.font, Component.translatable("gui.lanplus.notif.invitedyou"),
-                    x + 8, paneTop + 60, LanPlusUi.ACCENT, false);
+                    x + 8, paneTop + 60, LanPlusUI.ACCENT, false);
         }
     }
 
     private void renderDetails(GuiGraphics g, int x, int w) {
-        LanPlusUi.header(g, this.font, Component.translatable("gui.lanplus.details.title"), x + 6, paneTop + 6, w - 12);
+        LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.details.title"), x + 6, paneTop + 6, w - 12);
         HostInfo info = hostInfo();
         if (info == null) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.details.nothosting"),
-                    x + w / 2, paneTop + 40, LanPlusUi.FAINT);
+                    x + w / 2, paneTop + 40, LanPlusUI.FAINT);
             return;
         }
         g.drawString(this.font, Component.translatable("gui.lanplus.details.world", safe(info.world())),
-                x + 6, paneTop + 26, LanPlusUi.MUTED, false);
+                x + 6, paneTop + 26, LanPlusUI.MUTED, false);
         g.drawString(this.font, Component.translatable("gui.lanplus.details.access", modeName(info.mode())),
-                x + 6, paneTop + 38, LanPlusUi.MUTED, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.details.address"), x + 6, paneTop + 54, LanPlusUi.FAINT, false);
-        g.drawString(this.font, showAddress ? safe(info.address()) : mask(info.address()), x + 6, paneTop + 66, LanPlusUi.ONLINE, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.details.code"), x + 6, paneTop + 86, LanPlusUi.FAINT, false);
-        g.drawString(this.font, showCode ? safe(info.code()) : mask(info.code()), x + 6, paneTop + 98, LanPlusUi.ONLINE, false);
+                x + 6, paneTop + 38, LanPlusUI.MUTED, false);
+        g.drawString(this.font, Component.translatable("gui.lanplus.details.address"), x + 6, paneTop + 54, LanPlusUI.FAINT, false);
+        g.drawString(this.font, showAddress ? safe(info.address()) : mask(info.address()), x + 6, paneTop + 66, LanPlusUI.ONLINE, false);
+        g.drawString(this.font, Component.translatable("gui.lanplus.details.code"), x + 6, paneTop + 86, LanPlusUI.FAINT, false);
+        g.drawString(this.font, showCode ? safe(info.code()) : mask(info.code()), x + 6, paneTop + 98, LanPlusUI.ONLINE, false);
     }
 
     @Override
@@ -561,15 +554,15 @@ public final class FriendsScreen extends Screen {
         int y = menuY();
         int w = menuWidth();
         int h = menuHeight();
-        g.fill(x, y, x + w, y + h, LanPlusUi.SURFACE_RAISED);
-        LanPlusUi.border(g, x, y, x + w, y + h);
+        g.fill(x, y, x + w, y + h, LanPlusUI.SURFACE_RAISED);
+        LanPlusUI.border(g, x, y, x + w, y + h);
         int ey = y + 2;
         for (ContextEntry e : contextEntries) {
             boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= ey && mouseY < ey + MENU_ROW_H;
             if (hover && e.enabled()) {
-                g.fill(x + 1, ey, x + w - 1, ey + MENU_ROW_H, LanPlusUi.ACCENT_TINT);
+                g.fill(x + 1, ey, x + w - 1, ey + MENU_ROW_H, LanPlusUI.ACCENT_TINT);
             }
-            int color = !e.enabled() ? LanPlusUi.FAINT : (hover ? LanPlusUi.TEXT : LanPlusUi.MUTED);
+            int color = !e.enabled() ? LanPlusUI.FAINT : (hover ? LanPlusUI.TEXT : LanPlusUI.MUTED);
             g.drawString(this.font, e.label(), x + 6, ey + 3, color, false);
             ey += MENU_ROW_H;
         }
@@ -860,9 +853,9 @@ public final class FriendsScreen extends Screen {
 
     private int statusColor(Connectivity connectivity) {
         return switch (connectivity) {
-            case ONLINE -> LanPlusUi.ONLINE;
-            case STALE -> LanPlusUi.AMBER;
-            case OFFLINE -> LanPlusUi.FAINT;
+            case ONLINE -> LanPlusUI.ONLINE;
+            case STALE -> LanPlusUI.AMBER;
+            case OFFLINE -> LanPlusUI.FAINT;
             case UNKNOWN -> 0xFF4A4E57;
         };
     }

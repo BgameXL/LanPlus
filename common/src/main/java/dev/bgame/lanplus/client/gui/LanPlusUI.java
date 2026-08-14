@@ -1,38 +1,75 @@
 package dev.bgame.lanplus.client.gui;
 
+import dev.bgame.lanplus.Config;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
 /**
- * The LAN+ screen design language. Shared by every LAN+ screen.
+ * The LAN+ screen design language.
  */
-final class LanPlusUi {
+final class LanPlusUI {
 
-    static final int SURFACE = 0xF21A1C22;
-    static final int SURFACE_RAISED = 0xFF15171C;
-    static final int SURFACE_HOVER = 0xFF262A33;
-    static final int SURFACE_DISABLED = 0xFF191B21;
-    static final int SLOT = 0xFF101216;
-    static final int EDGE_LIGHT = 0xFF3A3F4E;
-    static final int EDGE_DARK = 0xFF0A0B0E;
-    static final int ACCENT = 0xFF7B8CFF;
-    static final int ACCENT_STRONG = 0xFF6A7AE0;
-    static final int ACCENT_HOVER = 0xFF92A0F2;
-    static final int ACCENT_TINT = 0x407B8CFF;
-    static final int ACCENT_LINE = 0xFF7B8CFF;
-    static final int LINK = 0xFF9AA6FF;
-    static final int ONLINE = 0xFF57C07A;
-    static final int AMBER = 0xFFD8A43C;
-    static final int RED = 0xFFD05656;
-    static final int TEXT = 0xFFECEEF2;
-    static final int MUTED = 0xFF8B909A;
-    static final int FAINT = 0xFF6A6F78;
-    static final int BORDER = 0xFF2A2C33;
-    static final int DIVIDER = 0x14FFFFFF;
-    static final int BACKDROP = 0xC00A0B0D;
+    static int SURFACE;
+    static int SURFACE_RAISED;
+    static int SURFACE_HOVER;
+    static int SURFACE_DISABLED;
+    static int SLOT;
+    static int EDGE_LIGHT;
+    static int EDGE_DARK;
+    static int ACCENT;
+    static int ACCENT_STRONG;
+    static int ACCENT_HOVER;
+    static int ACCENT_TINT;
+    static int ACCENT_LINE;
+    static int LINK;
+    static int ONLINE;
+    static int AMBER;
+    static int RED;
+    static int TEXT;
+    static int MUTED;
+    static int FAINT;
+    static int BORDER;
+    static int DIVIDER;
+    static int BACKDROP;
 
-    private LanPlusUi() {
+    private static Theme current;
+
+    static {
+        apply(Themes.byId(Config.theme));
+    }
+
+    private LanPlusUI() {
+    }
+
+    static Theme current() {
+        return current;
+    }
+
+    static void apply(Theme t) {
+        current = t;
+        SURFACE = t.surface();
+        SURFACE_RAISED = t.surfaceRaised();
+        SURFACE_HOVER = t.surfaceHover();
+        SURFACE_DISABLED = t.surfaceDisabled();
+        SLOT = t.slot();
+        EDGE_LIGHT = t.edgeLight();
+        EDGE_DARK = t.edgeDark();
+        ACCENT = t.accent();
+        ACCENT_STRONG = t.accentStrong();
+        ACCENT_HOVER = t.accentHover();
+        ACCENT_TINT = t.accentTint();
+        ACCENT_LINE = t.accentLine();
+        LINK = t.link();
+        ONLINE = t.online();
+        AMBER = t.amber();
+        RED = t.red();
+        TEXT = t.text();
+        MUTED = t.muted();
+        FAINT = t.faint();
+        BORDER = t.border();
+        DIVIDER = t.divider();
+        BACKDROP = t.backdrop();
     }
 
     static void backdrop(GuiGraphics g, int width, int height) {

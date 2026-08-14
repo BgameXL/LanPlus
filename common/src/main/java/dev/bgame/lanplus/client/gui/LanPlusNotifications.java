@@ -146,9 +146,9 @@ public final class LanPlusNotifications {
     private static void renderOne(GuiGraphics g, Notif n, int x, int y, float alpha, double mx, double my) {
         n.x = x;
         n.y = y;
-        g.fill(x, y, x + W, y + H, col(LanPlusUi.SURFACE, alpha * 0.95f));
+        g.fill(x, y, x + W, y + H, col(LanPlusUI.SURFACE, alpha * 0.95f));
         borderAlpha(g, x, y, x + W, y + H, alpha);
-        g.fill(x, y, x + 2, y + H, col(LanPlusUi.ACCENT, alpha));
+        g.fill(x, y, x + 2, y + H, col(LanPlusUI.ACCENT, alpha));
 
         Font font = Minecraft.getInstance().font;
         int textX = x + 8;
@@ -169,18 +169,18 @@ public final class LanPlusNotifications {
         n.btnY = y + (H - n.btnH) / 2;
         int textRight = hasAction ? n.btnX - 6 : x + W - 8;
 
-        g.drawString(font, ellipsize(font, n.title, textRight - textX), textX, y + 9, col(LanPlusUi.TEXT, alpha), false);
+        g.drawString(font, ellipsize(font, n.title, textRight - textX), textX, y + 9, col(LanPlusUI.TEXT, alpha), false);
         if (n.subtitle != null) {
             g.drawString(font, ellipsize(font, n.subtitle, textRight - textX), textX, y + 22,
-                    col(LanPlusUi.MUTED, alpha), false);
+                    col(LanPlusUI.MUTED, alpha), false);
         }
 
         if (hasAction) {
             boolean hover = mx >= n.btnX && mx < n.btnX + n.btnW && my >= n.btnY && my < n.btnY + n.btnH;
             g.fill(n.btnX, n.btnY, n.btnX + n.btnW, n.btnY + n.btnH,
-                    col(hover ? LanPlusUi.ACCENT_HOVER : LanPlusUi.ACCENT, alpha));
+                    col(hover ? LanPlusUI.ACCENT_HOVER : LanPlusUI.ACCENT, alpha));
             int tw = font.width(n.action);
-            g.drawString(font, n.action, n.btnX + (n.btnW - tw) / 2, n.btnY + 5, col(LanPlusUi.TEXT, alpha), false);
+            g.drawString(font, n.action, n.btnX + (n.btnW - tw) / 2, n.btnY + 5, col(LanPlusUI.TEXT, alpha), false);
         }
     }
 

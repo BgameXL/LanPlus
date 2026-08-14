@@ -63,7 +63,7 @@ public final class ReportScreen extends Screen {
                 ? Component.translatable("gui.lanplus.report.sent")
                 : Component.translatable("gui.lanplus.report.title", targetName);
         g.drawCenteredString(this.font, heading, this.width / 2,
-                this.height / 2 - (sent ? 20 : 100), LanPlusUi.TEXT);
+                this.height / 2 - (sent ? 20 : 100), LanPlusUI.TEXT);
         super.render(g, mouseX, mouseY, partialTick);
     }
 

@@ -21,14 +21,14 @@ LAN+ is a Minecraft mod for playing with friends without the usual hassle. Add f
 
 ## FAQ
 
-**Does it work on loaders other than Forge?**
-Not yet. Right now it's Forge 1.20.1. Other loaders are planned.
+**Does it work on other loaders?** 
+Right now it's Forge and Fabric 1.20.1. Other loaders are planned.
 
 **Do my friends need LAN+ to join?**
 Nope. Anyone can connect with the address, like a normal server.
 
 **How does XP work?**
-You earn it three ways: unlocking advancements, time spent playing modpacks, and time spent playing with friends. It fills up profile tiers and doesn't touch gameplay at all. There's nothing to spend it on yet, but cosmetics are on the way (see below).
+You earn it three ways: unlocking advancements, time spent playing modpacks, and time spent playing with friends. It fills up profile tiers and doesn't touch gameplay at all. There's nothing to spend it on yet, but accessories are on the way (see below).
 
 **Do I need a premium (paid) Minecraft account?**
 The social features work with offline accounts too. Joining someone's "Open to LAN" world usually needs a premium account, unless the host turns on offline support.
@@ -47,7 +47,7 @@ Your profile only holds what you choose to share. LAN+ signs in through your exi
 Still actively working on it. On the list:
 
 - **Unlockable cosmetics and emotes:** spend your XP on in-world cosmetics (head, hand, and back slots) and emotes.
-- **More mod loaders:** beyond Forge 1.20.1.
+- **More minecraft versions**
 - **Public world directory:** browse open ("everyone") worlds and hop in without an invite.
 - **Discord badges:** show your linked Discord on your profile (intended for the LAN+ server).
 - **Website:** a place to share your profile, join worlds, and see what cosmetics are available.

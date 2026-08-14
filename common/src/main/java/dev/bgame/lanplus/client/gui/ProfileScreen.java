@@ -58,24 +58,46 @@ import java.util.UUID;
 
 public final class ProfileScreen extends Screen {
 
-    private static final int SURFACE = LanPlusUi.SURFACE;
-    private static final int SURFACE_RAISED = LanPlusUi.SURFACE_RAISED;
-    private static final int SLOT = LanPlusUi.SLOT;
-    private static final int PANEL_BG = SURFACE;
-    private static final int SIDEBAR_BG = SURFACE_RAISED;
-    private static final int ACCENT = LanPlusUi.ACCENT;
-    private static final int ACCENT_HOVER = LanPlusUi.ACCENT_HOVER;
-    private static final int ACCENT_TINT = LanPlusUi.ACCENT_TINT;
-    private static final int ONLINE = LanPlusUi.ONLINE;
-    private static final int AMBER = LanPlusUi.AMBER;
-    private static final int BORDER = LanPlusUi.BORDER;
-    private static final int DIVIDER = LanPlusUi.DIVIDER;
-    private static final int ACCENT_LINE = LanPlusUi.ACCENT_LINE;
-    private static final int LINK = LanPlusUi.LINK;
-    private static final int HEADER_COLOR = LanPlusUi.TEXT;
-    private static final int TEXT = LanPlusUi.TEXT;
-    private static final int MUTED = LanPlusUi.MUTED;
-    private static final int FAINT = LanPlusUi.FAINT;
+    private static int SURFACE = LanPlusUI.SURFACE;
+    private static int SURFACE_RAISED = LanPlusUI.SURFACE_RAISED;
+    private static int SLOT = LanPlusUI.SLOT;
+    private static int PANEL_BG = LanPlusUI.SURFACE;
+    private static int SIDEBAR_BG = LanPlusUI.SURFACE_RAISED;
+    private static int ACCENT = LanPlusUI.ACCENT;
+    private static int ACCENT_HOVER = LanPlusUI.ACCENT_HOVER;
+    private static int ACCENT_TINT = LanPlusUI.ACCENT_TINT;
+    private static int ONLINE = LanPlusUI.ONLINE;
+    private static int AMBER = LanPlusUI.AMBER;
+    private static int BORDER = LanPlusUI.BORDER;
+    private static int DIVIDER = LanPlusUI.DIVIDER;
+    private static int ACCENT_LINE = LanPlusUI.ACCENT_LINE;
+    private static int LINK = LanPlusUI.LINK;
+    private static int HEADER_COLOR = LanPlusUI.TEXT;
+    private static int TEXT = LanPlusUI.TEXT;
+    private static int MUTED = LanPlusUI.MUTED;
+    private static int FAINT = LanPlusUI.FAINT;
+
+    private static void refreshTheme() {
+        SURFACE = LanPlusUI.SURFACE;
+        SURFACE_RAISED = LanPlusUI.SURFACE_RAISED;
+        SLOT = LanPlusUI.SLOT;
+        PANEL_BG = LanPlusUI.SURFACE;
+        SIDEBAR_BG = LanPlusUI.SURFACE_RAISED;
+        ACCENT = LanPlusUI.ACCENT;
+        ACCENT_HOVER = LanPlusUI.ACCENT_HOVER;
+        ACCENT_TINT = LanPlusUI.ACCENT_TINT;
+        ONLINE = LanPlusUI.ONLINE;
+        AMBER = LanPlusUI.AMBER;
+        BORDER = LanPlusUI.BORDER;
+        DIVIDER = LanPlusUI.DIVIDER;
+        ACCENT_LINE = LanPlusUI.ACCENT_LINE;
+        LINK = LanPlusUI.LINK;
+        HEADER_COLOR = LanPlusUI.TEXT;
+        TEXT = LanPlusUI.TEXT;
+        MUTED = LanPlusUI.MUTED;
+        FAINT = LanPlusUI.FAINT;
+    }
+
     private static final int SECTION_GAP = 12;
     private static final int MARGIN = 10;
     private static final int MAX_LAYOUT_W = 620;
@@ -135,6 +157,7 @@ public final class ProfileScreen extends Screen {
     private boolean skinSlimToggle;
     private int pronounIndex;
     private boolean invisibleToggle;
+
     private static final class LinkRow {
         int platform;
         String value = "";
@@ -189,9 +212,11 @@ public final class ProfileScreen extends Screen {
     private int layoutWidth() {
         return Math.min(this.width - 2 * MARGIN, MAX_LAYOUT_W);
     }
+
     private int layoutLeft() {
         return (this.width - layoutWidth()) / 2;
     }
+
     private int linkRowCount() {
         return Math.max(1, linkRows.size());
     }
@@ -215,9 +240,11 @@ public final class ProfileScreen extends Screen {
     private int formContentHeight() {
         return 8 + Math.max(leftColHeight(), rightColHeight()) + 8;
     }
+
     private int computeEditTop() {
         return Math.max(CONTENT_TOP, (this.height - (formContentHeight() + 32)) / 2 + 8);
     }
+
     private int editFormBottom() {
         return editTop + formContentHeight();
     }
@@ -874,6 +901,7 @@ public final class ProfileScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        refreshTheme();
         renderBackdrop(g);
         g.drawCenteredString(this.font, this.title, this.width / 2, 12, TEXT);
 
@@ -939,7 +967,7 @@ public final class ProfileScreen extends Screen {
         int ctop = editTop - 8;
         int cbot = editFormBottom() + 6;
         g.fill(cl, ctop, cr, cbot, PANEL_BG);
-        LanPlusUi.bevelRaised(g, cl, ctop, cr, cbot);
+        LanPlusUI.bevelRaised(g, cl, ctop, cr, cbot);
         int dx = (colLX + colW + colRX) / 2;
         g.fill(dx, ctop + 8, dx + 1, cbot - 8, DIVIDER);
 
@@ -990,7 +1018,7 @@ public final class ProfileScreen extends Screen {
         sbTop = top;
         sbBottom = bottom;
         g.fill(left, top, left + SIDEBAR_W, bottom, SIDEBAR_BG);
-        LanPlusUi.bevelRaised(g, left, top, left + SIDEBAR_W, bottom);
+        LanPlusUI.bevelRaised(g, left, top, left + SIDEBAR_W, bottom);
 
         g.enableScissor(left + 1, top + 1, left + SIDEBAR_W - 1, bottom - 1);
         int l = left + 8;
@@ -1007,7 +1035,7 @@ public final class ProfileScreen extends Screen {
             if (profile.pronouns() != null) {
                 int pw = this.font.width(profile.pronouns()) + 6;
                 g.fill(hx, base + 14, hx + pw, base + 25, ACCENT_TINT);
-                g.drawString(this.font, profile.pronouns(), hx + 3, base + 16, 0xFFB9C2FF);
+                g.drawString(this.font, profile.pronouns(), hx + 3, base + 16, LINK);
             }
             drawTierChip(g, r, base + 2);
             y = renderSidebarProgression(g, l, r, base + 38);
@@ -1080,7 +1108,7 @@ public final class ProfileScreen extends Screen {
             int barH = Math.max(20, viewport * viewport / contentH);
             int barY = top + (viewport - barH) * sbScrollY / sbMaxScroll;
             g.fill(left + SIDEBAR_W - 3, top, left + SIDEBAR_W, bottom, 0x40000000);
-            g.fill(left + SIDEBAR_W - 3, barY, left + SIDEBAR_W, barY + barH, 0xFF3A3F4E);
+            g.fill(left + SIDEBAR_W - 3, barY, left + SIDEBAR_W, barY + barH, LanPlusUI.EDGE_LIGHT);
         }
     }
 
@@ -1106,7 +1134,7 @@ public final class ProfileScreen extends Screen {
             ProfileImages.blitCover(g, tex, left, top, right - left, bottom - top);
         }
         g.fillGradient(left, bottom - 26, right, bottom, 0x00000000, 0xA0000000);
-        LanPlusUi.bevelInset(g, left, top, right, bottom);
+        LanPlusUI.bevelInset(g, left, top, right, bottom);
     }
 
     private void renderBannerIdentity(GuiGraphics g) {
@@ -1120,7 +1148,7 @@ public final class ProfileScreen extends Screen {
         int ax = left + 10;
         int ay = bottom - av + 10;
         g.fill(ax - 2, ay - 2, ax + av + 2, ay + av + 2, SLOT);
-        LanPlusUi.bevelInset(g, ax - 2, ay - 2, ax + av + 2, ay + av + 2);
+        LanPlusUI.bevelInset(g, ax - 2, ay - 2, ax + av + 2, ay + av + 2);
         drawAvatar(g, uuid, ax, ay, av);
         int hx = ax + av + 8;
         String name = profile.username() == null ? "?" : profile.username();
@@ -1132,8 +1160,8 @@ public final class ProfileScreen extends Screen {
         if (profile.pronouns() != null) {
             int px = hx + this.font.width(name) + 6;
             int pw = this.font.width(profile.pronouns()) + 6;
-            g.fill(px, bottom - 14, px + pw, bottom - 3, 0x507B8CFF);
-            g.drawString(this.font, profile.pronouns(), px + 3, bottom - 12, 0xFFB9C2FF);
+            g.fill(px, bottom - 14, px + pw, bottom - 3, ACCENT_TINT);
+            g.drawString(this.font, profile.pronouns(), px + 3, bottom - 12, LINK);
         }
         drawTierChip(g, right - 8, bottom - 17);
     }
@@ -1244,7 +1272,7 @@ public final class ProfileScreen extends Screen {
 
     private void drawModpackIcon(GuiGraphics g, int x, int y, int size, ModpackRef ref) {
         g.fill(x, y, x + size, y + size, SLOT);
-        LanPlusUi.bevelInset(g, x, y, x + size, y + size);
+        LanPlusUI.bevelInset(g, x, y, x + size, y + size);
         int strip = Math.max(2, size / 9);
         g.fill(x, y, x + size, y + strip, ACCENT);
         String name = ref.name() == null ? "" : ref.name().trim();
@@ -1312,7 +1340,7 @@ public final class ProfileScreen extends Screen {
                 int lw = this.font.width(lv) + 8;
                 int bx = r - lw;
                 g.fill(bx, y + 2, bx + lw, y + 13, ACCENT_TINT);
-                g.drawString(this.font, lv, bx + 4, y + 4, 0xFFB9C2FF);
+                g.drawString(this.font, lv, bx + 4, y + 4, LINK);
                 nameRight = bx - 4;
             }
             g.drawString(this.font, ellipsize(f.username(), nameRight - tx), tx, y + 2, 0xFFD3D6DC);
@@ -1339,7 +1367,7 @@ public final class ProfileScreen extends Screen {
         panelBottom = this.height - 34;
         int textW = panelRight - panelX - 12;
         g.fill(panelX, panelTop, panelRight, panelBottom, PANEL_BG);
-        LanPlusUi.bevelRaised(g, panelX, panelTop, panelRight, panelBottom);
+        LanPlusUI.bevelRaised(g, panelX, panelTop, panelRight, panelBottom);
 
         g.enableScissor(panelX, panelTop, panelRight, panelBottom);
         int x = panelX + 8;
@@ -1383,7 +1411,7 @@ public final class ProfileScreen extends Screen {
             int barH = Math.max(20, viewport * viewport / contentHeight);
             int barY = panelTop + (viewport - barH) * scrollY / maxScroll;
             g.fill(panelRight - 3, panelTop, panelRight, panelBottom, 0x40000000);
-            g.fill(panelRight - 3, barY, panelRight, barY + barH, 0xFF3A3F4E);
+            g.fill(panelRight - 3, barY, panelRight, barY + barH, LanPlusUI.EDGE_LIGHT);
         }
     }
 
@@ -1406,7 +1434,7 @@ public final class ProfileScreen extends Screen {
         cmBoxH = renderH;
 
         g.fill(x, y, x + renderW, y + renderH, SLOT);
-        LanPlusUi.bevelInset(g, x, y, x + renderW, y + renderH);
+        LanPlusUI.bevelInset(g, x, y, x + renderW, y + renderH);
         g.fill(x, y, x + renderW, y + 2, ACCENT);
         g.flush();
         g.enableScissor(x + 1, y + 2, x + renderW - 1, y + renderH - 1);
@@ -1818,9 +1846,9 @@ public final class ProfileScreen extends Screen {
 
     private static int friendDotColor(Connectivity connectivity) {
         return switch (connectivity) {
-            case ONLINE -> LanPlusUi.ONLINE;
-            case STALE -> LanPlusUi.AMBER;
-            case OFFLINE -> LanPlusUi.FAINT;
+            case ONLINE -> LanPlusUI.ONLINE;
+            case STALE -> LanPlusUI.AMBER;
+            case OFFLINE -> LanPlusUI.FAINT;
             case UNKNOWN -> 0xFF4A4E57;
         };
     }

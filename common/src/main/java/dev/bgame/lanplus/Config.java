@@ -17,7 +17,6 @@ public final class Config {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String FILE_NAME = "lanplus.json";
-
     public static boolean enabled = true;
     public static String backendUrl = "https://backend.lanplus.dev";
     public static int heartbeatSeconds = 15;
@@ -29,6 +28,7 @@ public final class Config {
     public static boolean skinCustomActive = true;
     public static boolean discordEnabled = true;
     public static String discordAppId = "1516914761626030170";
+    public static String theme = "amethyst";
 
     private Config() {
     }
@@ -49,6 +49,7 @@ public final class Config {
                 skinCustomActive = getBool(json, "skinCustomActive", skinCustomActive);
                 discordEnabled = getBool(json, "discordEnabled", discordEnabled);
                 discordAppId = getString(json, "discordAppId", discordAppId);
+                theme = getString(json, "theme", theme);
             } catch (Exception e) {
             }
         }
@@ -69,6 +70,7 @@ public final class Config {
         json.addProperty("skinCustomActive", skinCustomActive);
         json.addProperty("discordEnabled", discordEnabled);
         json.addProperty("discordAppId", discordAppId);
+        json.addProperty("theme", theme);
 
         try {
             Files.createDirectories(file.getParent());
@@ -88,6 +90,11 @@ public final class Config {
 
     public static void setSkinCustomActive(boolean active) {
         skinCustomActive = active;
+        save();
+    }
+
+    public static void setTheme(String id) {
+        theme = id;
         save();
     }
 

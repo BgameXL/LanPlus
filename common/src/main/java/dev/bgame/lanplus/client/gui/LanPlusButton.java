@@ -31,17 +31,17 @@ public final class LanPlusButton extends Button {
         int bg;
         int color;
         if (!isActive()) {
-            bg = LanPlusUi.SURFACE_DISABLED;
-            color = LanPlusUi.FAINT;
+            bg = LanPlusUI.SURFACE_DISABLED;
+            color = LanPlusUI.FAINT;
         } else if (primary) {
-            bg = isHovered() ? LanPlusUi.ACCENT_HOVER : LanPlusUi.ACCENT_STRONG;
-            color = LanPlusUi.TEXT;
+            bg = isHovered() ? LanPlusUI.ACCENT_HOVER : LanPlusUI.ACCENT_STRONG;
+            color = LanPlusUI.TEXT;
         } else {
-            bg = isHovered() ? LanPlusUi.SURFACE_HOVER : LanPlusUi.SURFACE_RAISED;
-            color = isHovered() ? LanPlusUi.TEXT : LanPlusUi.MUTED;
+            bg = isHovered() ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
+            color = isHovered() ? LanPlusUI.TEXT : LanPlusUI.MUTED;
         }
         g.fill(x, y, x + w, y + h, bg);
-        LanPlusUi.bevelRaised(g, x, y, x + w, y + h);
+        LanPlusUI.bevelRaised(g, x, y, x + w, y + h);
         int tx = x + (w - Minecraft.getInstance().font.width(getMessage())) / 2;
         g.drawString(Minecraft.getInstance().font, getMessage(), tx, y + (h - 8) / 2, color, false);
     }
