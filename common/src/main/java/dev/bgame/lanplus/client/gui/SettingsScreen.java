@@ -58,10 +58,10 @@ public final class SettingsScreen extends Screen {
     protected void init() {
         layout();
         addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.settings.back"), b -> onClose())
-                .bounds(px + 8, py + 6, 54, 18).build());
+                .bounds(px + 8, py + 7, 54, 18).build());
 
         if (selected == Cat.ADVANCED) {
-            backendBox = new EditBox(this.font, contentX + 8, contentTop + 24, contentW - 16, 20,
+            backendBox = new EditBox(this.font, contentX, contentTop + 32, contentW, 20,
                     Component.translatable("gui.lanplus.settings.backend"));
             backendBox.setMaxLength(200);
             backendBox.setValue(Config.backendUrl);
@@ -107,8 +107,12 @@ public final class SettingsScreen extends Screen {
         layout();
         rows.clear();
 
-        LanPlusUI.panel(g, px, py, px + pw, py + ph);
-        g.drawString(this.font, this.title, px + 70, py + 11, LanPlusUI.TEXT);
+        g.fill(px, py, px + pw, py + ph, LanPlusUI.SURFACE);
+        LanPlusUI.bevelRaised(g, px, py, px + pw, py + ph);
+        g.fill(px, py, px + pw, py + 2, LanPlusUI.LIME);
+
+        int wx = LanPlusUI.wordmark(g, this.font, px + 70, py + 12);
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings.word"), wx + 6, py + 12, LanPlusUI.MUTED, false);
         g.fill(px + 6, headerBottom, px + pw - 6, headerBottom + 1, LanPlusUI.DIVIDER);
         g.fill(sidebarX + SIDEBAR_W, headerBottom + 6, sidebarX + SIDEBAR_W + 1, py + ph - 8, LanPlusUI.DIVIDER);
 
@@ -130,13 +134,10 @@ public final class SettingsScreen extends Screen {
             boolean sel = c == selected;
             boolean hover = mouseX >= sidebarX && mouseX < sidebarX + SIDEBAR_W && mouseY >= y && mouseY < y + h;
             if (sel) {
-                g.fill(sidebarX, y, sidebarX + SIDEBAR_W, y + h, LanPlusUI.ACCENT_TINT);
-                g.fill(sidebarX, y, sidebarX + 2, y + h, LanPlusUI.ACCENT);
-            } else if (hover) {
-                g.fill(sidebarX, y, sidebarX + SIDEBAR_W, y + h, LanPlusUI.SURFACE_HOVER);
+                g.drawString(this.font, "+", sidebarX + 4, y + 5, LanPlusUI.LIME, false);
             }
             g.drawString(this.font, Component.translatable("gui.lanplus.settings." + c.key),
-                    sidebarX + 8, y + 5, sel ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
+                    sidebarX + 14, y + 5, sel || hover ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
             Cat pick = c;
             rows.add(new Row(sidebarX, y, SIDEBAR_W, h, () -> selectCat(pick)));
             y += h + 2;
@@ -144,54 +145,51 @@ public final class SettingsScreen extends Screen {
     }
 
     private void renderGeneral(GuiGraphics g) {
-        int y = contentTop;
-        y = toggleCard(g, y, "enabled", Config.enabled, () -> flip(() -> Config.enabled = !Config.enabled));
-        y = toggleCard(g, y, "discord", Config.discordEnabled, () -> flip(() -> Config.discordEnabled = !Config.discordEnabled));
-        toggleCard(g, y, "relay", Config.relayEnabled, () -> flip(() -> Config.relayEnabled = !Config.relayEnabled));
+        int y = contentTop + 2;
+        y = toggleRow(g, y, "enabled", Config.enabled, () -> flip(() -> Config.enabled = !Config.enabled));
+        y = toggleRow(g, y, "discord", Config.discordEnabled, () -> flip(() -> Config.discordEnabled = !Config.discordEnabled));
+        toggleRow(g, y, "relay", Config.relayEnabled, () -> flip(() -> Config.relayEnabled = !Config.relayEnabled));
     }
 
-    private int toggleCard(GuiGraphics g, int y, String key, boolean on, Runnable act) {
+    private int toggleRow(GuiGraphics g, int y, String key, boolean on, Runnable act) {
         int x = contentX;
         int w = contentW;
-        g.fill(x, y, x + w, y + CARD_H, LanPlusUI.SURFACE_RAISED);
-        LanPlusUI.bevelRaised(g, x, y, x + w, y + CARD_H);
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings." + key), x + 8, y + 8, LanPlusUI.TEXT, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings." + key + ".desc"), x + 8, y + 20, LanPlusUI.MUTED, false);
-        toggle(g, x + w - 8 - 26, y + (CARD_H - 12) / 2, on);
-        rows.add(new Row(x, y, w, CARD_H, act));
-        return y + CARD_H + ROW_GAP;
-    }
+        int rh = 40;
 
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings." + key), x, y + 5, LanPlusUI.TEXT, false);
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings." + key + ".desc"), x, y + 16, LanPlusUI.MUTED, false);
+        toggle(g, x + w - 28, y + 8, on);
+        g.fill(x, y + rh, x + w, y + rh + 1, LanPlusUI.DIVIDER);
+        rows.add(new Row(x, y, w, rh, act));
+        return y + rh + 8;
+    }
+    
     private void toggle(GuiGraphics g, int x, int y, boolean on) {
-        int w = 26;
-        int h = 12;
-        g.fill(x, y, x + w, y + h, on ? LanPlusUI.ACCENT : LanPlusUI.SLOT);
+        int w = 28;
+        int h = 14;
+        g.fill(x, y, x + w, y + h, on ? LanPlusUI.LIME : LanPlusUI.SLOT);
         LanPlusUI.bevelInset(g, x, y, x + w, y + h);
         int kx = on ? x + w - 2 - 10 : x + 2;
-        g.fill(kx, y + 1, kx + 10, y + h - 1, on ? LanPlusUI.TEXT : LanPlusUI.MUTED);
+        g.fill(kx, y + 2, kx + 10, y + h - 2, on ? LanPlusUI.SURFACE : LanPlusUI.MUTED);
     }
 
     private void renderAppearance(GuiGraphics g) {
         int x = contentX;
-        int w = contentW;
-        int y = contentTop;
-        int h = 56;
-        g.fill(x, y, x + w, y + h, LanPlusUI.SURFACE_RAISED);
-        LanPlusUI.bevelRaised(g, x, y, x + w, y + h);
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings.theme"), x + 8, y + 8, LanPlusUI.TEXT, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings.theme.desc"), x + 8, y + 20, LanPlusUI.MUTED, false);
+        int y = contentTop + 2;
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings.theme"), x, y + 6, LanPlusUI.TEXT, false);
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings.theme.desc"), x, y + 18, LanPlusUI.MUTED, false);
 
-        int sx = x + 8;
+        int sx = x;
         int sy = y + 32;
         for (Theme t : Themes.ALL) {
             boolean cur = LanPlusUI.current().id().equals(t.id());
             g.fill(sx, sy, sx + SWATCH, sy + SWATCH, t.surface() | 0xFF000000);
             g.fill(sx + 4, sy + 4, sx + SWATCH - 4, sy + SWATCH - 4, t.accent());
             if (cur) {
-                g.fill(sx - 2, sy - 2, sx + SWATCH + 2, sy, LanPlusUI.ACCENT);
-                g.fill(sx - 2, sy + SWATCH, sx + SWATCH + 2, sy + SWATCH + 2, LanPlusUI.ACCENT);
-                g.fill(sx - 2, sy - 2, sx, sy + SWATCH + 2, LanPlusUI.ACCENT);
-                g.fill(sx + SWATCH, sy - 2, sx + SWATCH + 2, sy + SWATCH + 2, LanPlusUI.ACCENT);
+                g.fill(sx - 2, sy - 2, sx + SWATCH + 2, sy, LanPlusUI.LIME);
+                g.fill(sx - 2, sy + SWATCH, sx + SWATCH + 2, sy + SWATCH + 2, LanPlusUI.LIME);
+                g.fill(sx - 2, sy - 2, sx, sy + SWATCH + 2, LanPlusUI.LIME);
+                g.fill(sx + SWATCH, sy - 2, sx + SWATCH + 2, sy + SWATCH + 2, LanPlusUI.LIME);
             } else {
                 LanPlusUI.bevelInset(g, sx, sy, sx + SWATCH, sy + SWATCH);
             }
@@ -204,13 +202,9 @@ public final class SettingsScreen extends Screen {
 
     private void renderAdvanced(GuiGraphics g) {
         int x = contentX;
-        int w = contentW;
-        int y = contentTop;
-        int h = 54;
-        g.fill(x, y, x + w, y + h, LanPlusUI.SURFACE_RAISED);
-        LanPlusUI.bevelRaised(g, x, y, x + w, y + h);
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings.backend"), x + 8, y + 6, LanPlusUI.TEXT, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings.backend.desc"), x + 8, y + 40, LanPlusUI.FAINT, false);
+        int y = contentTop + 2;
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings.backend"), x, y + 6, LanPlusUI.TEXT, false);
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings.backend.desc"), x, y + 18, LanPlusUI.MUTED, false);
     }
 
     @Override

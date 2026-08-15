@@ -10,8 +10,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Renders a LAN+ resolved skin (texture and slim/classic model) for players we have one for. Lets
- * offline / non-premium players show a skin in-world; falls through to vanilla when we have none.
+ * Renders a LAN+ resolved skin for players we have one for.
  */
 @Mixin(AbstractClientPlayer.class)
 public abstract class AbstractClientPlayerMixin {

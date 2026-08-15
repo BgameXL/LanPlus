@@ -68,6 +68,23 @@ public final class FriendsScreen extends Screen {
     private boolean showAddress;
     private boolean showCode;
 
+    private final FriendsService.FriendsListener changeListener = new FriendsService.FriendsListener() {
+        @Override
+        public void onFriendsChanged(List<Friend> friends) {
+            onIncomingChange();
+        }
+
+        @Override
+        public void onFriendStartedHosting(UUID uuid, String joinCode) {
+            onIncomingChange();
+        }
+
+        @Override
+        public void onFriendRequest(UUID fromUuid, String fromUsername) {
+            onIncomingChange();
+        }
+    };
+
     private UUID contextUuid;
     private int contextX;
     private int contextY;
@@ -79,6 +96,33 @@ public final class FriendsScreen extends Screen {
     public FriendsScreen(Screen parent) {
         super(Component.translatable("gui.lanplus.title"));
         this.parent = parent;
+        FriendsService fs = LanPlusClient.friends();
+        if (fs != null) {
+            fs.addListener(changeListener);
+        }
+    }
+
+    private void onIncomingChange() {
+        if (this.minecraft == null) {
+            return;
+        }
+        this.minecraft.execute(() -> {
+            if (this.minecraft.screen != this) {
+                return;
+            }
+            setStatus(Component.translatable("gui.lanplus.status.refreshing"));
+            if (tab != Tab.ADD && tab != Tab.JOIN) {
+                rebuildWidgets();
+            }
+        });
+    }
+
+    @Override
+    public void removed() {
+        FriendsService fs = LanPlusClient.friends();
+        if (fs != null) {
+            fs.removeListener(changeListener);
+        }
     }
 
     public FriendsScreen(Screen parent, UUID focus) {
@@ -105,16 +149,9 @@ public final class FriendsScreen extends Screen {
     protected void init() {
         layout();
 
-        // "My Profile" sits in the top bar (right-aligned, beside the tabs) so it reads as a primary action
-        addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.mine"), b -> doMyProfile())
-                .bounds(contentRight - 96, headerTop + 13, 96, 18).build());
-
         int btnY = paneBottom + 8;
-        addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.refresh"), b -> doRefresh())
-                .bounds(contentRight - 180, btnY, 88, 20).build());
         addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_DONE, b -> onClose())
-                .bounds(contentRight - 88, btnY, 88, 20).build());
-
+                .bounds(leftX + 8, btnY, 88, 20).build());
         if (tab == Tab.ADD) {
             addBox = new EditBox(this.font, rightX + 6, paneTop + 22, rightW - 84, 20,
                     Component.translatable("gui.lanplus.add.hint"));
@@ -158,7 +195,10 @@ public final class FriendsScreen extends Screen {
 
         if (!primed) {
             primed = true;
-            doRefresh();
+            FriendsService fs = LanPlusClient.friends();
+            if (fs != null) {
+                fs.refresh();
+            }
         }
     }
 
@@ -168,12 +208,13 @@ public final class FriendsScreen extends Screen {
         LanPlusUI.backdrop(g, this.width, this.height);
         layout();
 
-        g.drawString(this.font, this.title, leftX, headerTop, LanPlusUI.TEXT);
+        int wx = LanPlusUI.wordmark(g, this.font, leftX, headerTop);
+        g.drawString(this.font, Component.translatable("gui.lanplus.friends.word"), wx + 6, headerTop, LanPlusUI.MUTED, false);
         boolean online = isOnline();
         Component conn = online ? Component.translatable("gui.lanplus.status.connected")
                 : Component.translatable("gui.lanplus.status.local");
-        g.drawString(this.font, conn, contentRight - this.font.width(conn), headerTop + 2,
-                online ? LanPlusUI.ONLINE : LanPlusUI.FAINT);
+        g.drawString(this.font, conn, contentRight - 8 - this.font.width(conn), paneTop - 10,
+                online ? LanPlusUI.LIME : LanPlusUI.FAINT);
 
         renderTabs(g, mouseX, mouseY);
         LanPlusUI.panel(g, leftX, paneTop, leftX + LEFT_W, paneBottom);
@@ -187,9 +228,13 @@ public final class FriendsScreen extends Screen {
         }
         renderDetail(g, rightX, rightW);
 
+        int footerY = paneBottom + 4;
+        g.fill(leftX, footerY, contentRight, footerY + 28, LanPlusUI.SURFACE);
+        LanPlusUI.bevelRaised(g, leftX, footerY, contentRight, footerY + 28);
+
         if (status != null) {
             if (System.currentTimeMillis() < statusUntil) {
-                g.drawString(this.font, status, leftX, paneBottom + 13, LanPlusUI.MUTED);
+                g.drawString(this.font, status, contentRight - 8 - this.font.width(status), paneBottom + 13, LanPlusUI.MUTED);
             } else {
                 status = null;
             }
@@ -220,7 +265,7 @@ public final class FriendsScreen extends Screen {
             g.drawString(this.font, label, x, tabsTop, active ? LanPlusUI.TEXT
                     : hover ? LanPlusUI.MUTED : LanPlusUI.FAINT);
             if (active) {
-                g.fill(x, tabsTop + 11, x + w, tabsTop + 12, LanPlusUI.ACCENT);
+                g.fill(x, tabsTop + 11, x + w, tabsTop + 12, LanPlusUI.LIME);
             }
             int count = badgeCount(TABS[i]);
             if (count > 0) {
@@ -242,11 +287,11 @@ public final class FriendsScreen extends Screen {
         float scale = 0.85f;
         int tw = Math.round(this.font.width(s) * scale);
         int w = tw + 4;
-        g.fill(x, y - 1, x + w, y + 8, LanPlusUI.ACCENT);
+        g.fill(x, y - 1, x + w, y + 8, LanPlusUI.LIME);
         g.pose().pushPose();
         g.pose().translate(x + (w - tw) / 2.0f, y + 0.5f, 0);
         g.pose().scale(scale, scale, 1f);
-        g.drawString(this.font, s, 0, 0, LanPlusUI.TEXT, false);
+        g.drawString(this.font, s, 0, 0, LanPlusUI.EDGE_DARK, false);
         g.pose().popPose();
     }
 
@@ -574,14 +619,6 @@ public final class FriendsScreen extends Screen {
     }
 
     // Actions
-    private void doRefresh() {
-        FriendsService friends = LanPlusClient.friends();
-        if (friends != null) {
-            friends.refresh();
-            setStatus(Component.translatable("gui.lanplus.status.refreshing"));
-        }
-    }
-
     private void doAdd() {
         FriendsService friends = LanPlusClient.friends();
         if (friends == null || addBox == null) {
@@ -700,13 +737,6 @@ public final class FriendsScreen extends Screen {
         Friend friend = selectedFriend();
         if (friend != null) {
             this.minecraft.setScreen(new ProfileScreen(this, friend.uuid()));
-        }
-    }
-
-    private void doMyProfile() {
-        UUID id = LanPlusClient.selfUuid();
-        if (id != null) {
-            this.minecraft.setScreen(new ProfileScreen(this, id));
         }
     }
 
@@ -855,7 +885,7 @@ public final class FriendsScreen extends Screen {
         return switch (connectivity) {
             case ONLINE -> LanPlusUI.ONLINE;
             case STALE -> LanPlusUI.AMBER;
-            case OFFLINE -> LanPlusUI.FAINT;
+            case OFFLINE -> LanPlusUI.MUTED;
             case UNKNOWN -> 0xFF4A4E57;
         };
     }

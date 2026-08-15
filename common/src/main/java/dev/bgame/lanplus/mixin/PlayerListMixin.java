@@ -14,10 +14,7 @@ import java.net.SocketAddress;
 /**
  * Enforces the LAN+ host access policy at login: when the host opened the world with a FRIENDS or
  * INVITED mode, a player whose uuid is not allowed is rejected before entering the world.
- *
- * {@link HostAccessControl#isAllowed} returns true whenever no policy is armed (EVERYONE, vanilla
- * LAN, or a dedicated server), so this is a no-op outside LAN+ hosting - the decision lives in the
- * policy holder, not here.
+ * {@link HostAccessControl#isAllowed} returns true whenever no policy is armed.
  */
 @Mixin(PlayerList.class)
 public abstract class PlayerListMixin {

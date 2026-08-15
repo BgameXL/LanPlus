@@ -115,7 +115,7 @@ public class LanplusForge {
 
         @Override
         public boolean isClient() {
-            return true; // Forge client entry point is only constructed on the client side.
+            return true;
         }
     }
 }

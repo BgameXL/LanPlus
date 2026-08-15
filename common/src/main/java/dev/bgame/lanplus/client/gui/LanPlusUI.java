@@ -10,6 +10,8 @@ import net.minecraft.network.chat.Component;
  */
 final class LanPlusUI {
 
+    static final int LAVENDER = 0xFFA070F0;
+    static final int LIME = 0xFFBEE85A;
     static int SURFACE;
     static int SURFACE_RAISED;
     static int SURFACE_HOVER;
@@ -103,6 +105,13 @@ final class LanPlusUI {
     static void header(GuiGraphics g, Font font, Component label, int x, int y, int width) {
         g.drawString(font, label, x, y, TEXT, false);
         g.fill(x, y + 11, x + width, y + 12, ACCENT_LINE);
+    }
+
+    static int wordmark(GuiGraphics g, Font font, int x, int y) {
+        g.drawString(font, "LAN", x, y, LAVENDER, false);
+        x += font.width("LAN");
+        g.drawString(font, "+", x, y, LIME, false);
+        return x + font.width("+");
     }
 
     static void chip(GuiGraphics g, Font font, Component label, int x, int y, int w, int h,

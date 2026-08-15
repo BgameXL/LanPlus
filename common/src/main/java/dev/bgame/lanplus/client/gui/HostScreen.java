@@ -77,7 +77,7 @@ public final class HostScreen extends Screen {
 
     private void layout() {
         cardW = Math.min(this.width - 40, CARD_W);
-        int y = cardY + PAD + 24;
+        int y = PAD + 24;
 
         if (!inWorld) {
             int listRows = Math.max(3, Math.min(visibleRowsWanted(), (this.height - 190) / ROW_H));
@@ -103,9 +103,19 @@ public final class HostScreen extends Screen {
         y += DROPDOWN_H;
         y += 10;
         buttonsY = y;
-        cardH = buttonsY + 20 + PAD - cardY;
+        cardH = buttonsY + 20 + PAD;
         cardY = Math.max(16, (this.height - cardH) / 2);
         cardX = (this.width - cardW) / 2;
+
+        listTop += cardY;
+        listBottom += cardY;
+        gameRowY += cardY;
+        cmdRowY += cardY;
+        diffRowY += cardY;
+        accessLabelY += cardY;
+        accessRowY += cardY;
+        premiumRowY += cardY;
+        buttonsY += cardY;
 
         int labelW = Math.max(
                 Math.max(this.font.width(Component.translatable("gui.lanplus.host.gamemode")),
