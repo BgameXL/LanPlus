@@ -1,5 +1,6 @@
 package dev.bgame.lanplus.network;
 
+import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.Invite;
@@ -29,6 +30,7 @@ public interface LanPlusNetwork {
     CompletableFuture<Boolean> blockFriend(UUID uuid, UUID targetUuid);
     CompletableFuture<Boolean> unblockFriend(UUID uuid, UUID targetUuid);
     CompletableFuture<List<ResolvedUser>> getFriendRequests(UUID uuid);
+    CompletableFuture<List<ActivityEntry>> getActivity();
     CompletableFuture<ResolvedUser> resolveUser(String query);
     CompletableFuture<UserProfile> fetchProfile(UUID uuid);
     CompletableFuture<Profile> getProfile(UUID uuid, UUID viewer);

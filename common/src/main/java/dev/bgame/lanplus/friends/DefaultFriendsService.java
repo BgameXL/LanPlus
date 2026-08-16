@@ -1,6 +1,7 @@
 package dev.bgame.lanplus.friends;
 
 import com.mojang.logging.LogUtils;
+import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.PresenceUpdate;
@@ -29,6 +30,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     private final List<FriendsListener> listeners = new CopyOnWriteArrayList<>();
     private volatile UserProfile localProfile;
     private volatile List<ResolvedUser> requestCache = List.of();
+    private volatile List<ActivityEntry> activityCache = List.of();
 
     public DefaultFriendsService(LanPlusNetwork network, Supplier<PlayerIdentity> identity) {
         this.network = network;
@@ -43,6 +45,23 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     @Override
     public List<ResolvedUser> requests() {
         return requestCache;
+    }
+
+    @Override
+    public List<ActivityEntry> activity() {
+        return activityCache;
+    }
+
+    @Override
+    public CompletableFuture<List<ActivityEntry>> refreshActivity() {
+        if (localUuid() == null) {
+            return CompletableFuture.completedFuture(activityCache);
+        }
+        return network.getActivity().thenApply(list -> {
+            activityCache = list;
+            notifyChanged();
+            return list;
+        });
     }
 
     @Override
@@ -162,6 +181,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
         refresh();
         fetchProfile();
         refreshRequests();
+        refreshActivity();
         network.connectEvents(uuid, this);
         LOGGER.info("LAN+ friends realtime channel requested");
     }
@@ -210,6 +230,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
         refresh();
         fetchProfile();
         refreshRequests();
+        refreshActivity();
     }
 
     @Override
@@ -233,6 +254,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     @Override
     public void onFriendRequest(UUID fromUuid, String fromUsername) {
         refreshRequests();
+        refreshActivity();
         for (FriendsListener listener : listeners) {
             try {
                 listener.onFriendRequest(fromUuid, fromUsername);
@@ -250,6 +272,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
 
     @Override
     public void onFriendStartedHosting(UUID uuid, String joinCode) {
+        refreshActivity();
         for (FriendsListener listener : listeners) {
             try {
                 listener.onFriendStartedHosting(uuid, joinCode);

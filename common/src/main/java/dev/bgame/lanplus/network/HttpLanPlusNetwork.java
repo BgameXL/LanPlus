@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
+import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.Friend;
@@ -227,6 +228,35 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                     for (Wire.ResolvedUserDto d : arr) {
                         if (d != null && d.uuid() != null) {
                             out.add(d.toApi());
+                        }
+                    }
+                    return out;
+                })
+                .exceptionally(err -> {
+                    onError(err);
+                    return List.of();
+                });
+    }
+
+    @Override
+    public CompletableFuture<List<ActivityEntry>> getActivity() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get("/activity")
+                .thenApply(resp -> {
+                    Wire.ActivityFeedDto feed = Wire.ActivityFeedDto.fromJson(resp.body());
+                    if (feed == null || feed.activity() == null) {
+                        return List.<ActivityEntry>of();
+                    }
+                    List<ActivityEntry> out = new ArrayList<>(feed.activity().size());
+                    for (Wire.ActivityDto d : feed.activity()) {
+                        if (d == null) {
+                            continue;
+                        }
+                        ActivityEntry entry = d.toApi();
+                        if (entry != null) {
+                            out.add(entry);
                         }
                     }
                     return out;

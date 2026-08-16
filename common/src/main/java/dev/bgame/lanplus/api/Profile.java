@@ -29,6 +29,7 @@ public record Profile(
         Map<String, Integer> xpSources,
         ProfileBackground background,
         CatalogImage banner,
+        PlayedTogether playedTogether,
         boolean cached
 ) {
     public Profile {
@@ -44,7 +45,7 @@ public record Profile(
                 : new Profile(uuid, username, friendCode, skin, pronouns, bio, links, prompts,
                 online, lastSeen, invisible, currentlyPlaying, lastPlayed, favorite, recentlyPlayed,
                 favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible,
-                tier, advancements, xp, xpSources, background, banner, cached);
+                tier, advancements, xp, xpSources, background, banner, playedTogether, cached);
     }
 
     public String link(String platform) {

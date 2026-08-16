@@ -5,6 +5,7 @@ import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.ModpackRef;
+import dev.bgame.lanplus.api.PlayedTogether;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.ProfileBackground;
 import dev.bgame.lanplus.api.SkinRef;
@@ -25,7 +26,6 @@ import com.mojang.math.Axis;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
@@ -55,6 +55,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import static dev.bgame.lanplus.client.gui.FriendsScreen.getString;
 
 public final class ProfileScreen extends Screen {
 
@@ -102,7 +104,7 @@ public final class ProfileScreen extends Screen {
     private static final int MARGIN = 10;
     private static final int MAX_LAYOUT_W = 620;
     private static final int SIDEBAR_W = 250;
-    private static final int GAP = 8;
+    private static final int GAP = 0;
     private static final int CONTENT_TOP = 32;
     private static final String[] PLATFORMS =
             {"discord", "instagram", "twitter", "youtube", "twitch", "tiktok", "paypal", "kofi"};
@@ -118,7 +120,6 @@ public final class ProfileScreen extends Screen {
     private int bgStyle = BG_DARK;
     private int bgColor = 0x101216;
     private int bgOpacity = 92;
-    private boolean bgDirty;
     private String bgImageId;
     private CatalogImage bgImage;
     private CatalogImage banner;
@@ -170,11 +171,29 @@ public final class ProfileScreen extends Screen {
 
     private final List<LinkRow> linkRows = new ArrayList<>();
     private static final int COL_GAP = 16;
+    private static final int EDIT_SECTION_GAP = 18;
+    private static final int EDIT_W = 440;
+    private static final int EDIT_TAB_Y = 30;
+    private static final int EDIT_FRAME_TOP = 46;
+    private static final String[] EDIT_TABS = {"about", "identity", "modpack", "appearance"};
     private int eL, eW, eR;
     private int colLX, colRX, colW;
-    private int aAboutHdrY, aBioY, aIdentityHdrY, aIdentityY, aLinksHdrY, aLinksRowsY, aAddLinkY,
-            aQHdrY, aQRowsY, aMpHdrY, aMpRowY, aBgHdrY, aBgRowY, aBannerHdrY, aBannerRowY,
-            aSkinHdrY, aSkinRowY;
+    private int editTab;
+    private int editBodyBottom;
+    private int aAboutHdrY, aBioY, aBioToolbarY, aBioPreviewY, aLinksHdrY, aLinksRowsY, aAddLinkY,
+            aQHdrY, aQRowsY, aIdentityHdrY, aIdentityY, aMpHdrY, aMpValuesY, aMpRowY,
+            aBgHdrY, aBgRowY, aBannerHdrY, aBannerRowY, aSkinHdrY, aSkinRowY;
+
+    private static final java.util.regex.Pattern AMP_CODE =
+            java.util.regex.Pattern.compile("&([0-9a-fk-orA-FK-OR])");
+    private static final String[][] BIO_FMT = {
+            {"&l", "§lB"}, {"&o", "§oI"}, {"&n", "§nU"}, {"&m", "§mS"}, {"&r", "§rR"}
+    };
+    private static final char[] MC_COLOR_CODES =
+            {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+    private static final int[] MC_COLOR_RGB = {
+            0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xFFAA00, 0xAAAAAA,
+            0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF};
 
     private final String[] slotPromptId = new String[MAX_SLOTS];
     private final String[] slotFreeValue = new String[MAX_SLOTS];
@@ -221,79 +240,106 @@ public final class ProfileScreen extends Screen {
         return Math.max(1, linkRows.size());
     }
 
-    private int leftColHeight() {
-        int n = linkRowCount();
-        boolean addRow = linkRows.size() < PLATFORMS.length;
-        return 16 + 18 + 10
-                + 16 + n * 24 + (addRow ? 20 : 0) + 12
-                + 16 + MAX_SLOTS * 24;
+    private boolean hasCustomSkin() {
+        return !Config.skinUrl.isBlank();
     }
 
-    private int rightColHeight() {
-        return 16 + 20 + 12
-                + 16 + 18 + 12
-                + 16 + 20 + 12
-                + 16 + 20 + 12
-                + 16 + 20 + 4 + 20 + 14;
+    private int tabContentHeight(int tab) {
+        return switch (tab) {
+            case 0 -> {
+                int n = linkRowCount();
+                boolean addRow = linkRows.size() < PLATFORMS.length;
+                yield 16 + 6 + 16 + 6 + 18 + 6 + 22 + EDIT_SECTION_GAP
+                        + 16 + n * 24 + (addRow ? 20 : 0) + EDIT_SECTION_GAP
+                        + 16 + MAX_SLOTS * 24;
+            }
+            case 1 -> 16 + 20;
+            case 2 -> 16 + 14 + 4 + 18;
+            default -> 16 + 44 + EDIT_SECTION_GAP
+                    + 16 + 20 + EDIT_SECTION_GAP
+                    + 16 + 12 + (hasCustomSkin() ? 46 : 0);
+        };
     }
 
-    private int formContentHeight() {
-        return 8 + Math.max(leftColHeight(), rightColHeight()) + 8;
+    private int maxTabContentHeight() {
+        int m = 0;
+        for (int t = 0; t < EDIT_TABS.length; t++) {
+            m = Math.max(m, tabContentHeight(t));
+        }
+        return m;
     }
 
     private int computeEditTop() {
-        return Math.max(CONTENT_TOP, (this.height - (formContentHeight() + 32)) / 2 + 8);
+        return EDIT_FRAME_TOP + 8;
     }
 
     private int editFormBottom() {
-        return editTop + formContentHeight();
+        return editBodyBottom;
     }
 
     private void layoutEditAnchors() {
-        eW = Math.min(this.width - 2 * MARGIN, MAX_LAYOUT_W);
+        eW = Math.min(this.width - 2 * MARGIN, EDIT_W);
         eL = (this.width - eW) / 2;
         eR = eL + eW;
-        colW = (eW - COL_GAP) / 2;
-        colLX = eL;
-        colRX = eL + colW + COL_GAP;
+        colW = eW - 24;
+        colLX = eL + 12;
+        colRX = colLX;
+        editTop = EDIT_FRAME_TOP + 8;
+        int bodyH = Math.min(maxTabContentHeight() + 16, this.height - EDIT_FRAME_TOP - 44);
+        editBodyBottom = EDIT_FRAME_TOP + bodyH;
+        stackTabAnchors(editTab);
+    }
+
+    private void stackTabAnchors(int tab) {
         int n = linkRowCount();
         boolean addRow = linkRows.size() < PLATFORMS.length;
-
-        int y = editTop + 8;
-        aAboutHdrY = y;
-        y += 16;
-        aBioY = y;
-        y += 18 + 10;
-        aLinksHdrY = y;
-        y += 16;
-        aLinksRowsY = y;
-        y += n * 24;
-        aAddLinkY = y;
-        y += (addRow ? 20 : 0) + 12;
-        aQHdrY = y;
-        y += 16;
-        aQRowsY = y;
-
-        int ry = editTop + 8;
-        aIdentityHdrY = ry;
-        ry += 16;
-        aIdentityY = ry;
-        ry += 20 + 12;
-        aMpHdrY = ry;
-        ry += 16;
-        aMpRowY = ry;
-        ry += 18 + 12;
-        aBgHdrY = ry;
-        ry += 16;
-        aBgRowY = ry;
-        ry += 20 + 12;
-        aBannerHdrY = ry;
-        ry += 16;
-        aBannerRowY = ry;
-        ry += 20 + 12;
-        aSkinHdrY = ry;
-        ry += 16;
-        aSkinRowY = ry;
+        int y = editTop;
+        switch (tab) {
+            case 0 -> {
+                aAboutHdrY = y;
+                y += 16 + 6;
+                aBioToolbarY = y;
+                y += 16 + 6;
+                aBioY = y;
+                y += 18 + 6;
+                aBioPreviewY = y;
+                y += 22 + EDIT_SECTION_GAP;
+                aLinksHdrY = y;
+                y += 16;
+                aLinksRowsY = y;
+                y += n * 24;
+                aAddLinkY = y;
+                y += (addRow ? 20 : 0) + EDIT_SECTION_GAP;
+                aQHdrY = y;
+                y += 16;
+                aQRowsY = y;
+            }
+            case 1 -> {
+                aIdentityHdrY = y;
+                y += 16;
+                aIdentityY = y;
+            }
+            case 2 -> {
+                aMpHdrY = y;
+                y += 16;
+                aMpValuesY = y;
+                y += 14 + 4;
+                aMpRowY = y;
+            }
+            default -> {
+                aBgHdrY = y;
+                y += 16;
+                aBgRowY = y;
+                y += 44 + EDIT_SECTION_GAP;
+                aBannerHdrY = y;
+                y += 16;
+                aBannerRowY = y;
+                y += 20 + EDIT_SECTION_GAP;
+                aSkinHdrY = y;
+                y += 16;
+                aSkinRowY = y;
+            }
+        }
     }
 
     @Override
@@ -345,47 +391,57 @@ public final class ProfileScreen extends Screen {
 
     private void buildEditWidgets() {
         layoutEditAnchors();
-        bioBox = new EditBox(this.font, colLX, aBioY, colW, 18, Component.translatable("gui.lanplus.profile.about"));
-        bioBox.setMaxLength(300);
-        bioBox.setHint(Component.translatable("gui.lanplus.profile.bio.hint"));
-        bioBox.setValue(profile.bio() == null ? "" : profile.bio());
-        addRenderableWidget(bioBox);
-
-        int half = (colW - 6) / 2;
-        pronounButton = LanPlusButton.create(pronounLabel(), b -> {
-            pronounIndex = (pronounIndex + 1) % PRONOUN_CYCLE.length;
-            pronounButton.setMessage(pronounLabel());
-        }).bounds(colRX, aIdentityY, half, 20).build();
-        addRenderableWidget(pronounButton);
-
-        invisibleButton = LanPlusButton.create(invisibleLabel(), b -> {
-            invisibleToggle = !invisibleToggle;
-            invisibleButton.setMessage(invisibleLabel());
-        }).bounds(colRX + half + 6, aIdentityY, colW - half - 6, 20).build();
-        addRenderableWidget(invisibleButton);
-
-        buildLinkWidgets();
-        buildSlotWidgets();
-        buildBackgroundWidgets();
-        buildBannerWidgets();
-        buildSkinWidgets();
+        switch (editTab) {
+            case 0 -> {
+                bioBox = new EditBox(this.font, colLX, aBioY, colW, 18,
+                        Component.translatable("gui.lanplus.profile.about"));
+                bioBox.setMaxLength(300);
+                bioBox.setHint(Component.translatable("gui.lanplus.profile.bio.hint"));
+                bioBox.setValue(sectionToAmp(profile.bio()));
+                addRenderableWidget(bioBox);
+                buildLinkWidgets();
+                buildSlotWidgets();
+            }
+            case 1 -> {
+                int half = (colW - 6) / 2;
+                pronounButton = LanPlusButton.create(pronounLabel(), b -> {
+                    pronounIndex = (pronounIndex + 1) % PRONOUN_CYCLE.length;
+                    pronounButton.setMessage(pronounLabel());
+                }).bounds(colLX, aIdentityY, half, 20).build();
+                addRenderableWidget(pronounButton);
+                invisibleButton = LanPlusButton.create(invisibleLabel(), b -> {
+                    invisibleToggle = !invisibleToggle;
+                    invisibleButton.setMessage(invisibleLabel());
+                }).bounds(colLX + half + 6, aIdentityY, colW - half - 6, 20).build();
+                addRenderableWidget(invisibleButton);
+            }
+            case 2 -> {
+            }
+            default -> {
+                buildBackgroundWidgets();
+                buildBannerWidgets();
+                buildSkinWidgets();
+            }
+        }
     }
 
     private void buildSkinWidgets() {
+        if (!hasCustomSkin()) {
+            return;
+        }
         int half = (colW - 6) / 2;
+        int row = aSkinRowY + 14;
         skinSourceButton = LanPlusButton.create(skinSourceLabel(), b -> toggleSkinSource())
-                .bounds(colRX, aSkinRowY, half, 20).build();
-        skinSourceButton.active = !Config.skinUrl.isBlank();
+                .bounds(colRX, row, half, 20).build();
         addRenderableWidget(skinSourceButton);
 
         skinSlimButton = LanPlusButton.create(skinSlimLabel(), b -> toggleSkinSlim())
-                .bounds(colRX + half + 6, aSkinRowY, colW - half - 6, 20).build();
+                .bounds(colRX + half + 6, row, colW - half - 6, 20).build();
         addRenderableWidget(skinSlimButton);
 
         skinRemoveButton = LanPlusButton.create(Component.translatable("gui.lanplus.profile.skin.remove"),
                         b -> removeHostedSkin())
-                .bounds(colRX, aSkinRowY + 24, half, 20).build();
-        skinRemoveButton.active = !Config.skinUrl.isBlank();
+                .bounds(colRX, row + 24, half, 20).build();
         addRenderableWidget(skinRemoveButton);
     }
 
@@ -430,12 +486,8 @@ public final class ProfileScreen extends Screen {
             this.minecraft.execute(() -> {
                 applyLocalSkin();
                 setStatus(Component.translatable("gui.lanplus.profile.skin.removed"));
-                if (skinRemoveButton != null) {
-                    skinRemoveButton.active = false;
-                }
-                if (skinSourceButton != null) {
-                    skinSourceButton.setMessage(skinSourceLabel());
-                    skinSourceButton.active = false;
+                if (editing) {
+                    rebuildWidgets();
                 }
             });
         });
@@ -496,50 +548,41 @@ public final class ProfileScreen extends Screen {
                             return;
                         }
                         applyLocalSkin();
-                        if (skinRemoveButton != null) {
-                            skinRemoveButton.active = true;
-                        }
-                        if (skinSourceButton != null) {
-                            skinSourceButton.setMessage(skinSourceLabel());
-                            skinSourceButton.active = true;
-                        }
                         setStatus(Component.translatable("gui.lanplus.profile.skin.uploaded"));
+                        if (editing) {
+                            rebuildWidgets();
+                        }
                     });
                 });
     }
 
     private void buildBackgroundWidgets() {
-        int w = (colW - 12) / 3;
         bgStyleButton = LanPlusButton.create(bgStyleLabel(), b -> cycleBgStyle())
-                .bounds(colRX, aBgRowY, w, 20).build();
+                .bounds(colLX, aBgRowY, colW, 20).build();
         addRenderableWidget(bgStyleButton);
 
+        int row2 = aBgRowY + 24;
         if (bgStyle == BG_IMAGE) {
-            bgColorButton = LanPlusButton.create(bgImageLabel(), b -> cycleBgImage())
-                    .bounds(colRX + w + 6, aBgRowY, w, 20).build();
+            bgColorButton = LanPlusButton.create(bgImageLabel(), b -> openBackgroundPicker())
+                    .bounds(colLX, row2, colW, 20).primary().build();
             bgColorButton.active = !bgCatalog.isEmpty();
+            addRenderableWidget(bgColorButton);
         } else {
             bgColorButton = LanPlusButton.create(Component.translatable("gui.lanplus.profile.bg.color"), b -> cycleBgColor())
-                    .bounds(colRX + w + 6, aBgRowY, w, 20).build();
-            bgColorButton.active = bgStyle == BG_SOLID;
+                    .bounds(colLX, row2, colW, 20).build();
+            addRenderableWidget(bgColorButton);
         }
-        addRenderableWidget(bgColorButton);
-
-        BgOpacitySlider slider = new BgOpacitySlider(colRX + 2 * w + 12, aBgRowY, colW - 2 * w - 12, 20);
-        slider.active = bgStyle != BG_MINECRAFT;
-        addRenderableWidget(slider);
     }
 
     private void buildBannerWidgets() {
-        bannerButton = LanPlusButton.create(bannerLabel(), b -> cycleBanner())
-                .bounds(colRX, aBannerRowY, colW, 20).build();
+        bannerButton = LanPlusButton.create(bannerLabel(), b -> openBannerPicker())
+                .bounds(colRX, aBannerRowY, colW, 20).primary().build();
         bannerButton.active = !bannerCatalog.isEmpty() || banner != null;
         addRenderableWidget(bannerButton);
     }
 
     private void cycleBgStyle() {
-        int styles = bgCatalog.isEmpty() && bgImageId == null ? 3 : 4;
-        bgStyle = (bgStyle + 1) % styles;
+        bgStyle = bgStyle == BG_IMAGE ? BG_SOLID : BG_IMAGE;
         if (bgStyle == BG_IMAGE && bgImageId == null && !bgCatalog.isEmpty()) {
             selectBgImage(bgCatalog.get(0));
         }
@@ -547,22 +590,18 @@ public final class ProfileScreen extends Screen {
         rebuildWidgets();
     }
 
-    private void cycleBgImage() {
+    private void openBackgroundPicker() {
         if (bgCatalog.isEmpty()) {
             return;
         }
-        int idx = -1;
-        for (int i = 0; i < bgCatalog.size(); i++) {
-            if (bgCatalog.get(i).id().equals(bgImageId)) {
-                idx = i;
-                break;
+        this.minecraft.setScreen(new ImagePickerScreen(this,
+                Component.translatable("gui.lanplus.profile.bg.pick.title"),
+                bgCatalog, bgImageId, false, 3, 16f / 9f, img -> {
+            if (img != null) {
+                selectBgImage(img);
+                persistBackground();
             }
-        }
-        selectBgImage(bgCatalog.get((idx + 1) % bgCatalog.size()));
-        persistBackground();
-        if (bgColorButton != null) {
-            bgColorButton.setMessage(bgImageLabel());
-        }
+        }));
     }
 
     private void selectBgImage(CatalogImage image) {
@@ -582,32 +621,21 @@ public final class ProfileScreen extends Screen {
         return Component.translatable("gui.lanplus.profile.banner", value);
     }
 
-    private void cycleBanner() {
-        List<CatalogImage> options = new ArrayList<>();
-        options.add(null);
-        options.addAll(bannerCatalog);
-        int idx = 0;
-        if (banner != null) {
-            for (int i = 1; i < options.size(); i++) {
-                if (options.get(i).id().equals(banner.id())) {
-                    idx = i;
-                    break;
-                }
+    private void openBannerPicker() {
+        this.minecraft.setScreen(new ImagePickerScreen(this,
+                Component.translatable("gui.lanplus.profile.banner.pick.title"),
+                bannerCatalog, banner == null ? null : banner.id(), true, 2, 4f / 1f, img -> {
+            banner = img;
+            ProfilesService svc = LanPlusClient.profiles();
+            if (svc != null) {
+                svc.setBanner(img == null ? null : img.id()).whenComplete((error, ex) ->
+                        this.minecraft.execute(() -> {
+                            if (ex != null || error != null) {
+                                setStatus(Component.translatable(errorKey(error)));
+                            }
+                        }));
             }
-        }
-        banner = options.get((idx + 1) % options.size());
-        if (bannerButton != null) {
-            bannerButton.setMessage(bannerLabel());
-        }
-        ProfilesService svc = LanPlusClient.profiles();
-        if (svc != null) {
-            svc.setBanner(banner == null ? null : banner.id()).whenComplete((error, ex) ->
-                    this.minecraft.execute(() -> {
-                        if (ex != null || error != null) {
-                            setStatus(Component.translatable(errorKey(error)));
-                        }
-                    }));
-        }
+        }));
     }
 
     private void loadCatalogs() {
@@ -654,24 +682,6 @@ public final class ProfileScreen extends Screen {
             default -> "gui.lanplus.profile.bg.dark";
         };
         return Component.translatable("gui.lanplus.profile.bg.style", Component.translatable(key));
-    }
-
-    private final class BgOpacitySlider extends AbstractSliderButton {
-        BgOpacitySlider(int x, int y, int w, int h) {
-            super(x, y, w, h, Component.empty(), bgOpacity / 100.0);
-            updateMessage();
-        }
-
-        @Override
-        protected void updateMessage() {
-            setMessage(Component.translatable("gui.lanplus.profile.bg.opacity", (int) Math.round(value * 100)));
-        }
-
-        @Override
-        protected void applyValue() {
-            bgOpacity = (int) Math.round(value * 100);
-            bgDirty = true;
-        }
     }
 
     private void buildLinkWidgets() {
@@ -896,6 +906,9 @@ public final class ProfileScreen extends Screen {
         favoriteVisibleToggle = profile.favoriteVisible();
         playingVisibleToggle = profile.currentlyPlayingVisible();
         recentlyPlayedVisibleToggle = profile.recentlyPlayedVisible();
+        if (bgStyle == BG_DARK || bgStyle == BG_MINECRAFT) {
+            bgStyle = bgImageId != null ? BG_IMAGE : BG_SOLID;
+        }
         loadCatalogs();
     }
 
@@ -921,11 +934,12 @@ public final class ProfileScreen extends Screen {
         hits.clear();
         if (editing) {
             editTop = computeEditTop();
-            renderEditDecor(g);
+            renderEditDecor(g, mouseX, mouseY);
         } else {
             renderBanner(g);
             renderSidebar(g);
             renderPanel(g, mouseX, mouseY);
+            renderUnifiedFrame(g);
             renderBannerIdentity(g);
         }
 
@@ -960,43 +974,155 @@ public final class ProfileScreen extends Screen {
         return (Math.max(0, Math.min(255, opacity0to100 * 255 / 100))) << 24;
     }
 
-    private void renderEditDecor(GuiGraphics g) {
+    private void renderEditDecor(GuiGraphics g, int mouseX, int mouseY) {
         layoutEditAnchors();
         int cl = eL - 10;
         int cr = eR + 10;
-        int ctop = editTop - 8;
-        int cbot = editFormBottom() + 6;
+        int ctop = EDIT_FRAME_TOP;
+        int cbot = editBodyBottom + 6;
+        renderEditTabs(g, mouseX, mouseY);
         g.fill(cl, ctop, cr, cbot, PANEL_BG);
         LanPlusUI.bevelRaised(g, cl, ctop, cr, cbot);
-        int dx = (colLX + colW + colRX) / 2;
-        g.fill(dx, ctop + 8, dx + 1, cbot - 8, DIVIDER);
+        g.fill(cl, ctop, cr, ctop + 1, LanPlusUI.ACCENT_LINE);
 
-        editHeader(g, Component.translatable("gui.lanplus.profile.about"), colLX, colW, aAboutHdrY);
-        editHeader(g, Component.translatable("gui.lanplus.profile.links"), colLX, colW, aLinksHdrY);
-        editHeader(g, Component.translatable("gui.lanplus.profile.questions"), colLX, colW, aQHdrY);
+        switch (editTab) {
+            case 0 -> {
+                editHeader(g, Component.translatable("gui.lanplus.profile.about"), colLX, colW, aAboutHdrY);
+                renderBioToolbar(g, mouseX, mouseY);
+                renderBioPreview(g);
+                editHeader(g, Component.translatable("gui.lanplus.profile.links"), colLX, colW, aLinksHdrY);
+                editHeader(g, Component.translatable("gui.lanplus.profile.questions"), colLX, colW, aQHdrY);
+            }
+            case 1 -> editHeader(g, Component.translatable("gui.lanplus.profile.identity"), colLX, colW, aIdentityHdrY);
+            case 2 -> {
+                editHeader(g, Component.translatable("gui.lanplus.profile.modpack"), colLX, colW, aMpHdrY);
+                renderModpackValues(g);
+                renderModpackToggles(g);
+            }
+            default -> {
+                editHeader(g, Component.translatable("gui.lanplus.profile.bg.header"), colLX, colW, aBgHdrY);
+                editHeader(g, Component.translatable("gui.lanplus.profile.banner.header"), colLX, colW, aBannerHdrY);
+                editHeader(g, Component.translatable("gui.lanplus.profile.skin.header"), colLX, colW, aSkinHdrY);
+                g.drawString(this.font, Component.translatable("gui.lanplus.profile.skin.hint"),
+                        colLX, aSkinRowY, FAINT, false);
+            }
+        }
+    }
 
-        editHeader(g, Component.translatable("gui.lanplus.profile.identity"), colRX, colW, aIdentityHdrY);
-        editHeader(g, Component.translatable("gui.lanplus.profile.modpack"), colRX, colW, aMpHdrY);
-        editHeader(g, Component.translatable("gui.lanplus.profile.bg.header"), colRX, colW, aBgHdrY);
-        editHeader(g, Component.translatable("gui.lanplus.profile.banner.header"), colRX, colW, aBannerHdrY);
-        editHeader(g, Component.translatable("gui.lanplus.profile.skin.header"), colRX, colW, aSkinHdrY);
-        g.drawString(this.font, Component.translatable("gui.lanplus.profile.skin.hint"),
-                colRX, aSkinRowY + 48, FAINT, false);
+    private void renderEditTabs(GuiGraphics g, int mouseX, int mouseY) {
+        int tabW = eW / EDIT_TABS.length;
+        for (int i = 0; i < EDIT_TABS.length; i++) {
+            int x = eL + i * tabW;
+            Component label = Component.translatable("gui.lanplus.profile.tab." + EDIT_TABS[i]);
+            boolean active = editTab == i;
+            boolean hover = mouseX >= x && mouseX < x + tabW
+                    && mouseY >= EDIT_TAB_Y - 3 && mouseY < EDIT_TAB_Y + 12;
+            int color = active ? TEXT : (hover ? MUTED : FAINT);
+            g.drawString(this.font, label, x + (tabW - this.font.width(label)) / 2, EDIT_TAB_Y, color, false);
+            if (active) {
+                g.fill(x + 6, EDIT_TAB_Y + 11, x + tabW - 6, EDIT_TAB_Y + 12, ACCENT);
+            }
+        }
+    }
 
+    private int editTabAt(double mouseX, double mouseY) {
+        if (mouseY < EDIT_TAB_Y - 3 || mouseY >= EDIT_TAB_Y + 13 || mouseX < eL || mouseX >= eR) {
+            return -1;
+        }
+        int tabW = eW / EDIT_TABS.length;
+        int i = (int) ((mouseX - eL) / tabW);
+        return i >= 0 && i < EDIT_TABS.length ? i : -1;
+    }
+
+    private void renderModpackToggles(GuiGraphics g) {
         int gap = 6;
         int chipW = (colW - 2 * gap) / 3;
-        modpackChip(g, colRX, aMpRowY, chipW, "gui.lanplus.profile.mp.favorite", favoriteVisibleToggle,
+        modpackChip(g, colLX, aMpRowY, chipW, "gui.lanplus.profile.mp.favorite", favoriteVisibleToggle,
                 () -> favoriteVisibleToggle = !favoriteVisibleToggle);
-        modpackChip(g, colRX + chipW + gap, aMpRowY, chipW, "gui.lanplus.profile.mp.playing", playingVisibleToggle,
+        modpackChip(g, colLX + chipW + gap, aMpRowY, chipW, "gui.lanplus.profile.mp.playing", playingVisibleToggle,
                 () -> playingVisibleToggle = !playingVisibleToggle);
-        modpackChip(g, colRX + 2 * (chipW + gap), aMpRowY, colW - 2 * (chipW + gap), "gui.lanplus.profile.mp.recent",
+        modpackChip(g, colLX + 2 * (chipW + gap), aMpRowY, colW - 2 * (chipW + gap), "gui.lanplus.profile.mp.recent",
                 recentlyPlayedVisibleToggle, () -> recentlyPlayedVisibleToggle = !recentlyPlayedVisibleToggle);
+    }
+
+    private void renderModpackValues(GuiGraphics g) {
+        int gap = 6;
+        int chipW = (colW - 2 * gap) / 3;
+        drawMpValue(g, colLX, chipW, profile.favorite());
+        drawMpValue(g, colLX + chipW + gap, chipW, profile.currentlyPlaying());
+        drawMpValue(g, colLX + 2 * (chipW + gap), colW - 2 * (chipW + gap), profile.recentlyPlayed());
+    }
+
+    private void drawMpValue(GuiGraphics g, int x, int w, ModpackRef ref) {
+        String name = ref == null || ref.name() == null ? "—" : ellipsize(ref.name(), w);
+        g.drawString(this.font, name, x + (w - this.font.width(name)) / 2, aMpValuesY, MUTED, false);
     }
 
     private void editHeader(GuiGraphics g, Component label, int x, int w, int y) {
         g.fill(x, y + 1, x + 2, y + 9, ACCENT);
         g.drawString(this.font, label, x + 6, y, HEADER_COLOR);
         g.fill(x, y + 12, x + w, y + 13, DIVIDER);
+    }
+
+    private void renderBioToolbar(GuiGraphics g, int mouseX, int mouseY) {
+        int x = colLX;
+        int y = aBioToolbarY;
+        int h = 16;
+        int fw = 22;
+        for (String[] f : BIO_FMT) {
+            boolean hover = mouseX >= x && mouseX < x + fw && mouseY >= y && mouseY < y + h;
+            g.fill(x, y, x + fw, y + h, hover ? LanPlusUI.SURFACE_HOVER : SURFACE_RAISED);
+            drawBorder(g, x, y, x + fw, y + h, BORDER);
+            g.drawString(this.font, f[1], x + (fw - this.font.width(f[1])) / 2, y + 4, TEXT, false);
+            String code = f[0];
+            hits.add(new Hit(x, y, fw, h, () -> insertBio(code)));
+            x += fw + 3;
+        }
+        x += 6;
+        int sw = 14;
+        int sgap = 2;
+        int sy = y + (h - sw) / 2;
+        for (int i = 0; i < MC_COLOR_CODES.length; i++) {
+            int cx = x + i * (sw + sgap);
+            g.fill(cx, sy, cx + sw, sy + sw, 0xFF000000 | MC_COLOR_RGB[i]);
+            drawBorder(g, cx, sy, cx + sw, sy + sw, BORDER);
+            char code = MC_COLOR_CODES[i];
+            hits.add(new Hit(cx, sy, sw, sw, () -> insertBio("&" + code)));
+        }
+    }
+
+    private void renderBioPreview(GuiGraphics g) {
+        String sec = bioBox == null ? "" : ampToSection(bioBox.getValue());
+        if (sec.isBlank()) {
+            g.drawString(this.font, Component.translatable("gui.lanplus.profile.bio.preview"),
+                    colLX, aBioPreviewY, FAINT, false);
+            return;
+        }
+        int yy = aBioPreviewY;
+        int shown = 0;
+        for (FormattedCharSequence line : this.font.split(Component.literal(sec), colW)) {
+            if (shown >= 2) {
+                break;
+            }
+            g.drawString(this.font, line, colLX, yy, TEXT, false);
+            yy += 11;
+            shown++;
+        }
+    }
+
+    private void insertBio(String code) {
+        if (bioBox != null) {
+            bioBox.insertText(code);
+            this.setFocused(bioBox);
+        }
+    }
+
+    static String ampToSection(String s) {
+        return s == null ? "" : AMP_CODE.matcher(s).replaceAll("§$1");
+    }
+
+    static String sectionToAmp(String s) {
+        return s == null ? "" : s.replace('§', '&');
     }
 
     private void modpackChip(GuiGraphics g, int x, int y, int w, String key, boolean on, Runnable toggle) {
@@ -1017,8 +1143,7 @@ public final class ProfileScreen extends Screen {
         sbLeft = left;
         sbTop = top;
         sbBottom = bottom;
-        g.fill(left, top, left + SIDEBAR_W, bottom, SIDEBAR_BG);
-        LanPlusUI.bevelRaised(g, left, top, left + SIDEBAR_W, bottom);
+        g.fill(left, top, left + SIDEBAR_W, bottom, PANEL_BG);
 
         g.enableScissor(left + 1, top + 1, left + SIDEBAR_W - 1, bottom - 1);
         int l = left + 8;
@@ -1027,7 +1152,7 @@ public final class ProfileScreen extends Screen {
 
         int y;
         if (banner != null) {
-            y = renderSidebarProgression(g, l, r, base + 26);
+            y = renderSidebarProgression(g, l, r, base + 6);
         } else {
             drawAvatar(g, uuid, l, base, 36);
             int hx = left + 50;
@@ -1056,6 +1181,16 @@ public final class ProfileScreen extends Screen {
         g.fill(presX - 10, y + 1, presX - 4, y + 7, profile.online() ? ONLINE : FAINT);
         g.drawString(this.font, presenceLabel(), presX, y, profile.online() ? ONLINE : MUTED);
         y += 18;
+
+        PlayedTogether pt = profile.playedTogether();
+        if (!own && pt != null && pt.hasSessions()) {
+            Component label = pt.hasLastAt()
+                    ? Component.translatable("gui.lanplus.profile.playedtogether.last",
+                    pt.sessions(), relativeTime(pt.lastAt()))
+                    : Component.translatable("gui.lanplus.profile.playedtogether", pt.sessions());
+            g.drawString(this.font, label, l, y, LanPlusUI.LIME);
+            y += 14;
+        }
 
         y = renderSidebarAbout(g, l, r, y);
 
@@ -1359,6 +1494,17 @@ public final class ProfileScreen extends Screen {
         return f.connectivity() == Connectivity.ONLINE || f.connectivity() == Connectivity.STALE;
     }
 
+    private void renderUnifiedFrame(GuiGraphics g) {
+        int left = layoutLeft();
+        int top = contentTop();
+        int right = left + layoutWidth();
+        int bottom = this.height - 34;
+        int divX = left + SIDEBAR_W;
+        g.fill(divX, top + 1, divX + 1, bottom, LanPlusUI.DIVIDER);
+        LanPlusUI.bevelRaised(g, left, top, right, bottom);
+        g.fill(left, top, right, top + 1, LanPlusUI.ACCENT_LINE);
+    }
+
     private void renderPanel(GuiGraphics g, int mouseX, int mouseY) {
         int left = layoutLeft();
         panelX = left + SIDEBAR_W + GAP;
@@ -1367,7 +1513,6 @@ public final class ProfileScreen extends Screen {
         panelBottom = this.height - 34;
         int textW = panelRight - panelX - 12;
         g.fill(panelX, panelTop, panelRight, panelBottom, PANEL_BG);
-        LanPlusUI.bevelRaised(g, panelX, panelTop, panelRight, panelBottom);
 
         g.enableScissor(panelX, panelTop, panelRight, panelBottom);
         int x = panelX + 8;
@@ -1438,10 +1583,10 @@ public final class ProfileScreen extends Screen {
         g.fill(x, y, x + renderW, y + 2, ACCENT);
         g.flush();
         g.enableScissor(x + 1, y + 2, x + renderW - 1, y + renderH - 1);
-        drawPlayerModel(g, x + renderW / 2, y + renderH - 16, 52);
+        drawPlayerModel(g, x + renderW / 2, y + renderH - 26, 52);
         g.disableScissor();
         g.drawString(this.font, Component.translatable("gui.lanplus.profile.cosmetics.rotate"),
-                x + 4, y + renderH - 11, FAINT);
+                x + 8, y + renderH - 12, FAINT);
         int sx = x + renderW + 8;
         int sw = textW - renderW - 8;
         int slotH = 26;
@@ -1529,6 +1674,16 @@ public final class ProfileScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (editing && button == 0) {
+            int t = editTabAt(mouseX, mouseY);
+            if (t >= 0) {
+                if (t != editTab) {
+                    editTab = t;
+                    rebuildWidgets();
+                }
+                return true;
+            }
+        }
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
@@ -1550,7 +1705,7 @@ public final class ProfileScreen extends Screen {
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (draggingModel && button == 0) {
-            modelYaw += (float) dragX;
+            modelYaw -= (float) dragX;
             modelPitch = Math.max(-35f, Math.min(35f, modelPitch - (float) dragY));
             return true;
         }
@@ -1563,12 +1718,7 @@ public final class ProfileScreen extends Screen {
             draggingModel = false;
             return true;
         }
-        boolean handled = super.mouseReleased(mouseX, mouseY, button);
-        if (button == 0 && bgDirty) {
-            bgDirty = false;
-            persistBackground();
-        }
-        return handled;
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     private boolean inCmBox(double mx, double my) {
@@ -1597,7 +1747,7 @@ public final class ProfileScreen extends Screen {
         }
         captureFreeValues();
         captureLinkValues();
-        String bio = bioBox.getValue();
+        String bio = ampToSection(bioBox.getValue());
         String pronouns = PRONOUN_CYCLE[pronounIndex];
         Map<String, String> links = new LinkedHashMap<>();
         for (String pf : PLATFORMS) {
@@ -1854,17 +2004,7 @@ public final class ProfileScreen extends Screen {
     }
 
     private static String relativeTime(long epochMillis) {
-        long seconds = Math.max(0, (System.currentTimeMillis() - epochMillis) / 1000L);
-        if (seconds < 60) {
-            return seconds + "s";
-        }
-        if (seconds < 3600) {
-            return (seconds / 60) + "m";
-        }
-        if (seconds < 86400) {
-            return (seconds / 3600) + "h";
-        }
-        return (seconds / 86400) + "d";
+        return getString(epochMillis);
     }
 
     private void setStatus(Component message) {

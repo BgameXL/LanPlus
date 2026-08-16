@@ -1,9 +1,11 @@
 package dev.bgame.lanplus.network;
 
+import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.ModpackRef;
+import dev.bgame.lanplus.api.PlayedTogether;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.ProfileBackground;
 import dev.bgame.lanplus.api.RelayTicket;
@@ -119,7 +121,8 @@ final class Wire {
                       boolean online, Long lastSeen, Boolean invisible, ModpackDto currentlyPlaying,
                       ModpackDto lastPlayed, ModpackDto favorite, ModpackDto recentlyPlayed,
                       BackgroundDto background, CatalogImageDto banner,
-                      SettingsDto settings, ProgressionDto progression) {
+                      SettingsDto settings, ProgressionDto progression,
+                      PlayedTogetherDto playedTogether) {
         Profile toApi(String base) {
             SettingsDto s = settings == null ? new SettingsDto(true, true, true) : settings;
             ProgressionDto p = progression == null ? new ProgressionDto(0, 0, null, null) : progression;
@@ -143,6 +146,7 @@ final class Wire {
                     p.sources() == null ? Map.of() : p.sources(),
                     background == null ? ProfileBackground.DEFAULT : background.toApi(base),
                     banner == null ? null : banner.toApi(base),
+                    playedTogether == null ? null : playedTogether.toApi(),
                     false);
         }
 
@@ -160,6 +164,41 @@ final class Wire {
     }
 
     record ProgressionDto(Integer tier, Integer advancements, Integer xp, Map<String, Integer> sources) {
+    }
+
+    record PlayedTogetherDto(Integer sessions, Long lastAt) {
+        PlayedTogether toApi() {
+            return new PlayedTogether(sessions == null ? 0 : sessions, lastAt == null ? 0L : lastAt);
+        }
+    }
+
+    record ActivityDto(String actor, String actorName, String type, String subject, Long at) {
+        ActivityEntry toApi() {
+            if (actor == null) {
+                return null;
+            }
+            UUID id;
+            try {
+                id = UUID.fromString(actor);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+            return new ActivityEntry(id, actorName, ActivityEntry.Type.fromWire(type), subject,
+                    at == null ? 0L : at);
+        }
+    }
+
+    record ActivityFeedDto(List<ActivityDto> activity) {
+        static ActivityFeedDto fromJson(String body) {
+            if (body == null || body.isBlank()) {
+                return null;
+            }
+            try {
+                return GSON.fromJson(body, ActivityFeedDto.class);
+            } catch (RuntimeException e) {
+                return null;
+            }
+        }
     }
 
     record ModpackDto(String modpackId, String name, String downloadUrl) {

@@ -1,5 +1,6 @@
 package dev.bgame.lanplus.friends;
 
+import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.UserProfile;
@@ -12,8 +13,10 @@ public interface FriendsService {
 
     List<Friend> friends();
     List<ResolvedUser> requests();
+    List<ActivityEntry> activity();
     UserProfile localProfile();
     CompletableFuture<List<Friend>> refresh();
+    CompletableFuture<List<ActivityEntry>> refreshActivity();
     CompletableFuture<Boolean> add(UUID friendUuid);
     CompletableFuture<Boolean> addByQuery(String query);
     CompletableFuture<Boolean> remove(UUID friendUuid);
