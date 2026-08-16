@@ -48,6 +48,13 @@ final class EventHub {
         }
     }
 
+    void sendAll(Object event) {
+        String json = Json.write(event);
+        for (WebSocket ws : userOf.keySet()) {
+            ForkJoinPool.commonPool().execute(() -> sendOne(ws, json));
+        }
+    }
+
     private void sendOne(WebSocket ws, String json) {
         try {
             ws.sendText(json);

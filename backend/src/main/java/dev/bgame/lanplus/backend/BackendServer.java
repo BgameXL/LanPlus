@@ -8,6 +8,7 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -213,6 +214,18 @@ public final class BackendServer {
             if (m.equals("GET") && path.equals("/friends/requests")) {
                 return ok(store.friendRequests(self));
             }
+            if (m.equals("GET") && path.equals("/activity")) {
+                return ok(ordered("activity", store.activityFeed(self)));
+            }
+            if (m.equals("GET") && path.equals("/announcements/unseen")) {
+                return ok(store.announcementsUnseen(self));
+            }
+            if (m.equals("GET") && path.equals("/announcements")) {
+                return ok(store.announcementsAll());
+            }
+            if (m.equals("POST") && path.equals("/announcements/seen")) {
+                return announcementsSeen(req, self);
+            }
             if (m.equals("GET") && path.startsWith("/friends/")) {
                 return ok(store.friendList(uuid(path.substring("/friends/".length()))));
             }
@@ -327,7 +340,9 @@ public final class BackendServer {
                 (String) b.get("username"), (String) b.get("state"), (String) b.get("worldName"),
                 (String) b.get("address"), (String) b.get("joinCode"), b.get("skin"),
                 (String) b.get("modpackId"), (String) b.get("accessMode"),
-                parseUuidSet(b.get("allowedUuids")));
+                parseUuidSet(b.get("allowedUuids")),
+                (String) b.get("gameMode"), (String) b.get("difficulty"),
+                Boolean.TRUE.equals(b.get("allowCommands")));
 
         boolean invisible = store.isInvisible(uuid);
         String connectivity = invisible ? "OFFLINE" : store.connectivity(uuid);
@@ -336,6 +351,9 @@ public final class BackendServer {
         Object modpackId = (invisible || !store.currentlyPlayingVisible(uuid))
                 ? null : store.registeredModpackOrNull((String) b.get("modpackId"));
         Object joinCode = b.get("joinCode");
+        Object gameMode = invisible ? null : b.get("gameMode");
+        Object difficulty = invisible ? null : b.get("difficulty");
+        Object allowCommands = invisible ? null : b.get("allowCommands");
 
         Set<UUID> recipients = new LinkedHashSet<>();
         for (UUID friend : store.friendsOf(uuid)) {
@@ -351,11 +369,15 @@ public final class BackendServer {
                     "state", state,
                     "worldName", worldName,
                     "joinCode", codeVisible ? joinCode : null,
-                    "modpackId", modpackId);
+                    "modpackId", modpackId,
+                    "gameMode", gameMode,
+                    "difficulty", difficulty,
+                    "allowCommands", allowCommands);
             hub.send(friend, Map.of("type", "PRESENCE_UPDATE", "data", data));
         }
         if (announceHosting && !invisible) {
             boolean invited = "INVITED".equalsIgnoreCase((String) b.get("accessMode"));
+            store.recordHostingStarted(uuid, (String) b.get("worldName"));
             log("hosting-start by " + uuid + " access=" + b.get("accessMode")
                     + " -> joinCode " + (invited ? "sent (invited)" : "withheld"));
             for (UUID friend : recipients) {
@@ -484,7 +506,41 @@ public final class BackendServer {
         if (m.equals("POST") && path.equals("/admin/reports/resolve")) {
             return adminResolveReport(req);
         }
+        if (m.equals("POST") && path.equals("/admin/announcement")) {
+            return adminAnnouncement(req);
+        }
         return NOT_FOUND;
+    }
+
+    private static final Set<String> ANNOUNCEMENT_TYPES = Set.of("UPDATE", "MAINTENANCE", "GENERAL", "FREE");
+
+    private Resp announcementsSeen(Http.Request req, UUID self) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        List<Integer> ids = new ArrayList<>();
+        if (b.get("ids") instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Number n) {
+                    ids.add(n.intValue());
+                }
+            }
+        }
+        store.markAnnouncementsSeen(self, ids);
+        return ok(ordered("success", true));
+    }
+
+    private Resp adminAnnouncement(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        String type = b.get("type") == null ? null : String.valueOf(b.get("type"));
+        String title = b.get("title") == null ? null : String.valueOf(b.get("title"));
+        String body = b.get("body") == null ? null : String.valueOf(b.get("body"));
+        if (type == null || !ANNOUNCEMENT_TYPES.contains(type)
+                || title == null || title.isBlank() || body == null || body.isBlank()) {
+            return BAD;
+        }
+        Map<String, Object> row = store.publishAnnouncement(type, title, body);
+        hub.sendAll(ordered("type", "ANNOUNCEMENT", "data", row));
+        log("admin announcement published: " + type + " / " + title);
+        return ok(row);
     }
 
     private Resp adminScrub(Http.Request req) {
