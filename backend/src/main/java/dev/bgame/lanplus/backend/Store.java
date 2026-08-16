@@ -27,15 +27,9 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Backend state. Durable identity and social graph (users, friends, friend_requests, relationships)
- * lives in SQLite; presence, invites, and relay tickets stay in memory because they are ephemeral
- * (TTL-bounded) and correct to lose on restart.
- * Concurrency: a single shared JDBC Connection guarded by {@link #lock} (SQLite admits one writer;
- * WAL allows concurrent readers, but a single Connection is not thread-safe, so all DB access is
- * serialized). Presence/invite/ticket maps are concurrent and need no lock.
- * Simplifications vs a real backend: users auto-register on first contact; adding a friend sends a
- * request the other side must accept (auto-accepted if mutual); there is no authentication.
- */
+ * Backend state. Durable identity and social graph lives in SQLite;
+ * presence, invites, and relay tickets stay in memory because they are ephemeral and correct to lose on restart.
+ * */
 final class Store {
 
     private static final String[] WORDS = {
@@ -229,6 +223,14 @@ final class Store {
                         + "target_uuid TEXT NOT NULL, reason TEXT, status TEXT NOT NULL DEFAULT 'open', "
                         + "created_at INTEGER NOT NULL)");
                 st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS activity ("
+                        + "id INTEGER PRIMARY KEY AUTOINCREMENT, actor_uuid TEXT NOT NULL, "
+                        + "type TEXT NOT NULL, subject TEXT, created_at INTEGER NOT NULL)");
+                st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_activity_actor "
+                        + "ON activity(actor_uuid, created_at)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS social_pair ("
+                        + "a TEXT NOT NULL, b TEXT NOT NULL, sessions INTEGER NOT NULL DEFAULT 0, "
+                        + "last_at INTEGER NOT NULL, PRIMARY KEY (a, b))");
                 st.executeUpdate("UPDATE presence_state SET online=0");
             }
             return c;
@@ -379,8 +381,12 @@ final class Store {
                 if (prevModpackId != null) {
                     addPlaytime(uuid, prevModpackId, elapsedSeconds);
                 }
-                if (anyFriendOnline(uuid)) {
+                List<UUID> onlineFriends = onlineFriendsOf(uuid);
+                if (!onlineFriends.isEmpty()) {
                     addSocialTime(uuid, elapsedSeconds);
+                    for (UUID friend : onlineFriends) {
+                        recordSocialPair(uuid, friend, now);
+                    }
                 }
             }
         }
@@ -795,6 +801,11 @@ final class Store {
         try {
             clearRequestLocked(uuid, friendUuid);
             linkFriendsLocked(uuid, friendUuid);
+            long now = System.currentTimeMillis();
+            User a = findUser(uuid);
+            User b = findUser(friendUuid);
+            recordActivityLocked(uuid, "FRIEND_ADDED", b == null ? null : b.username, now);
+            recordActivityLocked(friendUuid, "FRIEND_ADDED", a == null ? null : a.username, now);
             connection.commit();
             return true;
         } catch (SQLException e) {
@@ -970,6 +981,8 @@ final class Store {
     private static final int XP_WINDOW_MAX = 10;
     private static final long SECONDS_PER_PLAYTIME_XP = 600;
     private static final long SECONDS_PER_SOCIAL_XP = 300;
+    private static final long ACTIVITY_RETENTION_MS = 14L * 24 * 60 * 60 * 1000;
+    private static final long SOCIAL_SESSION_GAP_MS = 10L * 60 * 1000;
 
     static int tierFor(long xp) {
         int tier = 0;
@@ -1271,6 +1284,10 @@ final class Store {
                     progression.put("sources", xpBySourceLocked(uuid));
                 }
                 m.put("progression", progression);
+
+                if (!self && viewer != null && areFriends(viewer, uuid)) {
+                    m.put("playedTogether", playedTogetherLocked(viewer, uuid));
+                }
                 return m;
             } catch (SQLException e) {
                 throw fail("profile", e);
@@ -1404,14 +1421,144 @@ final class Store {
         }
     }
 
-    private boolean anyFriendOnline(UUID uuid) {
+    private List<UUID> onlineFriendsOf(UUID uuid) {
+        List<UUID> out = new ArrayList<>();
         for (UUID fid : friendsOf(uuid)) {
-            String c = connectivity(fid);
-            if ("ONLINE".equals(c) || "STALE".equals(c)) {
-                return true;
+            if (isLive(connectivity(fid))) {
+                out.add(fid);
             }
         }
-        return false;
+        return out;
+    }
+
+    void recordSocialPair(UUID a, UUID b, long now) {
+        String[] pair = normalize(a, b);
+        synchronized (lock) {
+            try {
+                long lastAt = 0;
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "SELECT last_at FROM social_pair WHERE a=? AND b=?")) {
+                    ps.setString(1, pair[0]);
+                    ps.setString(2, pair[1]);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            lastAt = rs.getLong(1);
+                        }
+                    }
+                }
+                boolean newSession = now - lastAt > SOCIAL_SESSION_GAP_MS;
+                try (PreparedStatement ps = connection.prepareStatement(
+                        "INSERT INTO social_pair (a, b, sessions, last_at) VALUES (?,?,1,?) "
+                                + "ON CONFLICT(a, b) DO UPDATE SET "
+                                + "sessions = sessions + ?, last_at = excluded.last_at")) {
+                    ps.setString(1, pair[0]);
+                    ps.setString(2, pair[1]);
+                    ps.setLong(3, now);
+                    ps.setInt(4, newSession ? 1 : 0);
+                    ps.executeUpdate();
+                }
+            } catch (SQLException e) {
+                throw fail("recordSocialPair", e);
+            }
+        }
+    }
+
+    void recordHostingStarted(UUID actor, String worldName) {
+        synchronized (lock) {
+            try {
+                recordActivityLocked(actor, "HOSTING_STARTED", truncate(worldName, 120),
+                        System.currentTimeMillis());
+            } catch (SQLException e) {
+                throw fail("recordHostingStarted", e);
+            }
+        }
+    }
+
+    private void recordActivityLocked(UUID actor, String type, String subject, long now)
+            throws SQLException {
+        try (PreparedStatement ps = connection.prepareStatement(
+                "INSERT INTO activity (actor_uuid, type, subject, created_at) VALUES (?,?,?,?)")) {
+            ps.setString(1, actor.toString());
+            ps.setString(2, type);
+            ps.setString(3, subject);
+            ps.setLong(4, now);
+            ps.executeUpdate();
+        }
+        try (PreparedStatement ps = connection.prepareStatement(
+                "DELETE FROM activity WHERE created_at < ?")) {
+            ps.setLong(1, now - ACTIVITY_RETENTION_MS);
+            ps.executeUpdate();
+        }
+    }
+
+    List<Object> activityFeed(UUID viewer) {
+        Set<UUID> friends = friendsOf(viewer);
+        if (friends.isEmpty()) {
+            return List.of();
+        }
+        long cutoff = System.currentTimeMillis() - ACTIVITY_RETENTION_MS;
+        synchronized (lock) {
+            try {
+                StringBuilder in = new StringBuilder();
+                for (int i = 0; i < friends.size(); i++) {
+                    in.append(i == 0 ? "?" : ",?");
+                }
+                String sql = "SELECT a.actor_uuid, u.username, a.type, a.subject, a.created_at "
+                        + "FROM activity a JOIN users u ON u.uuid = a.actor_uuid "
+                        + "WHERE a.created_at >= ? AND a.actor_uuid IN (" + in + ") "
+                        + "ORDER BY a.created_at DESC LIMIT 100";
+                List<Object> out = new ArrayList<>();
+                try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                    ps.setLong(1, cutoff);
+                    int idx = 2;
+                    for (UUID f : friends) {
+                        ps.setString(idx++, f.toString());
+                    }
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next() && out.size() < 20) {
+                            UUID actor = UUID.fromString(rs.getString(1));
+                            if (isMutedOrBlocked(viewer, actor) || invisibleLocked(actor)) {
+                                continue;
+                            }
+                            out.add(ordered("actor", rs.getString(1), "actorName", rs.getString(2),
+                                    "type", rs.getString(3), "subject", rs.getString(4),
+                                    "at", rs.getLong(5)));
+                        }
+                    }
+                }
+                return out;
+            } catch (SQLException e) {
+                throw fail("activityFeed", e);
+            }
+        }
+    }
+
+    private Map<String, Object> playedTogetherLocked(UUID a, UUID b) throws SQLException {
+        String[] pair = normalize(a, b);
+        try (PreparedStatement ps = connection.prepareStatement(
+                "SELECT sessions, last_at FROM social_pair WHERE a=? AND b=?")) {
+            ps.setString(1, pair[0]);
+            ps.setString(2, pair[1]);
+            try (ResultSet rs = ps.executeQuery()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                if (rs.next()) {
+                    m.put("sessions", rs.getLong(1));
+                    long lastAt = rs.getLong(2);
+                    m.put("lastAt", rs.wasNull() ? null : lastAt);
+                } else {
+                    m.put("sessions", 0L);
+                    m.put("lastAt", null);
+                }
+                return m;
+            }
+        }
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) {
+            return null;
+        }
+        return s.length() > max ? s.substring(0, max) : s;
     }
 
     private Map<String, Object> recentlyPlayedLocked(UUID uuid) throws SQLException {

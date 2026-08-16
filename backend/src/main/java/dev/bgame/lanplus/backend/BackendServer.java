@@ -213,6 +213,9 @@ public final class BackendServer {
             if (m.equals("GET") && path.equals("/friends/requests")) {
                 return ok(store.friendRequests(self));
             }
+            if (m.equals("GET") && path.equals("/activity")) {
+                return ok(ordered("activity", store.activityFeed(self)));
+            }
             if (m.equals("GET") && path.startsWith("/friends/")) {
                 return ok(store.friendList(uuid(path.substring("/friends/".length()))));
             }
@@ -356,6 +359,7 @@ public final class BackendServer {
         }
         if (announceHosting && !invisible) {
             boolean invited = "INVITED".equalsIgnoreCase((String) b.get("accessMode"));
+            store.recordHostingStarted(uuid, (String) b.get("worldName"));
             log("hosting-start by " + uuid + " access=" + b.get("accessMode")
                     + " -> joinCode " + (invited ? "sent (invited)" : "withheld"));
             for (UUID friend : recipients) {
