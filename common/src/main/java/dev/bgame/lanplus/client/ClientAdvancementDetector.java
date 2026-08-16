@@ -6,18 +6,13 @@ import net.minecraft.client.User;
 
 import java.util.UUID;
 
-/**
- * Loader-agnostic detector for local-player advancements. Each loader is responsible for
- * firing {@link #onAdvancementEarn(String, boolean)} when the local player earns an
- * advancement.
- */
 public final class ClientAdvancementDetector {
 
     private ClientAdvancementDetector() {}
 
     public static void onAdvancementEarn(String advancementId, boolean hasDisplay) {
         if (!hasDisplay) {
-            return; // recipe/hidden advancements have no display info; ignore them (they would spam XP)
+            return;
         }
         UUID local = localUuid();
         if (local == null) {

@@ -11,10 +11,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-/**
- * Fetches skin bytes from an untrusted URL with SSRF and size guards. Custom skin URLs are supplied
- * by other players, so the resolver (us) must not be tricked into hitting localhost/internal hosts.
- */
 final class SkinUrlGuard {
 
     static final int MAX_BYTES = 256 * 1024;

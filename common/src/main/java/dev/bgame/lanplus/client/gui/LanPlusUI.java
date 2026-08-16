@@ -5,9 +5,6 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
-/**
- * The LAN+ screen design language.
- */
 final class LanPlusUI {
 
     static final int LAVENDER = 0xFFA070F0;

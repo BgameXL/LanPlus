@@ -68,7 +68,6 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     private volatile boolean reachable = false;
     private volatile WebSocket webSocket;
 
-    // Realtime channel state. eventsEnabled gates reconnection so an intentional disconnect() stays disconnected.
     private volatile UUID eventsUuid;
     private volatile BackendEventListener eventsListener;
     private volatile boolean eventsEnabled = false;
@@ -145,64 +144,49 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
 
     @Override
     public CompletableFuture<Boolean> addFriend(UUID uuid, UUID friendUuid) {
-        return friendsEdge("/friends/add", uuid, friendUuid);
+        return edge("/friends/add", new Wire.FriendAdd(uuid.toString(), friendUuid.toString()));
     }
 
     @Override
     public CompletableFuture<Boolean> removeFriend(UUID uuid, UUID friendUuid) {
-        return friendsEdge("/friends/remove", uuid, friendUuid);
+        return edge("/friends/remove", new Wire.FriendAdd(uuid.toString(), friendUuid.toString()));
     }
 
     @Override
     public CompletableFuture<Boolean> acceptFriend(UUID uuid, UUID friendUuid) {
-        return friendsEdge("/friends/accept", uuid, friendUuid);
+        return edge("/friends/accept", new Wire.FriendAdd(uuid.toString(), friendUuid.toString()));
     }
 
     @Override
     public CompletableFuture<Boolean> declineFriend(UUID uuid, UUID friendUuid) {
-        return friendsEdge("/friends/decline", uuid, friendUuid);
-    }
-
-    private CompletableFuture<Boolean> friendsEdge(String path, UUID uuid, UUID friendUuid) {
-        if (!configured()) {
-            return CompletableFuture.completedFuture(false);
-        }
-        return post(path, new Wire.FriendAdd(uuid.toString(), friendUuid.toString()))
-                .thenApply(resp -> {
-                    Wire.Success ok = GSON.fromJson(resp.body(), Wire.Success.class);
-                    return ok != null && ok.success();
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return false;
-                });
+        return edge("/friends/decline", new Wire.FriendAdd(uuid.toString(), friendUuid.toString()));
     }
 
     @Override
     public CompletableFuture<Boolean> muteFriend(UUID uuid, UUID targetUuid) {
-        return relationEdge("/friends/mute", uuid, targetUuid);
+        return edge("/friends/mute", new Wire.FriendRelation(uuid.toString(), targetUuid.toString()));
     }
 
     @Override
     public CompletableFuture<Boolean> unmuteFriend(UUID uuid, UUID targetUuid) {
-        return relationEdge("/friends/unmute", uuid, targetUuid);
+        return edge("/friends/unmute", new Wire.FriendRelation(uuid.toString(), targetUuid.toString()));
     }
 
     @Override
     public CompletableFuture<Boolean> blockFriend(UUID uuid, UUID targetUuid) {
-        return relationEdge("/friends/block", uuid, targetUuid);
+        return edge("/friends/block", new Wire.FriendRelation(uuid.toString(), targetUuid.toString()));
     }
 
     @Override
     public CompletableFuture<Boolean> unblockFriend(UUID uuid, UUID targetUuid) {
-        return relationEdge("/friends/unblock", uuid, targetUuid);
+        return edge("/friends/unblock", new Wire.FriendRelation(uuid.toString(), targetUuid.toString()));
     }
 
-    private CompletableFuture<Boolean> relationEdge(String path, UUID uuid, UUID targetUuid) {
+    private CompletableFuture<Boolean> edge(String path, Object body) {
         if (!configured()) {
             return CompletableFuture.completedFuture(false);
         }
-        return post(path, new Wire.FriendRelation(uuid.toString(), targetUuid.toString()))
+        return post(path, body)
                 .thenApply(resp -> {
                     Wire.Success ok = GSON.fromJson(resp.body(), Wire.Success.class);
                     return ok != null && ok.success();
@@ -433,8 +417,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 .thenApply(resp -> {
                     Wire.SkinUploadResponse r = GSON.fromJson(resp.body(), Wire.SkinUploadResponse.class);
                     if (r != null && r.url() != null) {
-                        // the per-uuid URL is stable across replacements, so version it by content
-                        // hash: URL-keyed caches (ours and friends') re-download on change
+
                         String hash = r.hash() == null ? "" : r.hash();
                         String version = hash.isEmpty() ? ""
                                 : "?v=" + hash.substring(0, Math.min(16, hash.length()));
@@ -588,7 +571,6 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         return dto == null ? null : dto.toApi(base());
     }
 
-    // internals
     private boolean configured() {
         return !base().isEmpty();
     }

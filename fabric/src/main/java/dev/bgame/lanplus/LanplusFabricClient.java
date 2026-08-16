@@ -15,13 +15,6 @@ import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenMouseEvents;
 import net.minecraft.client.gui.GuiGraphics;
 
-/**
- * Fabric client entry point. Wires the loader-agnostic common handlers to Fabric events.
- *
- * NOTE: Advancement tracking is handled by the fabric mixin client.PlayerAdvancementsMixin
- * (Fabric has no client advancement event), so nothing is wired here for it. Forge uses
- * AdvancementEarnEvent instead.
- */
 public class LanplusFabricClient implements ClientModInitializer {
 
     @Override
@@ -45,7 +38,6 @@ public class LanplusFabricClient implements ClientModInitializer {
             PauseMenuButtons.tryAddHostButton(screen);
         });
 
-        // Fabric screen render callback signature
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             ScreenEvents.afterRender(screen).register((screenInstance, graphics, mouseX, mouseY, tickDelta) -> {
                 LanPlusNotifications.onScreenRender(graphics, mouseX, mouseY);
@@ -57,6 +49,6 @@ public class LanplusFabricClient implements ClientModInitializer {
 
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
                 (handler, client) -> ClientPresenceDetector.onLogout());
-        
+
     }
 }

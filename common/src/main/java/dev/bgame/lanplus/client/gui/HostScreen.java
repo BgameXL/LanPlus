@@ -171,24 +171,28 @@ public final class HostScreen extends Screen {
         LanPlusUI.panel(g, cardX, cardY, cardX + cardW, cardY + cardH);
         LanPlusUI.header(g, this.font, this.title, cardX + PAD, cardY + PAD, cardW - 2 * PAD);
 
+        boolean anyOpen = gameTypeOpen || difficultyOpen;
+        int bmx = anyOpen ? -1 : mouseX;
+        int bmy = anyOpen ? -1 : mouseY;
+
         if (!inWorld) {
             g.fill(cardX + PAD, listTop, cardX + cardW - PAD, listBottom, LanPlusUI.SURFACE_RAISED);
             LanPlusUI.border(g, cardX + PAD, listTop, cardX + cardW - PAD, listBottom);
             if (loading) {
                 g.drawCenteredString(this.font, Component.translatable("gui.lanplus.host.loading"),
-                        cardX + cardW / 2, listTop + 24, LanPlusUI.FAINT);
+                        cardX + cardW / 2, listTop + 47, LanPlusUI.FAINT);
             } else if (worlds.isEmpty()) {
                 g.drawCenteredString(this.font, Component.translatable("gui.lanplus.host.noworlds"),
-                        cardX + cardW / 2, listTop + 24, LanPlusUI.FAINT);
+                        cardX + cardW / 2, listTop + 47, LanPlusUI.FAINT);
             } else {
-                renderWorldList(g, mouseX, mouseY);
+                renderWorldList(g, bmx, bmy);
             }
         }
 
-        renderWorldSettings(g, mouseX, mouseY);
-        renderAccess(g, mouseX, mouseY);
+        renderWorldSettings(g, bmx, bmy);
+        renderAccess(g, bmx, bmy);
 
-        super.render(g, mouseX, mouseY, partialTick);
+        super.render(g, bmx, bmy, partialTick);
 
         renderOpenDropdowns(g, mouseX, mouseY);
     }
@@ -236,6 +240,8 @@ public final class HostScreen extends Screen {
                                    Function<Integer, Component> labelFn, int selectedIdx,
                                    int mouseX, int mouseY) {
         int menuH = count * ITEM_H + 4;
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 300);
         g.fill(x, menuTop, x + w, menuTop + menuH, LanPlusUI.SURFACE_RAISED);
         LanPlusUI.border(g, x, menuTop, x + w, menuTop + menuH);
         for (int i = 0; i < count; i++) {
@@ -249,6 +255,7 @@ public final class HostScreen extends Screen {
             g.drawString(this.font, labelFn.apply(i), x + 6, iy + (ITEM_H - 8) / 2,
                     i == selectedIdx ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
         }
+        g.pose().popPose();
     }
 
     private void renderAccess(GuiGraphics g, int mouseX, int mouseY) {
@@ -410,13 +417,20 @@ public final class HostScreen extends Screen {
             difficultyOpen = false;
             return true;
         }
-        if (in(mouseX, mouseY, ctrlX, cmdRowY, ctrlW, DROPDOWN_H)) {
-            allowCheats = !allowCheats;
-            return true;
-        }
         if (in(mouseX, mouseY, ctrlX, diffRowY, ctrlW, DROPDOWN_H)) {
             difficultyOpen = !difficultyOpen;
             gameTypeOpen = false;
+            return true;
+        }
+
+        if (gameTypeOpen || difficultyOpen) {
+            gameTypeOpen = false;
+            difficultyOpen = false;
+            return true;
+        }
+
+        if (in(mouseX, mouseY, ctrlX, cmdRowY, ctrlW, DROPDOWN_H)) {
+            allowCheats = !allowCheats;
             return true;
         }
         return false;

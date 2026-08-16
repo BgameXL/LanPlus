@@ -4,9 +4,6 @@ import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
-/**
- * The fixed catalog of "Questions about yourself" prompts.
- */
 public final class ProfilePromptCatalog {
 
     public enum Type {FREE, CHOICE}

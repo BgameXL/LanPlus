@@ -21,10 +21,6 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Loader-agnostic client-side presence detector. Loader modules are responsible for
- * subscribing the public static methods to the appropriate client tick and logout events.
- */
 public final class ClientPresenceDetector {
 
     private static final String MODPACK_CONFIG_FILE = "lanplus-modpack.json";

@@ -14,10 +14,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Low-level Discord IPC transport + framing.
- * This class only moves bytes; the activity protocol lives in {@link DiscordRichPresence}.
- */
 final class DiscordIpc implements Closeable {
 
     static final int OP_HANDSHAKE = 0;

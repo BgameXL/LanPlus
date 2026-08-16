@@ -11,12 +11,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
-/**
- * Drives the relay {@link RelayTunnel} from presence state.
- * When the local player starts HOSTING, it requests a ticket, opens the tunnel, and republishes the assigned
- * public domain as the presence address - so {@code invites/} mints a join code that points at the
- * relay instead of the unreachable {@code localhost} address. When hosting stops, it closes the tunnel.
- */
 public final class RelayHostingCoordinator implements PresenceManager.PresenceListener {
 
     private static final Logger LOGGER = LogUtils.getLogger();

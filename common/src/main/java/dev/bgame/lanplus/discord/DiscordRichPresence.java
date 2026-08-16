@@ -20,11 +20,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-/**
- * {@link DiscordPresence} backed by Discord's local IPC (see {@link DiscordIpc}). Maps the local
- * {@link PresenceSnapshot} to a Rich Presence activity and, while hosting, carries the LAN+ invite code as the activity
- * join secret so friends can join straight from Discord.
- */
 public final class DiscordRichPresence implements DiscordPresence {
 
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -32,7 +27,8 @@ public final class DiscordRichPresence implements DiscordPresence {
     private static final long REFRESH_SECONDS = 60;
     private static final int MAX_TEXT = 128;
     private final String appId;
-    private final boolean enabled;
+    private final boolean hasAppId;
+    private volatile boolean enabled;
     private final long pid = ProcessHandle.current().pid();
     private final long sessionStart = Instant.now().getEpochSecond();
     private final ScheduledExecutorService exec;
@@ -46,9 +42,10 @@ public final class DiscordRichPresence implements DiscordPresence {
     private volatile String worldKey;
     private volatile long worldStart = sessionStart;
 
-    public DiscordRichPresence(String appId, Supplier<int[]> partySize, Consumer<String> joinHandler) {
+    public DiscordRichPresence(String appId, boolean enabled, Supplier<int[]> partySize, Consumer<String> joinHandler) {
         this.appId = appId == null ? "" : appId.trim();
-        this.enabled = !this.appId.isBlank();
+        this.hasAppId = !this.appId.isBlank();
+        this.enabled = enabled && this.hasAppId;
         this.partySize = partySize;
         this.joinHandler = joinHandler;
         this.exec = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -56,7 +53,7 @@ public final class DiscordRichPresence implements DiscordPresence {
             t.setDaemon(true);
             return t;
         });
-        if (enabled) {
+        if (hasAppId) {
             exec.scheduleWithFixedDelay(this::push, REFRESH_SECONDS, REFRESH_SECONDS, TimeUnit.SECONDS);
         }
     }
@@ -68,12 +65,32 @@ public final class DiscordRichPresence implements DiscordPresence {
 
     @Override
     public void update(PresenceSnapshot snapshot) {
-        if (!enabled || snapshot == null) {
+        if (snapshot == null) {
             return;
         }
         trackWorld(snapshot);
         last = snapshot;
-        exec.execute(this::push);
+        if (enabled) {
+            exec.execute(this::push);
+        }
+    }
+
+    @Override
+    public void setEnabled(boolean value) {
+        boolean want = value && hasAppId;
+        if (want == enabled) {
+            return;
+        }
+        enabled = want;
+        if (want) {
+            exec.execute(this::push);
+        } else {
+            exec.execute(() -> {
+                if (connected) {
+                    trySend(null);
+                }
+            });
+        }
     }
 
     @Override
@@ -101,6 +118,9 @@ public final class DiscordRichPresence implements DiscordPresence {
     }
 
     private void push() {
+        if (!enabled) {
+            return;
+        }
         PresenceSnapshot snapshot = last;
         if (snapshot == null || !ensureConnected()) {
             return;

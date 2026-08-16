@@ -7,10 +7,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Local host-side access policy for the world currently opened to LAN through LAN+: which mode is
- * active and the set of allowed player uuids.
- */
 public final class HostAccessControl {
 
     private static volatile HostAccessMode mode = HostAccessMode.EVERYONE;
@@ -61,7 +57,7 @@ public final class HostAccessControl {
             return true;
         }
         if (uuid != null && uuid.equals(hostUuid)) {
-            return true; // the host themselves
+            return true;
         }
         return uuid != null && allowed.contains(uuid);
     }

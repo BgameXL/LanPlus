@@ -1,6 +1,7 @@
 package dev.bgame.lanplus.client.gui;
 
 import dev.bgame.lanplus.Config;
+import dev.bgame.lanplus.client.LanPlusClient;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -12,7 +13,7 @@ import java.util.List;
 public final class SettingsScreen extends Screen {
 
     private enum Cat {
-        GENERAL("general"), APPEARANCE("appearance"), ADVANCED("advanced");
+        GENERAL("general"), THEME("Theme"), ADVANCED("advanced");
         final String key;
 
         Cat(String key) {
@@ -23,8 +24,6 @@ public final class SettingsScreen extends Screen {
     private static final int SIDEBAR_W = 118;
     private static final int ROW_GAP = 6;
     private static final int CARD_H = 38;
-    private static final int SWATCH = 22;
-    private static final int SWATCH_GAP = 6;
     private final Screen parent;
     private Cat selected = Cat.GENERAL;
     private EditBox backendBox;
@@ -95,11 +94,6 @@ public final class SettingsScreen extends Screen {
         }
     }
 
-    private void selectTheme(Theme t) {
-        LanPlusUI.apply(t);
-        Config.setTheme(t.id());
-    }
-
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         renderBackground(g);
@@ -120,7 +114,7 @@ public final class SettingsScreen extends Screen {
 
         switch (selected) {
             case GENERAL -> renderGeneral(g);
-            case APPEARANCE -> renderAppearance(g);
+            case THEME -> renderTheme(g);
             case ADVANCED -> renderAdvanced(g);
         }
 
@@ -147,7 +141,10 @@ public final class SettingsScreen extends Screen {
     private void renderGeneral(GuiGraphics g) {
         int y = contentTop + 2;
         y = toggleRow(g, y, "enabled", Config.enabled, () -> flip(() -> Config.enabled = !Config.enabled));
-        y = toggleRow(g, y, "discord", Config.discordEnabled, () -> flip(() -> Config.discordEnabled = !Config.discordEnabled));
+        y = toggleRow(g, y, "discord", Config.discordEnabled, () -> flip(() -> {
+            Config.discordEnabled = !Config.discordEnabled;
+            LanPlusClient.setDiscordEnabled(Config.discordEnabled);
+        }));
         toggleRow(g, y, "relay", Config.relayEnabled, () -> flip(() -> Config.relayEnabled = !Config.relayEnabled));
     }
 
@@ -163,7 +160,7 @@ public final class SettingsScreen extends Screen {
         rows.add(new Row(x, y, w, rh, act));
         return y + rh + 8;
     }
-    
+
     private void toggle(GuiGraphics g, int x, int y, boolean on) {
         int w = 28;
         int h = 14;
@@ -173,31 +170,10 @@ public final class SettingsScreen extends Screen {
         g.fill(kx, y + 2, kx + 10, y + h - 2, on ? LanPlusUI.SURFACE : LanPlusUI.MUTED);
     }
 
-    private void renderAppearance(GuiGraphics g) {
-        int x = contentX;
-        int y = contentTop + 2;
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings.theme"), x, y + 6, LanPlusUI.TEXT, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings.theme.desc"), x, y + 18, LanPlusUI.MUTED, false);
-
-        int sx = x;
-        int sy = y + 32;
-        for (Theme t : Themes.ALL) {
-            boolean cur = LanPlusUI.current().id().equals(t.id());
-            g.fill(sx, sy, sx + SWATCH, sy + SWATCH, t.surface() | 0xFF000000);
-            g.fill(sx + 4, sy + 4, sx + SWATCH - 4, sy + SWATCH - 4, t.accent());
-            if (cur) {
-                g.fill(sx - 2, sy - 2, sx + SWATCH + 2, sy, LanPlusUI.LIME);
-                g.fill(sx - 2, sy + SWATCH, sx + SWATCH + 2, sy + SWATCH + 2, LanPlusUI.LIME);
-                g.fill(sx - 2, sy - 2, sx, sy + SWATCH + 2, LanPlusUI.LIME);
-                g.fill(sx + SWATCH, sy - 2, sx + SWATCH + 2, sy + SWATCH + 2, LanPlusUI.LIME);
-            } else {
-                LanPlusUI.bevelInset(g, sx, sy, sx + SWATCH, sy + SWATCH);
-            }
-            Theme pick = t;
-            rows.add(new Row(sx, sy, SWATCH, SWATCH, () -> selectTheme(pick)));
-            sx += SWATCH + SWATCH_GAP;
-        }
-        g.drawString(this.font, LanPlusUI.current().name(), sx + 4, sy + (SWATCH - 8) / 2, LanPlusUI.MUTED, false);
+    private void renderTheme(GuiGraphics g) {
+        int cx = contentX + contentW / 2;
+        int cy = (contentTop + py + ph - 8) / 2;
+        g.drawCenteredString(this.font, Component.translatable("gui.lanplus.settings.theme.soon"), cx, cy + 2, LanPlusUI.FAINT);
     }
 
     private void renderAdvanced(GuiGraphics g) {

@@ -9,10 +9,6 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.chat.Component;
 
-/**
- * Connects the client to a LAN+ world address, leaving the current world first if needed. Shared
- * by the friends screen JOIN flow and the Discord activity-join handler.
- */
 public final class JoinHelper {
 
     private JoinHelper() {

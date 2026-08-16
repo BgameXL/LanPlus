@@ -16,11 +16,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Opens the active singleplayer world to LAN once it has loaded and applies the chosen
- * {@link HostAccessMode}. The {@link dev.bgame.lanplus.client.gui.HostScreen}
- * arms a request, then this watcher publishes the integrated server on the server thread when it is up.
- */
 public final class HostController {
 
     private static final Logger LOGGER = LogUtils.getLogger();

@@ -14,12 +14,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * Default {@link PresenceManager}: the hub of {@code Minecraft → PresenceManager → LanPlusNetwork →
- * Backend}. Side-agnostic (no Minecraft types) - detection feeds it from the client.
- * Assembles the local {@link PresenceSnapshot} from parts contributed by different modules and pushes it on every
- * change as well as on each {@link #heartbeat()}. All pushes are fire-and-forget and fail soft.
- */
 public final class DefaultPresenceManager implements PresenceManager {
 
     private static final Logger LOGGER = LogUtils.getLogger();

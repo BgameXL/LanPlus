@@ -76,7 +76,7 @@ public final class LanPlusClient {
         friends.addListener(LanPlusClient::resolveFriendSkins);
         friends.addListener(new SocialToastListener());
 
-        discord = new DiscordRichPresence(Config.discordEnabled ? Config.discordAppId : "",
+        discord = new DiscordRichPresence(Config.discordAppId, Config.discordEnabled,
                 LanPlusClient::integratedPartySize, LanPlusClient::joinByInviteCode);
         presence.addListener(discord::update);
         discord.update(presence.current());
@@ -122,6 +122,12 @@ public final class LanPlusClient {
 
     public static DiscordPresence discord() {
         return discord;
+    }
+
+    public static void setDiscordEnabled(boolean on) {
+        if (discord != null) {
+            discord.setEnabled(on);
+        }
     }
 
     public static void resolveFriendSkins(List<Friend> list) {

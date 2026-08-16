@@ -25,7 +25,6 @@ import java.util.function.Supplier;
 
 public final class DefaultProfilesService implements ProfilesService {
 
-    // catalog entries are capped at 512 KB server-side; allow a little slack while streaming
     private static final int MAX_IMAGE_BYTES = 512 * 1024;
     private static final Duration FETCH_TIMEOUT = Duration.ofSeconds(10);
 

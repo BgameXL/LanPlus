@@ -579,8 +579,14 @@ public final class FriendsScreen extends Screen {
         if (tab == Tab.FRIENDS && button == 0) {
             Friend f = friendAt(mouseX, mouseY);
             if (f != null) {
-                selectedUuid = f.uuid();
+                selectedUuid = f.uuid().equals(selectedUuid) ? null : f.uuid();
                 FriendNotifications.markSeen(f.uuid());
+                rebuildWidgets();
+                return true;
+            }
+            if (selectedUuid != null && mouseX >= leftX && mouseX <= leftX + LEFT_W
+                    && mouseY >= paneTop && mouseY <= paneBottom) {
+                selectedUuid = null;
                 rebuildWidgets();
                 return true;
             }
@@ -737,7 +743,6 @@ public final class FriendsScreen extends Screen {
         return false;
     }
 
-    // Actions
     private void doAdd() {
         FriendsService friends = LanPlusClient.friends();
         if (friends == null || addBox == null) {
@@ -934,7 +939,6 @@ public final class FriendsScreen extends Screen {
         return s == null || s.isEmpty() ? "-" : "*".repeat(Math.min(s.length(), 24));
     }
 
-    // helpers
     private List<Friend> friends() {
         FriendsService friends = LanPlusClient.friends();
         return friends == null ? List.of() : friends.friends();
@@ -984,7 +988,7 @@ public final class FriendsScreen extends Screen {
             return Component.translatable("gui.lanplus.rel.muted");
         }
         if (f.connectivity() != Connectivity.ONLINE && f.connectivity() != Connectivity.STALE) {
-            // OFFLINE and UNKNOWN (no presence record) both read as offline; only ONLINE/STALE are live.
+
             return Component.translatable("gui.lanplus.state.offline");
         }
         GameplayState state = f.state();

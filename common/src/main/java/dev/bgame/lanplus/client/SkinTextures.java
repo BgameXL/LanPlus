@@ -11,11 +11,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * Client-side binding of resolved skin bytes to Minecraft textures.
- * Textures are registered once per cache key; each player just points at one. Queried
- * by the friends UI avatars and the in-world {@code AbstractClientPlayerMixin}.
- */
 public final class SkinTextures implements SkinTextureSink {
 
     public record Resolved(ResourceLocation texture, boolean slim) {

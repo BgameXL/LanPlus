@@ -5,9 +5,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
-/*
- * A {@link Button} rendered in the LAN+ style instead of vanilla Minecraft.
- */
 public final class LanPlusButton extends Button {
 
     private final boolean primary;

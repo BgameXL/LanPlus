@@ -69,7 +69,6 @@ public final class TcpRelayTunnel implements RelayTunnel {
         return open && c != null && !c.isClosed();
     }
 
-    // control connection
     private void runControl(RelayTicket ticket, CompletableFuture<String> result) {
         try {
             Socket c = connect(ticket.relayHost(), ticket.relayPort());
@@ -102,18 +101,17 @@ public final class TcpRelayTunnel implements RelayTunnel {
                         pool.execute(() -> proxySession(ticket, id));
                     }
                     case "PING" -> writeLine(out, GSON.toJson(Map.of("type", "PONG")));
-                    default -> { /* ignored */ }
+                    default -> { }
                 }
             }
         } catch (IOException e) {
             LOGGER.debug("LAN+ relay tunnel closed: {}", e.toString());
-            result.complete(null); // no-op if already completed
+            result.complete(null);
         } finally {
             open = false;
         }
     }
 
-    // per-player data connection
     private void proxySession(RelayTicket ticket, String id) {
         Socket data = null;
         Socket local = null;
@@ -159,17 +157,14 @@ public final class TcpRelayTunnel implements RelayTunnel {
                 out.flush();
             }
         } catch (IOException ignored) {
-            // peer closed - tear down
         } finally {
             try {
                 to.shutdownOutput();
             } catch (IOException ignored) {
-                // already closed
             }
         }
     }
 
-    // helpers
     private Socket connect(String host, int port) throws IOException {
         if (plaintext) {
             Socket s = new Socket();
@@ -179,7 +174,7 @@ public final class TcpRelayTunnel implements RelayTunnel {
         }
         SSLSocket s = (SSLSocket) SSLSocketFactory.getDefault().createSocket(host, port);
         SSLParameters params = s.getSSLParameters();
-        params.setEndpointIdentificationAlgorithm("HTTPS"); // verify the relay's cert hostname
+        params.setEndpointIdentificationAlgorithm("HTTPS");
         s.setSSLParameters(params);
         s.setTcpNoDelay(true);
         s.startHandshake();
@@ -215,7 +210,6 @@ public final class TcpRelayTunnel implements RelayTunnel {
             try {
                 s.close();
             } catch (IOException ignored) {
-                // nothing to do
             }
         }
     }

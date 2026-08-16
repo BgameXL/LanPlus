@@ -19,10 +19,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.net.http.HttpClient;
 
-/**
- * Resolves skin references into PNG bytes off the game thread and hands them to a {@link
- * SkinTextureSink} for client-side binding.
- */
 public final class DefaultSkinService implements SkinService {
 
     private static final String PROFILE_API = "https://sessionserver.mojang.com/session/minecraft/profile/";

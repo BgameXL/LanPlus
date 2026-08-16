@@ -170,6 +170,9 @@ public final class ProfileScreen extends Screen {
     }
 
     private final List<LinkRow> linkRows = new ArrayList<>();
+    private static final int LINK_PICK_W = 76;
+    private int linkPickerOpen = -1;
+    private final List<int[]> linkPickerCells = new ArrayList<>();
     private static final int COL_GAP = 16;
     private static final int EDIT_SECTION_GAP = 18;
     private static final int EDIT_W = 440;
@@ -685,10 +688,11 @@ public final class ProfileScreen extends Screen {
     }
 
     private void buildLinkWidgets() {
+        linkPickerOpen = -1;
         if (linkRows.isEmpty()) {
             linkRows.add(new LinkRow(firstUnusedPlatform()));
         }
-        int pickW = 76;
+        int pickW = LINK_PICK_W;
         int rmW = 16;
         int boxX = colLX + pickW + 6;
         int boxW = colW - pickW - 6 - rmW - 4;
@@ -697,7 +701,7 @@ public final class ProfileScreen extends Screen {
             int y = aLinksRowsY + i * 24;
             final int idx = i;
             addRenderableWidget(LanPlusButton.create(Component.literal(platformLabel(PLATFORMS[r.platform])),
-                    b -> cycleLinkPlatform(idx)).bounds(colLX, y, pickW, 20).build());
+                    b -> openLinkPicker(idx)).bounds(colLX, y, pickW, 20).build());
             EditBox box = new EditBox(this.font, boxX, y + 1, boxW, 18, Component.literal(PLATFORMS[r.platform]));
             box.setMaxLength(40);
             box.setHint(Component.translatable("gui.lanplus.profile.link.hint"));
@@ -721,12 +725,31 @@ public final class ProfileScreen extends Screen {
         }
     }
 
-    private void cycleLinkPlatform(int idx) {
+    private void openLinkPicker(int idx) {
         captureLinkValues();
         captureFreeValues();
-        LinkRow r = linkRows.get(idx);
-        r.platform = nextUnusedPlatform(r.platform, idx);
+        linkPickerOpen = idx;
+    }
+
+    private void pickLinkPlatform(int idx, int platform) {
+        captureLinkValues();
+        captureFreeValues();
+        linkPickerOpen = -1;
+        if (idx >= 0 && idx < linkRows.size()) {
+            linkRows.get(idx).platform = platform;
+        }
         rebuildWidgets();
+    }
+
+    private List<Integer> linkOptions(int idx) {
+        List<Integer> out = new ArrayList<>();
+        int cur = idx >= 0 && idx < linkRows.size() ? linkRows.get(idx).platform : -1;
+        for (int p = 0; p < PLATFORMS.length; p++) {
+            if (p == cur || !platformUsed(p, idx)) {
+                out.add(p);
+            }
+        }
+        return out;
     }
 
     private void addLinkRow() {
@@ -755,16 +778,6 @@ public final class ProfileScreen extends Screen {
             }
         }
         return 0;
-    }
-
-    private int nextUnusedPlatform(int cur, int exceptRow) {
-        for (int step = 1; step <= PLATFORMS.length; step++) {
-            int p = (cur + step) % PLATFORMS.length;
-            if (!platformUsed(p, exceptRow)) {
-                return p;
-            }
-        }
-        return cur;
     }
 
     private boolean platformUsed(int p, int exceptRow) {
@@ -864,6 +877,7 @@ public final class ProfileScreen extends Screen {
         pronounIndex = 0;
         invisibleToggle = profile.invisible();
         skinSlimToggle = Config.skinSlim;
+        linkPickerOpen = -1;
         linkRows.clear();
         for (int p = 0; p < PLATFORMS.length; p++) {
             String v = profile.link(PLATFORMS[p]);
@@ -950,7 +964,63 @@ public final class ProfileScreen extends Screen {
                 status = null;
             }
         }
-        super.render(g, mouseX, mouseY, partialTick);
+        boolean pickerOpen = editing && editTab == 0 && linkPickerOpen >= 0;
+        super.render(g, pickerOpen ? -1 : mouseX, pickerOpen ? -1 : mouseY, partialTick);
+        if (pickerOpen) {
+            renderLinkPicker(g, mouseX, mouseY);
+        }
+    }
+
+    private void renderLinkPicker(GuiGraphics g, int mouseX, int mouseY) {
+        linkPickerCells.clear();
+        if (linkPickerOpen < 0 || linkPickerOpen >= linkRows.size()) {
+            return;
+        }
+        List<Integer> opts = linkOptions(linkPickerOpen);
+        int cur = linkRows.get(linkPickerOpen).platform;
+        int itemH = 15;
+        int w = LINK_PICK_W;
+        for (int p : opts) {
+            w = Math.max(w, this.font.width(platformLabel(PLATFORMS[p])) + 12);
+        }
+        int x = colLX;
+        int top = aLinksRowsY + linkPickerOpen * 24 + 21;
+        int h = opts.size() * itemH;
+        int bg = 0xFF000000 | (PANEL_BG & 0xFFFFFF);
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 300);
+        g.fill(x, top, x + w, top + h, bg);
+        LanPlusUI.border(g, x, top, x + w, top + h);
+        g.fill(x, top, x + w, top + 1, ACCENT_LINE);
+        for (int i = 0; i < opts.size(); i++) {
+            int p = opts.get(i);
+            int iy = top + i * itemH;
+            boolean hover = mouseX >= x && mouseX < x + w && mouseY >= iy && mouseY < iy + itemH;
+            boolean sel = p == cur;
+            if (hover) {
+                g.fill(x + 1, iy, x + w - 1, iy + itemH, ACCENT_TINT);
+            }
+            if (sel) {
+                g.fill(x + 1, iy, x + 2, iy + itemH, ACCENT);
+            }
+            g.drawString(this.font, platformLabel(PLATFORMS[p]), x + 6, iy + 3,
+                    sel ? ACCENT : (hover ? TEXT : MUTED), false);
+            linkPickerCells.add(new int[]{x, iy, w, itemH, p});
+        }
+        g.pose().popPose();
+    }
+
+    private int linkPickerButtonAt(double mx, double my) {
+        if (editTab != 0) {
+            return -1;
+        }
+        for (int i = 0; i < linkRows.size(); i++) {
+            int y = aLinksRowsY + i * 24;
+            if (mx >= colLX && mx < colLX + LINK_PICK_W && my >= y && my < y + 20) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void renderBackdrop(GuiGraphics g) {
@@ -1683,6 +1753,17 @@ public final class ProfileScreen extends Screen {
                 }
                 return true;
             }
+        }
+        if (editing && button == 0 && linkPickerOpen >= 0) {
+            for (int[] c : linkPickerCells) {
+                if (mouseX >= c[0] && mouseX < c[0] + c[2] && mouseY >= c[1] && mouseY < c[1] + c[3]) {
+                    pickLinkPlatform(linkPickerOpen, c[4]);
+                    return true;
+                }
+            }
+            int pb = linkPickerButtonAt(mouseX, mouseY);
+            linkPickerOpen = (pb >= 0 && pb != linkPickerOpen) ? pb : -1;
+            return true;
         }
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;

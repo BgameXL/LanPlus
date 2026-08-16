@@ -6,5 +6,6 @@ public interface DiscordPresence {
 
     boolean isAvailable();
     void update(PresenceSnapshot snapshot);
+    void setEnabled(boolean enabled);
     void clear();
 }
