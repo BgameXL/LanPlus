@@ -14,6 +14,7 @@
   "gui.lanplus.status.refreshing": "Refreshing…",
 
   "gui.lanplus.friends.empty": "No friends yet",
+  "gui.lanplus.friends.offline": "Offline (%s)",
   "gui.lanplus.friends.tooltip": "Friends",
   "gui.lanplus.detail.none": "Select a friend",
 
@@ -53,6 +54,10 @@
   "gui.lanplus.blocked.on": "Blocked %s",
   "gui.lanplus.blocked.off": "Unblocked %s",
   "gui.lanplus.join.title": "Join by code",
+  "gui.lanplus.join.hosting.title": "Hosting now",
+  "gui.lanplus.join.hosting.empty": "No friends hosting right now",
+  "gui.lanplus.join.pick": "Select a hosting friend, or join by code below.",
+  "gui.lanplus.join.cheats": "Cheats",
   "gui.lanplus.join.hint": "Invite code",
   "gui.lanplus.join.button": "Join",
   "gui.lanplus.join.note": "Enter a friend's invite code to join their world.",

@@ -245,7 +245,10 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
                 friend.skin(),
                 friend.muted(),
                 friend.blocked(),
-                friend.tier()));
+                friend.tier(),
+                update.gameMode(),
+                update.difficulty(),
+                update.allowCommands()));
         if (patched != null) {
             notifyChanged();
         }

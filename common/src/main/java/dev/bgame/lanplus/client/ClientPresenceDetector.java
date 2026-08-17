@@ -30,6 +30,9 @@ public final class ClientPresenceDetector {
     private static String lastModpack = null;
     private static boolean modpackCached = false;
     private static String cachedModpack = null;
+    private static String lastGameMode = null;
+    private static String lastDifficulty = null;
+    private static boolean lastAllowCommands = false;
 
     private ClientPresenceDetector() {
     }
@@ -46,6 +49,7 @@ public final class ClientPresenceDetector {
             lastState = state;
             publishSkinIfChanged(mc, presence);
             publishModpackIfChanged(mc, presence);
+            publishWorldIfChanged(mc, presence, state);
             presence.updateState(state, detectWorldName(mc, state), detectAddress(mc, state));
         }
 
@@ -54,6 +58,7 @@ public final class ClientPresenceDetector {
             tickCounter = 0;
             publishSkinIfChanged(mc, presence);
             publishModpackIfChanged(mc, presence);
+            publishWorldIfChanged(mc, presence, state);
             presence.heartbeat();
         }
     }
@@ -67,7 +72,11 @@ public final class ClientPresenceDetector {
         lastModpack = null;
         modpackCached = false;
         cachedModpack = null;
+        lastGameMode = null;
+        lastDifficulty = null;
+        lastAllowCommands = false;
         presence.updateModpack(null);
+        presence.updateWorld(null, null, false);
         presence.updateState(GameplayState.MENU, null, null);
     }
 
@@ -106,6 +115,44 @@ public final class ClientPresenceDetector {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static void publishWorldIfChanged(Minecraft mc, PresenceManager presence, GameplayState state) {
+        String gameMode = detectGameMode(mc, state);
+        String difficulty = detectDifficulty(mc, state);
+        boolean allowCommands = detectAllowCommands(mc, state);
+        if (Objects.equals(gameMode, lastGameMode) && Objects.equals(difficulty, lastDifficulty)
+                && allowCommands == lastAllowCommands) {
+            return;
+        }
+        lastGameMode = gameMode;
+        lastDifficulty = difficulty;
+        lastAllowCommands = allowCommands;
+        presence.updateWorld(gameMode, difficulty, allowCommands);
+    }
+
+    private static String detectGameMode(Minecraft mc, GameplayState state) {
+        if (state != GameplayState.HOSTING) {
+            return null;
+        }
+        IntegratedServer server = mc.getSingleplayerServer();
+        return server == null ? null : server.getDefaultGameType().name();
+    }
+
+    private static String detectDifficulty(Minecraft mc, GameplayState state) {
+        if (state != GameplayState.HOSTING) {
+            return null;
+        }
+        IntegratedServer server = mc.getSingleplayerServer();
+        return server == null ? null : server.getWorldData().getDifficulty().name();
+    }
+
+    private static boolean detectAllowCommands(Minecraft mc, GameplayState state) {
+        if (state != GameplayState.HOSTING) {
+            return false;
+        }
+        IntegratedServer server = mc.getSingleplayerServer();
+        return server != null && server.getWorldData().getAllowCommands();
     }
 
     private static void publishSkinIfChanged(Minecraft mc, PresenceManager presence) {

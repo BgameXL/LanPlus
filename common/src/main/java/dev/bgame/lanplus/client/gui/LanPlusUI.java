@@ -86,17 +86,18 @@ final class LanPlusUI {
     }
 
     static void bevelRaised(GuiGraphics g, int x0, int y0, int x1, int y1) {
-        g.fill(x0, y0, x1, y0 + 1, EDGE_LIGHT);
-        g.fill(x0, y0, x0 + 1, y1, EDGE_LIGHT);
-        g.fill(x0, y1 - 1, x1, y1, EDGE_DARK);
-        g.fill(x1 - 1, y0, x1, y1, EDGE_DARK);
+        bevel(g, x0, y0, x1, y1, EDGE_LIGHT, EDGE_DARK);
     }
 
     static void bevelInset(GuiGraphics g, int x0, int y0, int x1, int y1) {
-        g.fill(x0, y0, x1, y0 + 1, EDGE_DARK);
-        g.fill(x0, y0, x0 + 1, y1, EDGE_DARK);
-        g.fill(x0, y1 - 1, x1, y1, EDGE_LIGHT);
-        g.fill(x1 - 1, y0, x1, y1, EDGE_LIGHT);
+        bevel(g, x0, y0, x1, y1, EDGE_DARK, EDGE_LIGHT);
+    }
+
+    private static void bevel(GuiGraphics g, int x0, int y0, int x1, int y1, int edgeDark, int edgeLight) {
+        g.fill(x0, y0, x1, y0 + 1, edgeDark);
+        g.fill(x0, y0, x0 + 1, y1, edgeDark);
+        g.fill(x0, y1 - 1, x1, y1, edgeLight);
+        g.fill(x1 - 1, y0, x1, y1, edgeLight);
     }
 
     static void header(GuiGraphics g, Font font, Component label, int x, int y, int width) {
@@ -119,5 +120,19 @@ final class LanPlusUI {
         int color = !enabled ? FAINT : selected || hover ? TEXT : MUTED;
         int tx = x + (w - font.width(label)) / 2;
         g.drawString(font, label, tx, y + (h - 8) / 2, color, false);
+    }
+
+    static String relativeTime(long epochMillis) {
+        long seconds = Math.max(0, (System.currentTimeMillis() - epochMillis) / 1000L);
+        if (seconds < 60) {
+            return seconds + "s";
+        }
+        if (seconds < 3600) {
+            return (seconds / 60) + "m";
+        }
+        if (seconds < 86400) {
+            return (seconds / 3600) + "h";
+        }
+        return (seconds / 86400) + "d";
     }
 }

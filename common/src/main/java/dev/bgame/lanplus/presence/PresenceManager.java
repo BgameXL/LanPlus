@@ -20,6 +20,8 @@ public interface PresenceManager {
 
     void updateModpack(String modpackId);
 
+    void updateWorld(String gameMode, String difficulty, boolean allowCommands);
+
     void heartbeat();
 
     void addListener(PresenceListener listener);

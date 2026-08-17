@@ -56,7 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static dev.bgame.lanplus.client.gui.FriendsScreen.getString;
+import static javax.swing.UIManager.getString;
 
 public final class ProfileScreen extends Screen {
 
@@ -627,7 +627,7 @@ public final class ProfileScreen extends Screen {
     private void openBannerPicker() {
         this.minecraft.setScreen(new ImagePickerScreen(this,
                 Component.translatable("gui.lanplus.profile.banner.pick.title"),
-                bannerCatalog, banner == null ? null : banner.id(), true, 2, 4f / 1f, img -> {
+                bannerCatalog, banner == null ? null : banner.id(), true, 2, 4f, img -> {
             banner = img;
             ProfilesService svc = LanPlusClient.profiles();
             if (svc != null) {
@@ -1256,7 +1256,7 @@ public final class ProfileScreen extends Screen {
         if (!own && pt != null && pt.hasSessions()) {
             Component label = pt.hasLastAt()
                     ? Component.translatable("gui.lanplus.profile.playedtogether.last",
-                    pt.sessions(), relativeTime(pt.lastAt()))
+                    pt.sessions(), LanPlusUI.relativeTime(pt.lastAt()))
                     : Component.translatable("gui.lanplus.profile.playedtogether", pt.sessions());
             g.drawString(this.font, label, l, y, LanPlusUI.LIME);
             y += 14;
@@ -2049,7 +2049,7 @@ public final class ProfileScreen extends Screen {
         if (profile.lastSeen() <= 0) {
             return Component.translatable("gui.lanplus.profile.offline");
         }
-        return Component.translatable("gui.lanplus.profile.lastseen", relativeTime(profile.lastSeen()));
+        return Component.translatable("gui.lanplus.profile.lastseen", LanPlusUI.relativeTime(profile.lastSeen()));
     }
 
     private Component friendStatus(Friend f) {
@@ -2082,10 +2082,6 @@ public final class ProfileScreen extends Screen {
             case OFFLINE -> LanPlusUI.FAINT;
             case UNKNOWN -> 0xFF4A4E57;
         };
-    }
-
-    private static String relativeTime(long epochMillis) {
-        return getString(epochMillis);
     }
 
     private void setStatus(Component message) {

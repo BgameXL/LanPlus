@@ -47,6 +47,9 @@ final class Wire {
             String accessMode,
             List<String> allowedUuids,
             Skin skin,
+            String gameMode,
+            String difficulty,
+            boolean allowCommands,
             long timestamp
     ) {
     }
@@ -61,7 +64,10 @@ final class Wire {
             Skin skin,
             boolean muted,
             boolean blocked,
-            int tier
+            int tier,
+            String gameMode,
+            String difficulty,
+            boolean allowCommands
     ) {
         dev.bgame.lanplus.api.Friend toApi() {
             return new dev.bgame.lanplus.api.Friend(
@@ -74,7 +80,10 @@ final class Wire {
                     skin == null ? null : skin.toApi(),
                     muted,
                     blocked,
-                    tier);
+                    tier,
+                    gameMode,
+                    difficulty,
+                    allowCommands);
         }
     }
 

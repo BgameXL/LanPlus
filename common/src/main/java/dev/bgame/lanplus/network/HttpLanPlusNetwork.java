@@ -113,6 +113,9 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 snapshot.accessMode() == null ? null : snapshot.accessMode().name(),
                 snapshot.allowedUuids().stream().map(UUID::toString).toList(),
                 Wire.Skin.from(snapshot.skin()),
+                snapshot.gameMode(),
+                snapshot.difficulty(),
+                snapshot.allowCommands(),
                 System.currentTimeMillis());
         return post("/presence", body)
                 .thenAccept(resp -> {
@@ -905,7 +908,10 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                                 Connectivity.valueOf(d.get("connectivity").getAsString()),
                                 optionalEnum(d, "state"),
                                 optionalString(d, "worldName"),
-                                optionalString(d, "joinCode"));
+                                optionalString(d, "joinCode"),
+                                optionalString(d, "gameMode"),
+                                optionalString(d, "difficulty"),
+                                optionalBool(d, "allowCommands"));
                         fanout(l -> l.onPresenceUpdate(update));
                     }
                     case "FRIEND_STARTED_HOSTING" -> {
@@ -950,6 +956,10 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
 
         private String optionalString(JsonObject obj, String key) {
             return obj.has(key) && !obj.get(key).isJsonNull() ? obj.get(key).getAsString() : null;
+        }
+
+        private boolean optionalBool(JsonObject obj, String key) {
+            return obj.has(key) && !obj.get(key).isJsonNull() && obj.get(key).getAsBoolean();
         }
     }
 }

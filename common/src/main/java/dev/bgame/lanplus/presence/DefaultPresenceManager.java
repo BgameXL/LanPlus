@@ -22,7 +22,7 @@ public final class DefaultPresenceManager implements PresenceManager {
     private final List<PresenceListener> listeners = new CopyOnWriteArrayList<>();
 
     private volatile PresenceSnapshot snapshot =
-            new PresenceSnapshot(GameplayState.MENU, null, null, null, null, null, null, Set.of());
+            new PresenceSnapshot(GameplayState.MENU, null, null, null, null, null, null, Set.of(), null, null, false);
 
     public DefaultPresenceManager(LanPlusNetwork network) {
         this.network = network;
@@ -37,25 +37,36 @@ public final class DefaultPresenceManager implements PresenceManager {
     public synchronized void updateState(GameplayState state, String worldName, String address) {
         Objects.requireNonNull(state, "state");
         apply(new PresenceSnapshot(state, worldName, address, snapshot.joinCode(), snapshot.skin(),
-                snapshot.modpackId(), snapshot.accessMode(), snapshot.allowedUuids()));
+                snapshot.modpackId(), snapshot.accessMode(), snapshot.allowedUuids(),
+                snapshot.gameMode(), snapshot.difficulty(), snapshot.allowCommands()));
     }
 
     @Override
     public synchronized void setJoinCode(String joinCode, HostAccessMode accessMode, Set<UUID> allowedUuids) {
         apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), joinCode,
-                snapshot.skin(), snapshot.modpackId(), accessMode, allowedUuids));
+                snapshot.skin(), snapshot.modpackId(), accessMode, allowedUuids,
+                snapshot.gameMode(), snapshot.difficulty(), snapshot.allowCommands()));
     }
 
     @Override
     public synchronized void updateSkin(SkinRef skin) {
         apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(),
-                skin, snapshot.modpackId(), snapshot.accessMode(), snapshot.allowedUuids()));
+                skin, snapshot.modpackId(), snapshot.accessMode(), snapshot.allowedUuids(),
+                snapshot.gameMode(), snapshot.difficulty(), snapshot.allowCommands()));
     }
 
     @Override
     public synchronized void updateModpack(String modpackId) {
         apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(),
-                snapshot.skin(), modpackId, snapshot.accessMode(), snapshot.allowedUuids()));
+                snapshot.skin(), modpackId, snapshot.accessMode(), snapshot.allowedUuids(),
+                snapshot.gameMode(), snapshot.difficulty(), snapshot.allowCommands()));
+    }
+
+    @Override
+    public synchronized void updateWorld(String gameMode, String difficulty, boolean allowCommands) {
+        apply(new PresenceSnapshot(snapshot.state(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(),
+                snapshot.skin(), snapshot.modpackId(), snapshot.accessMode(), snapshot.allowedUuids(),
+                gameMode, difficulty, allowCommands));
     }
 
     @Override

@@ -13,7 +13,10 @@ public record Friend(
         SkinRef skin,
         boolean muted,
         boolean blocked,
-        int tier
+        int tier,
+        String gameMode,
+        String difficulty,
+        boolean allowCommands
 ) {
     public Friend {
         Objects.requireNonNull(uuid, "uuid");

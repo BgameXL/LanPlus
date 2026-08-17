@@ -12,7 +12,10 @@ public record PresenceSnapshot(
         SkinRef skin,
         String modpackId,
         HostAccessMode accessMode,
-        Set<UUID> allowedUuids
+        Set<UUID> allowedUuids,
+        String gameMode,
+        String difficulty,
+        boolean allowCommands
 ) {
     public PresenceSnapshot {
         Objects.requireNonNull(state, "state");
