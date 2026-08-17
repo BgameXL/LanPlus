@@ -1,6 +1,7 @@
 package dev.bgame.lanplus.network;
 
 import dev.bgame.lanplus.api.ActivityEntry;
+import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.Invite;
@@ -31,6 +32,9 @@ public interface LanPlusNetwork {
     CompletableFuture<Boolean> unblockFriend(UUID uuid, UUID targetUuid);
     CompletableFuture<List<ResolvedUser>> getFriendRequests(UUID uuid);
     CompletableFuture<List<ActivityEntry>> getActivity();
+    CompletableFuture<List<Announcement>> getAnnouncements();
+    CompletableFuture<List<Announcement>> getUnseenAnnouncements();
+    CompletableFuture<Boolean> markAnnouncementsSeen(List<Integer> ids);
     CompletableFuture<ResolvedUser> resolveUser(String query);
     CompletableFuture<UserProfile> fetchProfile(UUID uuid);
     CompletableFuture<Profile> getProfile(UUID uuid, UUID viewer);
@@ -64,14 +68,19 @@ public interface LanPlusNetwork {
     UUID sessionUuid();
     interface BackendEventListener {
 
-        void onPresenceUpdate(PresenceUpdate update);
+        default void onPresenceUpdate(PresenceUpdate update) {
+        }
 
-        void onFriendStartedHosting(UUID uuid, String joinCode);
+        default void onFriendStartedHosting(UUID uuid, String joinCode) {
+        }
 
         default void onFriendRequest(UUID fromUuid, String fromUsername) {
         }
 
         default void onInviteRedeemed(UUID guestUuid) {
+        }
+
+        default void onAnnouncement(Announcement announcement) {
         }
 
         default void onConnected() {

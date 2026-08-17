@@ -1,6 +1,7 @@
 package dev.bgame.lanplus.client;
 
 import dev.bgame.lanplus.LanplusCommon;
+import dev.bgame.lanplus.client.gui.AnnouncementsScreen;
 import dev.bgame.lanplus.client.gui.FriendsScreen;
 import dev.bgame.lanplus.client.gui.HostScreen;
 import dev.bgame.lanplus.client.gui.LanPlusIconButton;
@@ -22,6 +23,7 @@ public final class TitleScreenButtons {
     private static final ResourceLocation FRIENDS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/friends.png");
     private static final ResourceLocation PROFILE_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/profile.png");
     private static final ResourceLocation SETTINGS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/settings.png");
+    private static final ResourceLocation ANNOUNCEMENTS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/announcements.png");
 
     private TitleScreenButtons() {
     }
@@ -50,6 +52,9 @@ public final class TitleScreenButtons {
                 }));
         accessor.lanplus$invokeAddRenderableWidget(new LanPlusIconButton(x + 66, y, SETTINGS_ICON, "gui.lanplus.settings.tooltip",
                 b -> Minecraft.getInstance().setScreen(new SettingsScreen(title))));
+        accessor.lanplus$invokeAddRenderableWidget(new LanPlusIconButton(x + 88, y, ANNOUNCEMENTS_ICON, "gui.lanplus.announcements.tooltip",
+                b -> Minecraft.getInstance().setScreen(new AnnouncementsScreen(title)),
+                () -> LanPlusClient.announcements() == null ? 0 : LanPlusClient.announcements().unseenCount()));
     }
 
     private static AbstractWidget findSingleplayer(Screen screen) {

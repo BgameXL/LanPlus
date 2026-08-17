@@ -61,6 +61,19 @@ public final class LanPlusNotifications {
         push(new Notif(null, title, subtitle, null, null, HOLD_INFO_MS));
     }
 
+    public static void announcement(dev.bgame.lanplus.api.Announcement a) {
+        if (a == null) {
+            return;
+        }
+        push(new Notif(null, Component.literal(a.title()),
+                Component.translatable("gui.lanplus.toast.announcement"),
+                Component.translatable("gui.lanplus.notif.view"),
+                () -> {
+                    Minecraft mc = Minecraft.getInstance();
+                    mc.setScreen(new AnnouncementsScreen(mc.screen));
+                }, HOLD_ACTION_MS));
+    }
+
     private static void push(Notif n) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) {

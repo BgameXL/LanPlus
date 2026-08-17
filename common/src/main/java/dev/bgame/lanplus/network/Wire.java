@@ -1,6 +1,7 @@
 package dev.bgame.lanplus.network;
 
 import dev.bgame.lanplus.api.ActivityEntry;
+import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.GameplayState;
@@ -199,6 +200,19 @@ final class Wire {
                 return null;
             }
         }
+    }
+
+    record AnnouncementDto(Integer id, String type, String title, String body, Long createdAt) {
+        Announcement toApi() {
+            if (title == null || body == null) {
+                return null;
+            }
+            return new Announcement(id == null ? 0 : id, Announcement.Type.fromWire(type), title, body,
+                    createdAt == null ? 0L : createdAt);
+        }
+    }
+
+    record AnnouncementsSeen(List<Integer> ids) {
     }
 
     record ModpackDto(String modpackId, String name, String downloadUrl) {

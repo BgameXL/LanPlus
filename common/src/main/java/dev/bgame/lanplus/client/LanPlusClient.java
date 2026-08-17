@@ -2,6 +2,9 @@ package dev.bgame.lanplus.client;
 
 import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.Config;
+import dev.bgame.lanplus.announcements.AnnouncementsService;
+import dev.bgame.lanplus.announcements.DefaultAnnouncementsService;
+import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.PlayerIdentity;
@@ -54,6 +57,7 @@ public final class LanPlusClient {
     private static SkinService skins;
     private static SkinTextures skinTextures;
     private static DiscordPresence discord;
+    private static AnnouncementsService announcements;
     private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
 
     private LanPlusClient() {
@@ -90,10 +94,23 @@ public final class LanPlusClient {
         invites = new DefaultInviteService(network, presence, LanPlusClient::localIdentity,
                 () -> Config.relayEnabled, HostController::isOfflineHosting);
 
+        announcements = new DefaultAnnouncementsService(network, LanPlusClient::localIdentity);
+        announcements.addListener(new AnnouncementsService.AnnouncementsListener() {
+            @Override
+            public void onAnnouncementsChanged(List<Announcement> list) {
+            }
+
+            @Override
+            public void onNewAnnouncement(Announcement announcement) {
+                LanPlusNotifications.announcement(announcement);
+            }
+        });
+
         String url = backendUrl();
         LOGGER.info("LAN+ client initialised (backend: {})", url.isBlank() ? "local-only" : url);
 
         friends.connect();
+        announcements.connect();
     }
 
     public static PresenceManager presence() {
@@ -122,6 +139,10 @@ public final class LanPlusClient {
 
     public static DiscordPresence discord() {
         return discord;
+    }
+
+    public static AnnouncementsService announcements() {
+        return announcements;
     }
 
     public static void setDiscordEnabled(boolean on) {

@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.api.ActivityEntry;
+import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.Friend;
@@ -69,7 +70,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     private volatile WebSocket webSocket;
 
     private volatile UUID eventsUuid;
-    private volatile BackendEventListener eventsListener;
+    private final List<BackendEventListener> eventsListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
     private volatile boolean eventsEnabled = false;
     private final AtomicBoolean connecting = new AtomicBoolean(false);
     private final AtomicBoolean reconnectPending = new AtomicBoolean(false);
@@ -249,6 +250,52 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                     onError(err);
                     return List.of();
                 });
+    }
+
+    @Override
+    public CompletableFuture<List<Announcement>> getAnnouncements() {
+        return fetchAnnouncements("/announcements");
+    }
+
+    @Override
+    public CompletableFuture<List<Announcement>> getUnseenAnnouncements() {
+        return fetchAnnouncements("/announcements/unseen");
+    }
+
+    private CompletableFuture<List<Announcement>> fetchAnnouncements(String path) {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get(path)
+                .thenApply(resp -> {
+                    Wire.AnnouncementDto[] arr = GSON.fromJson(resp.body(), Wire.AnnouncementDto[].class);
+                    if (arr == null) {
+                        return List.<Announcement>of();
+                    }
+                    List<Announcement> out = new ArrayList<>(arr.length);
+                    for (Wire.AnnouncementDto d : arr) {
+                        if (d == null) {
+                            continue;
+                        }
+                        Announcement a = d.toApi();
+                        if (a != null) {
+                            out.add(a);
+                        }
+                    }
+                    return out;
+                })
+                .exceptionally(err -> {
+                    onError(err);
+                    return List.of();
+                });
+    }
+
+    @Override
+    public CompletableFuture<Boolean> markAnnouncementsSeen(List<Integer> ids) {
+        if (!configured() || ids == null || ids.isEmpty()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return edge("/announcements/seen", new Wire.AnnouncementsSeen(ids));
     }
 
     @Override
@@ -539,10 +586,18 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return;
         }
         this.eventsUuid = uuid;
-        this.eventsListener = listener;
+        if (listener != null && !eventsListeners.contains(listener)) {
+            eventsListeners.add(listener);
+        }
         this.eventsEnabled = true;
         this.reconnectAttempts.set(0);
         openSocket();
+    }
+
+    private void fanout(java.util.function.Consumer<BackendEventListener> action) {
+        for (BackendEventListener l : eventsListeners) {
+            action.accept(l);
+        }
     }
 
     @Override
@@ -749,7 +804,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             URI uri = URI.create(toWebSocketUrl(base()) + "/events");
             http.newWebSocketBuilder()
                     .connectTimeout(Duration.ofSeconds(5))
-                    .buildAsync(uri, new EventSocketListener(token, eventsListener))
+                    .buildAsync(uri, new EventSocketListener(token))
                     .whenComplete((ws, err) -> {
                         connecting.set(false);
                         if (err != null) {
@@ -796,12 +851,10 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     private final class EventSocketListener implements WebSocket.Listener {
 
         private final String token;
-        private final BackendEventListener listener;
         private final StringBuilder buffer = new StringBuilder();
 
-        EventSocketListener(String token, BackendEventListener listener) {
+        EventSocketListener(String token) {
             this.token = token;
-            this.listener = listener;
         }
 
         @Override
@@ -809,7 +862,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             reachable = true;
             webSocket.sendText(GSON.toJson(Map.of("type", "AUTH", "token", token)), true);
             webSocket.request(1);
-            listener.onConnected();
+            fanout(BackendEventListener::onConnected);
         }
 
         @Override
@@ -847,21 +900,39 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 switch (type) {
                     case "PRESENCE_UPDATE" -> {
                         JsonObject d = obj.getAsJsonObject("data");
-                        listener.onPresenceUpdate(new PresenceUpdate(
+                        PresenceUpdate update = new PresenceUpdate(
                                 UUID.fromString(d.get("uuid").getAsString()),
                                 Connectivity.valueOf(d.get("connectivity").getAsString()),
                                 optionalEnum(d, "state"),
                                 optionalString(d, "worldName"),
-                                optionalString(d, "joinCode")));
+                                optionalString(d, "joinCode"));
+                        fanout(l -> l.onPresenceUpdate(update));
                     }
-                    case "FRIEND_STARTED_HOSTING" -> listener.onFriendStartedHosting(
-                            UUID.fromString(obj.get("uuid").getAsString()),
-                            optionalString(obj, "joinCode"));
-                    case "FRIEND_REQUEST" -> listener.onFriendRequest(
-                            UUID.fromString(obj.get("fromUuid").getAsString()),
-                            optionalString(obj, "fromUsername"));
-                    case "INVITE_REDEEMED" -> listener.onInviteRedeemed(
-                            UUID.fromString(obj.get("guestUuid").getAsString()));
+                    case "FRIEND_STARTED_HOSTING" -> {
+                        UUID uuid = UUID.fromString(obj.get("uuid").getAsString());
+                        String joinCode = optionalString(obj, "joinCode");
+                        fanout(l -> l.onFriendStartedHosting(uuid, joinCode));
+                    }
+                    case "FRIEND_REQUEST" -> {
+                        UUID fromUuid = UUID.fromString(obj.get("fromUuid").getAsString());
+                        String fromUsername = optionalString(obj, "fromUsername");
+                        fanout(l -> l.onFriendRequest(fromUuid, fromUsername));
+                    }
+                    case "INVITE_REDEEMED" -> {
+                        UUID guestUuid = UUID.fromString(obj.get("guestUuid").getAsString());
+                        fanout(l -> l.onInviteRedeemed(guestUuid));
+                    }
+                    case "ANNOUNCEMENT" -> {
+                        JsonObject d = obj.getAsJsonObject("data");
+                        Announcement a = new Announcement(
+                                d.has("id") && !d.get("id").isJsonNull() ? d.get("id").getAsInt() : 0,
+                                Announcement.Type.fromWire(optionalString(d, "type")),
+                                optionalString(d, "title"),
+                                optionalString(d, "body"),
+                                d.has("createdAt") && !d.get("createdAt").isJsonNull()
+                                        ? d.get("createdAt").getAsLong() : 0L);
+                        fanout(l -> l.onAnnouncement(a));
+                    }
                     case "PING" -> webSocket.sendText(GSON.toJson(Map.of("type", "PONG")), true);
                     default -> {
                     }
