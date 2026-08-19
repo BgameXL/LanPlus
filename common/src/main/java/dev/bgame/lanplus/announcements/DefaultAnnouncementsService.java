@@ -103,6 +103,22 @@ public final class DefaultAnnouncementsService
     }
 
     @Override
+    public void onAnnouncementDeleted(int id) {
+        List<Announcement> next = new ArrayList<>();
+        for (Announcement a : cache) {
+            if (a.id() != id) {
+                next.add(a);
+            }
+        }
+        if (next.size() == cache.size()) {
+            return;
+        }
+        cache = List.copyOf(next);
+        unseen = Math.min(unseen, cache.size());
+        notifyChanged();
+    }
+
+    @Override
     public void addListener(AnnouncementsListener listener) {
         listeners.add(listener);
     }

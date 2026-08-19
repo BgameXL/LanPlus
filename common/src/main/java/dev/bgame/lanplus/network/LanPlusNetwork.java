@@ -83,6 +83,9 @@ public interface LanPlusNetwork {
         default void onAnnouncement(Announcement announcement) {
         }
 
+        default void onAnnouncementDeleted(int id) {
+        }
+
         default void onConnected() {
         }
     }

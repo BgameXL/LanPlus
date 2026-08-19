@@ -939,6 +939,11 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                                         ? d.get("createdAt").getAsLong() : 0L);
                         fanout(l -> l.onAnnouncement(a));
                     }
+                    case "ANNOUNCEMENT_DELETE" -> {
+                        JsonObject d = obj.getAsJsonObject("data");
+                        int id = d.has("id") && !d.get("id").isJsonNull() ? d.get("id").getAsInt() : 0;
+                        fanout(l -> l.onAnnouncementDeleted(id));
+                    }
                     case "PING" -> webSocket.sendText(GSON.toJson(Map.of("type", "PONG")), true);
                     default -> {
                     }
