@@ -115,6 +115,7 @@ public final class ProfileScreen extends Screen {
     private static final int BG_SOLID = 1;
     private static final int BG_MINECRAFT = 2;
     private static final int BG_IMAGE = 3;
+    private static final int BG_NONE = 4;
     private static final int[] BG_PALETTE =
             {0x7B8CFF, 0x1A1C22, 0x262A33, 0x3BA55D, 0xE74C3C, 0x9B59B6, 0xF1A33C, 0x101216};
     private int bgStyle = BG_DARK;
@@ -149,7 +150,6 @@ public final class ProfileScreen extends Screen {
     private EditBox bioBox;
     private Button pronounButton;
     private Button invisibleButton;
-    private Button bgStyleButton;
     private Button bgColorButton;
     private Button bannerButton;
     private Button skinSlimButton;
@@ -178,7 +178,7 @@ public final class ProfileScreen extends Screen {
     private static final int EDIT_W = 440;
     private static final int EDIT_TAB_Y = 30;
     private static final int EDIT_FRAME_TOP = 46;
-    private static final String[] EDIT_TABS = {"about", "identity", "modpack", "appearance"};
+    private static final String[] EDIT_TABS = {"about", "identity", "appearance"};
     private int eL, eW, eR;
     private int colLX, colRX, colW;
     private int editTab;
@@ -257,8 +257,7 @@ public final class ProfileScreen extends Screen {
                         + 16 + MAX_SLOTS * 24;
             }
             case 1 -> 16 + 20;
-            case 2 -> 16 + 14 + 4 + 18;
-            default -> 16 + 44 + EDIT_SECTION_GAP
+            default -> 16 + 20 + EDIT_SECTION_GAP
                     + 16 + 20 + EDIT_SECTION_GAP
                     + 16 + 12 + (hasCustomSkin() ? 46 : 0);
         };
@@ -322,18 +321,11 @@ public final class ProfileScreen extends Screen {
                 y += 16;
                 aIdentityY = y;
             }
-            case 2 -> {
-                aMpHdrY = y;
-                y += 16;
-                aMpValuesY = y;
-                y += 14 + 4;
-                aMpRowY = y;
-            }
             default -> {
                 aBgHdrY = y;
                 y += 16;
                 aBgRowY = y;
-                y += 44 + EDIT_SECTION_GAP;
+                y += 20 + EDIT_SECTION_GAP;
                 aBannerHdrY = y;
                 y += 16;
                 aBannerRowY = y;
@@ -365,6 +357,8 @@ public final class ProfileScreen extends Screen {
                             b -> {
                                 editing = false;
                                 status = null;
+                                applyBackground(profile.background());
+                                banner = profile.banner();
                                 rebuildWidgets();
                             })
                     .bounds(bx + 96, by, 90, 20).build());
@@ -417,8 +411,6 @@ public final class ProfileScreen extends Screen {
                     invisibleButton.setMessage(invisibleLabel());
                 }).bounds(colLX + half + 6, aIdentityY, colW - half - 6, 20).build();
                 addRenderableWidget(invisibleButton);
-            }
-            case 2 -> {
             }
             default -> {
                 buildBackgroundWidgets();
@@ -560,49 +552,38 @@ public final class ProfileScreen extends Screen {
     }
 
     private void buildBackgroundWidgets() {
-        bgStyleButton = LanPlusButton.create(bgStyleLabel(), b -> cycleBgStyle())
-                .bounds(colLX, aBgRowY, colW, 20).build();
+        Button bgStyleButton = LanPlusButton.create(Component.translatable("gui.lanplus.profile.bg.color"), b -> picker())
+                .bounds(colLX, aBgRowY, 72, 20).build();
         addRenderableWidget(bgStyleButton);
 
-        int row2 = aBgRowY + 24;
-        if (bgStyle == BG_IMAGE) {
-            bgColorButton = LanPlusButton.create(bgImageLabel(), b -> openBackgroundPicker())
-                    .bounds(colLX, row2, colW, 20).primary().build();
-            bgColorButton.active = !bgCatalog.isEmpty();
-            addRenderableWidget(bgColorButton);
-        } else {
-            bgColorButton = LanPlusButton.create(Component.translatable("gui.lanplus.profile.bg.color"), b -> cycleBgColor())
-                    .bounds(colLX, row2, colW, 20).build();
-            addRenderableWidget(bgColorButton);
-        }
+        bgColorButton = LanPlusButton.create(bgImageLabel(), b -> openBackgroundPicker())
+                .bounds(colLX + 78, aBgRowY, 170, 20).primary().build();
+        addRenderableWidget(bgColorButton);
+    }
+
+    private void picker() {
+        this.minecraft.setScreen(new BackgroundPicker(this, bgColor, BG_PALETTE, c -> {
+            bgStyle = BG_SOLID;
+            bgColor = c;
+        }));
     }
 
     private void buildBannerWidgets() {
         bannerButton = LanPlusButton.create(bannerLabel(), b -> openBannerPicker())
-                .bounds(colRX, aBannerRowY, colW, 20).primary().build();
+                .bounds(colRX, aBannerRowY, 170, 20).primary().build();
         bannerButton.active = !bannerCatalog.isEmpty() || banner != null;
         addRenderableWidget(bannerButton);
     }
 
-    private void cycleBgStyle() {
-        bgStyle = bgStyle == BG_IMAGE ? BG_SOLID : BG_IMAGE;
-        if (bgStyle == BG_IMAGE && bgImageId == null && !bgCatalog.isEmpty()) {
-            selectBgImage(bgCatalog.get(0));
-        }
-        persistBackground();
-        rebuildWidgets();
-    }
-
     private void openBackgroundPicker() {
-        if (bgCatalog.isEmpty()) {
-            return;
-        }
         this.minecraft.setScreen(new ImagePickerScreen(this,
                 Component.translatable("gui.lanplus.profile.bg.pick.title"),
-                bgCatalog, bgImageId, false, 3, 16f / 9f, img -> {
-            if (img != null) {
+                bgCatalog, bgStyle == BG_NONE ? null : bgImageId, true, 3, 16f / 9f, img -> {
+            if (img == null) {
+                bgStyle = BG_NONE;
+            } else {
+                bgStyle = BG_IMAGE;
                 selectBgImage(img);
-                persistBackground();
             }
         }));
     }
@@ -613,8 +594,10 @@ public final class ProfileScreen extends Screen {
     }
 
     private Component bgImageLabel() {
-        return Component.translatable("gui.lanplus.profile.bg.image.pick",
-                bgImageId == null ? "?" : bgImageId);
+        Component value = bgStyle == BG_NONE || bgImageId == null
+                ? Component.translatable("gui.lanplus.profile.bg.none")
+                : Component.literal(bgImageId);
+        return Component.translatable("gui.lanplus.profile.bg.image.pick", value);
     }
 
     private Component bannerLabel() {
@@ -627,18 +610,7 @@ public final class ProfileScreen extends Screen {
     private void openBannerPicker() {
         this.minecraft.setScreen(new ImagePickerScreen(this,
                 Component.translatable("gui.lanplus.profile.banner.pick.title"),
-                bannerCatalog, banner == null ? null : banner.id(), true, 2, 4f, img -> {
-            banner = img;
-            ProfilesService svc = LanPlusClient.profiles();
-            if (svc != null) {
-                svc.setBanner(img == null ? null : img.id()).whenComplete((error, ex) ->
-                        this.minecraft.execute(() -> {
-                            if (ex != null || error != null) {
-                                setStatus(Component.translatable(errorKey(error)));
-                            }
-                        }));
-            }
-        }));
+                bannerCatalog, banner == null ? null : banner.id(), true, 2, 4f, img -> banner = img));
     }
 
     private void loadCatalogs() {
@@ -664,28 +636,6 @@ public final class ProfileScreen extends Screen {
         }));
     }
 
-    private void cycleBgColor() {
-        int current = bgColor & 0xFFFFFF;
-        int idx = -1;
-        for (int i = 0; i < BG_PALETTE.length; i++) {
-            if (BG_PALETTE[i] == current) {
-                idx = i;
-                break;
-            }
-        }
-        bgColor = BG_PALETTE[(idx + 1) % BG_PALETTE.length];
-        persistBackground();
-    }
-
-    private Component bgStyleLabel() {
-        String key = switch (bgStyle) {
-            case BG_SOLID -> "gui.lanplus.profile.bg.solid";
-            case BG_MINECRAFT -> "gui.lanplus.profile.bg.minecraft";
-            case BG_IMAGE -> "gui.lanplus.profile.bg.image";
-            default -> "gui.lanplus.profile.bg.dark";
-        };
-        return Component.translatable("gui.lanplus.profile.bg.style", Component.translatable(key));
-    }
 
     private void buildLinkWidgets() {
         linkPickerOpen = -1;
@@ -1025,7 +975,7 @@ public final class ProfileScreen extends Screen {
 
     private void renderBackdrop(GuiGraphics g) {
         renderBackground(g);
-        if (bgStyle == BG_MINECRAFT) {
+        if (bgStyle == BG_MINECRAFT || bgStyle == BG_NONE) {
             return;
         }
         if (bgStyle == BG_IMAGE) {
@@ -1036,8 +986,11 @@ public final class ProfileScreen extends Screen {
                 return;
             }
         }
-        int rgb = bgStyle == BG_SOLID ? (bgColor & 0xFFFFFF) : 0x0C0D10;
-        g.fill(0, 0, this.width, this.height, alpha(bgOpacity) | rgb);
+        if (bgStyle == BG_SOLID) {
+            g.fill(0, 0, this.width, this.height, 0xFF000000 | (bgColor & 0xFFFFFF));
+            return;
+        }
+        g.fill(0, 0, this.width, this.height, alpha(bgOpacity) | 0x0C0D10);
     }
 
     private static int alpha(int opacity0to100) {
@@ -1064,11 +1017,6 @@ public final class ProfileScreen extends Screen {
                 editHeader(g, Component.translatable("gui.lanplus.profile.questions"), colLX, colW, aQHdrY);
             }
             case 1 -> editHeader(g, Component.translatable("gui.lanplus.profile.identity"), colLX, colW, aIdentityHdrY);
-            case 2 -> {
-                editHeader(g, Component.translatable("gui.lanplus.profile.modpack"), colLX, colW, aMpHdrY);
-                renderModpackValues(g);
-                renderModpackToggles(g);
-            }
             default -> {
                 editHeader(g, Component.translatable("gui.lanplus.profile.bg.header"), colLX, colW, aBgHdrY);
                 editHeader(g, Component.translatable("gui.lanplus.profile.banner.header"), colLX, colW, aBannerHdrY);
@@ -1653,7 +1601,7 @@ public final class ProfileScreen extends Screen {
         g.fill(x, y, x + renderW, y + 2, ACCENT);
         g.flush();
         g.enableScissor(x + 1, y + 2, x + renderW - 1, y + renderH - 1);
-        drawPlayerModel(g, x + renderW / 2, y + renderH - 26, 52);
+        drawPlayerModel(g, x + renderW / 2, y + renderH - 26);
         g.disableScissor();
         g.drawString(this.font, Component.translatable("gui.lanplus.profile.cosmetics.rotate"),
                 x + 8, y + renderH - 12, FAINT);
@@ -1700,7 +1648,7 @@ public final class ProfileScreen extends Screen {
         return wideModel;
     }
 
-    private void drawPlayerModel(GuiGraphics g, int cx, int feetY, int scale) {
+    private void drawPlayerModel(GuiGraphics g, int cx, int feetY) {
         SkinTextures st = LanPlusClient.skinTextures();
         SkinTextures.Resolved res = st == null ? null : st.get(uuid);
         ResourceLocation skin = res != null ? res.texture() : resolveFallbackSkin();
@@ -1717,7 +1665,7 @@ public final class ProfileScreen extends Screen {
         PoseStack ps = g.pose();
         ps.pushPose();
         ps.translate(cx, feetY, 50.0);
-        ps.mulPoseMatrix(new Matrix4f().scaling((float) scale, (float) scale, (float) -scale));
+        ps.mulPoseMatrix(new Matrix4f().scaling((float) 52, (float) 52, (float) -52));
         ps.mulPose(Axis.ZP.rotationDegrees(180f));
         ps.mulPose(Axis.XP.rotationDegrees(modelPitch));
         ps.mulPose(Axis.YP.rotationDegrees(-modelYaw));
@@ -1854,9 +1802,15 @@ public final class ProfileScreen extends Screen {
             }
         }
         setStatus(Component.translatable("gui.lanplus.profile.saving"));
-        svc.save(bio, pronouns, links, prompts, invisibleToggle, favoriteVisibleToggle,
-                playingVisibleToggle, recentlyPlayedVisibleToggle).whenComplete((error, ex) -> this.minecraft.execute(() -> {
-            if (ex == null && error == null) {
+        CompletableFuture<String> bgF = svc.setBackground(bgStyleName(), bgColor, bgOpacity, bgImageId);
+        CompletableFuture<String> bannerF = svc.setBanner(banner == null ? null : banner.id());
+        CompletableFuture<String> saveF = svc.save(bio, pronouns, links, prompts, invisibleToggle,
+                favoriteVisibleToggle, playingVisibleToggle, recentlyPlayedVisibleToggle);
+        CompletableFuture.allOf(bgF, bannerF, saveF).whenComplete((v, ex) -> this.minecraft.execute(() -> {
+            String error = ex != null ? "offline"
+                    : saveF.getNow(null) != null ? saveF.getNow(null)
+                    : bgF.getNow(null) != null ? bgF.getNow(null) : bannerF.getNow(null);
+            if (error == null) {
                 editing = false;
                 loaded = false;
                 setStatus(Component.translatable("gui.lanplus.profile.saved"));
@@ -1913,6 +1867,7 @@ public final class ProfileScreen extends Screen {
             case "SOLID" -> BG_SOLID;
             case "MINECRAFT" -> BG_MINECRAFT;
             case "IMAGE" -> BG_IMAGE;
+            case "NONE" -> BG_NONE;
             default -> BG_DARK;
         };
         bgColor = bg.color() & 0xFFFFFF;
@@ -1926,20 +1881,9 @@ public final class ProfileScreen extends Screen {
             case BG_SOLID -> "SOLID";
             case BG_MINECRAFT -> "MINECRAFT";
             case BG_IMAGE -> "IMAGE";
+            case BG_NONE -> "NONE";
             default -> "DARK";
         };
-    }
-
-    private void persistBackground() {
-        ProfilesService svc = LanPlusClient.profiles();
-        if (svc != null) {
-            svc.setBackground(bgStyleName(), bgColor, bgOpacity, bgImageId).whenComplete((error, ex) ->
-                    this.minecraft.execute(() -> {
-                        if (ex != null || error != null) {
-                            setStatus(Component.translatable(errorKey(error)));
-                        }
-                    }));
-        }
     }
 
     private boolean hasAnyLink() {
@@ -1958,9 +1902,7 @@ public final class ProfileScreen extends Screen {
             net.minecraft.client.player.AbstractClientPlayer local = mc.player;
             if (local != null && uuid.equals(local.getUUID())) {
                 ResourceLocation loc = local.getSkinTextureLocation();
-                if (loc != null) {
-                    return loc;
-                }
+                return loc;
             }
         }
         return DefaultPlayerSkin.getDefaultSkin(uuid);
