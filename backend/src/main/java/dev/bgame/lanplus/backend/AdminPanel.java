@@ -46,6 +46,9 @@ final class AdminPanel {
   .grid2 { display:flex; gap:8px; flex-wrap:wrap; }
   .grid2 input { flex:1; min-width:180px; }
   label { font-size:12px; color:#9a97a8; display:block; margin-bottom:6px; }
+  select, textarea { width:100%; padding:10px 12px; border-radius:8px; border:1px solid #34313f;
+    background:#14131a; color:#e8e8ef; font-size:14px; }
+  textarea { min-height:70px; resize:vertical; font-family:inherit; margin-top:8px; }
 </style>
 </head>
 <body>
@@ -76,6 +79,23 @@ final class AdminPanel {
         <button onclick="manual('scrub')">Scrub</button>
         <button class="danger" onclick="manual('ban')">Ban</button>
         <button onclick="manual('unban')">Unban</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Publish announcement</label>
+      <div class="grid2">
+        <select id="annType">
+          <option value="UPDATE">UPDATE</option>
+          <option value="MAINTENANCE">MAINTENANCE</option>
+          <option value="GENERAL">GENERAL</option>
+          <option value="FREE">FREE</option>
+        </select>
+        <input id="annTitle" type="text" placeholder="Title">
+      </div>
+      <textarea id="annBody" placeholder="Body (Minecraft section codes allowed)"></textarea>
+      <div class="actions">
+        <button class="accent" onclick="publishAnnouncement()">Publish</button>
       </div>
     </div>
   </div>
@@ -165,6 +185,21 @@ function manual(kind) {
   if (kind === 'ban') { if (!confirm('Ban ' + uuid + '?')) return; return act1('/admin/ban', { targetUuid: uuid, reason: 'manual' }, 'Banned'); }
   if (kind === 'unban') return act1('/admin/unban', { targetUuid: uuid }, 'Unbanned');
   return act1('/admin/scrub', { targetUuid: uuid }, 'Scrubbed');
+}
+
+async function publishAnnouncement() {
+  const type = document.getElementById('annType').value;
+  const title = document.getElementById('annTitle').value.trim();
+  const body = document.getElementById('annBody').value.trim();
+  if (!title || !body) { msg('Title and body required', true); return; }
+  try {
+    const r = await api('/admin/announcement', { type, title, body });
+    if (r.status === 401) { msg('Invalid admin key', true); show(false); return; }
+    if (!r.ok) { msg('Error ' + r.status, true); return; }
+    document.getElementById('annTitle').value = '';
+    document.getElementById('annBody').value = '';
+    msg('Announcement published');
+  } catch (e) { msg('Network error', true); }
 }
 
 // Boot
