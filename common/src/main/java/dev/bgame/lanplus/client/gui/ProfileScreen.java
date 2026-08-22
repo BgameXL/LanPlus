@@ -971,7 +971,7 @@ public final class ProfileScreen extends Screen {
         return -1;
     }
 
-    private void renderBackdrop(GuiGraphics g) {
+    void renderBackdrop(GuiGraphics g) {
         renderBackground(g);
         if (bgStyle == BG_MINECRAFT || bgStyle == BG_NONE) {
             return;
