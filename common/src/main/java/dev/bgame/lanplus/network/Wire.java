@@ -211,13 +211,16 @@ final class Wire {
         }
     }
 
-    record AnnouncementDto(Integer id, String type, String title, String body, Long createdAt) {
-        Announcement toApi() {
+    record AnnouncementDto(Integer id, String type, String title, String body, Long createdAt,
+                           String imageId, String image, String imageHash) {
+        Announcement toApi(String base) {
             if (title == null || body == null) {
                 return null;
             }
+            CatalogImage img = imageId == null || image == null ? null
+                    : new CatalogImage(imageId, versionedUrl(base, image, imageHash), imageHash);
             return new Announcement(id == null ? 0 : id, Announcement.Type.fromWire(type), title, body,
-                    createdAt == null ? 0L : createdAt);
+                    createdAt == null ? 0L : createdAt, img);
         }
     }
 

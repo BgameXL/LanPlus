@@ -11,17 +11,26 @@ import net.minecraft.util.FormattedCharSequence;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public final class Announcements extends Screen {
 
+    private enum Filter {ALL, UPDATE, MAINTENANCE, GENERAL, FREE}
+
+    private static final Filter[] FILTERS = Filter.values();
     private static final int MARGIN = 20;
-    private static final int MAX_W = 360;
+    private static final int MAX_W = 420;
     private static final int PAD = 10;
+    private static final int SIDEBAR_W = 84;
+    private static final int SB_ROW_H = 18;
     private static final int ENTRY_GAP = 8;
     private static final int LINE_H = 9;
+    private static final int MAX_IMG_H = 120;
+    private static final int MIN_IMG_H = 42;
     private final Screen parent;
+    private Filter selected = Filter.ALL;
     private int cardX, cardY, cardW, cardH;
-    private int listTop, listBottom, contentW;
+    private int sidebarX, sidebarTop, listX, listTop, listBottom, contentW;
     private int scrollY;
 
     public Announcements(Screen parent) {
@@ -34,7 +43,7 @@ public final class Announcements extends Screen {
         layout();
         addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                 .bounds(cardX + cardW - 90, cardY + cardH + 6, 90, 20).build());
-        markAllSeen();
+        markSeen();
     }
 
     private void layout() {
@@ -42,12 +51,15 @@ public final class Announcements extends Screen {
         cardH = Math.min(this.height - 80, 260);
         cardX = (this.width - cardW) / 2;
         cardY = Math.max(20, (this.height - cardH) / 2 - 10);
-        listTop = cardY + 30;
+        sidebarX = cardX + PAD;
+        sidebarTop = cardY + 34;
+        listX = sidebarX + SIDEBAR_W + 12;
+        listTop = cardY + 34;
         listBottom = cardY + cardH - PAD;
-        contentW = cardW - 2 * PAD;
+        contentW = cardX + cardW - PAD - listX;
     }
 
-    private void markAllSeen() {
+    private void markSeen() {
         AnnouncementsService svc = LanPlusClient.announcements();
         if (svc == null) {
             return;
@@ -57,6 +69,22 @@ public final class Announcements extends Screen {
             ids.add(a.id());
         }
         svc.markSeen(ids);
+    }
+
+    private List<Announcement> filtered() {
+        AnnouncementsService svc = LanPlusClient.announcements();
+        List<Announcement> all = svc == null ? List.of() : svc.announcements();
+        if (selected == Filter.ALL) {
+            return all;
+        }
+        Announcement.Type type = typeOf(selected);
+        List<Announcement> out = new ArrayList<>();
+        for (Announcement a : all) {
+            if (a.type() == type) {
+                out.add(a);
+            }
+        }
+        return out;
     }
 
     @Override
@@ -69,12 +97,17 @@ public final class Announcements extends Screen {
         int wx = LanPlusUI.wordmark(g, this.font, cardX + PAD, cardY + PAD);
         g.drawString(this.font, this.title, wx + 6, cardY + PAD, LanPlusUI.MUTED, false);
         g.fill(cardX + PAD, cardY + 26, cardX + cardW - PAD, cardY + 27, LanPlusUI.DIVIDER);
+        g.fill(listX - 7, sidebarTop, listX - 6, listBottom, LanPlusUI.DIVIDER);
 
-        List<Announcement> list = LanPlusClient.announcements() == null
-                ? List.of() : LanPlusClient.announcements().announcements();
+        renderSidebar(g, mouseX, mouseY);
+
+        List<Announcement> list = filtered();
         if (list.isEmpty()) {
-            g.drawCenteredString(this.font, Component.translatable("gui.lanplus.announcements.empty"),
-                    cardX + cardW / 2, (listTop + listBottom) / 2 - 4, LanPlusUI.FAINT);
+            Component empty = selected == Filter.ALL
+                    ? Component.translatable("gui.lanplus.announcements.empty")
+                    : Component.translatable("gui.lanplus.announcements.filter.empty");
+            g.drawCenteredString(this.font, empty, listX + contentW / 2,
+                    (listTop + listBottom) / 2 - 4, LanPlusUI.FAINT);
             super.render(g, mouseX, mouseY, partialTick);
             return;
         }
@@ -86,35 +119,85 @@ public final class Announcements extends Screen {
         int maxScroll = Math.max(0, total - (listBottom - listTop));
         scrollY = Math.max(0, Math.min(maxScroll, scrollY));
 
-        g.enableScissor(cardX + PAD, listTop, cardX + cardW - PAD, listBottom);
-        int x = cardX + PAD;
+        g.enableScissor(listX, listTop, cardX + cardW - PAD, listBottom);
         int y = listTop - scrollY;
         for (Announcement a : list) {
-            renderEntry(g, x, y, a);
+            renderEntry(g, listX, y, a);
             y += entryHeight(a) + ENTRY_GAP;
-            g.fill(x, y - ENTRY_GAP / 2, x + contentW, y - ENTRY_GAP / 2 + 1, LanPlusUI.DIVIDER);
+            g.fill(listX, y - ENTRY_GAP / 2, listX + contentW, y - ENTRY_GAP / 2 + 1, LanPlusUI.DIVIDER);
         }
         g.disableScissor();
 
         super.render(g, mouseX, mouseY, partialTick);
     }
 
+    private void renderSidebar(GuiGraphics g, int mouseX, int mouseY) {
+        for (int i = 0; i < FILTERS.length; i++) {
+            Filter f = FILTERS[i];
+            int y = sidebarTop + i * SB_ROW_H;
+            boolean sel = f == selected;
+            boolean hover = mouseX >= sidebarX && mouseX < sidebarX + SIDEBAR_W
+                    && mouseY >= y && mouseY < y + SB_ROW_H;
+            if (sel) {
+                g.drawString(this.font, "+", sidebarX, y + 5, LanPlusUI.LIME, false);
+            }
+            g.drawString(this.font, filterLabel(f), sidebarX + 10, y + 5,
+                    sel || hover ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
+        }
+    }
+
     private void renderEntry(GuiGraphics g, int x, int y, Announcement a) {
         g.drawString(this.font, typeLabel(a.type()), x, y, typeColor(a.type()), false);
         g.drawString(this.font, Component.literal(a.title()), x, y + 11, LanPlusUI.TEXT, false);
         int by = y + 22;
+        int ih = imageHeight(a);
+        if (ih > 0) {
+            g.fill(x, by, x + contentW, by + ih, LanPlusUI.SLOT);
+            LanPlusUI.bevelI(g, x, by, x + contentW, by + ih);
+            ProfileImages.Tex tex = ProfileImages.get(a.image());
+            if (tex != null) {
+                ProfileImages.blitContain(g, tex, x + 1, by + 1, contentW - 2, ih - 2);
+            }
+            by += ih + 6;
+        }
         for (FormattedCharSequence line : bodyLines(a)) {
             g.drawString(this.font, line, x, by, LanPlusUI.MUTED, false);
             by += LINE_H;
         }
     }
 
+    private int imageHeight(Announcement a) {
+        if (a.image() == null) {
+            return 0;
+        }
+        ProfileImages.Tex tex = ProfileImages.get(a.image());
+        if (tex == null || tex.width() <= 0) {
+            return MAX_IMG_H;
+        }
+        int natural = contentW * tex.height() / tex.width();
+        return Math.max(MIN_IMG_H, Math.min(MAX_IMG_H, natural));
+    }
+
     private int entryHeight(Announcement a) {
-        return 22 + bodyLines(a).size() * LINE_H;
+        int ih = imageHeight(a);
+        return 22 + (ih > 0 ? ih + 6 : 0) + bodyLines(a).size() * LINE_H;
     }
 
     private List<FormattedCharSequence> bodyLines(Announcement a) {
         return this.font.split(Component.literal(a.body()), contentW);
+    }
+
+    private static Component filterLabel(Filter f) {
+        return Component.translatable("gui.lanplus.announcements.filter." + f.name().toLowerCase(Locale.ROOT));
+    }
+
+    private static Announcement.Type typeOf(Filter f) {
+        return switch (f) {
+            case UPDATE -> Announcement.Type.UPDATE;
+            case MAINTENANCE -> Announcement.Type.MAINTENANCE;
+            case FREE -> Announcement.Type.FREE;
+            default -> Announcement.Type.GENERAL;
+        };
     }
 
     private static String typeLabel(Announcement.Type type) {
@@ -131,8 +214,24 @@ public final class Announcements extends Screen {
     }
 
     @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0 && mouseX >= sidebarX && mouseX < sidebarX + SIDEBAR_W
+                && mouseY >= sidebarTop && mouseY < sidebarTop + FILTERS.length * SB_ROW_H) {
+            int idx = (int) ((mouseY - sidebarTop) / SB_ROW_H);
+            if (idx >= 0 && idx < FILTERS.length) {
+                if (FILTERS[idx] != selected) {
+                    selected = FILTERS[idx];
+                    scrollY = 0;
+                }
+                return true;
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
-        if (mouseX >= cardX && mouseX <= cardX + cardW && mouseY >= listTop && mouseY <= listBottom) {
+        if (mouseX >= listX && mouseX <= cardX + cardW && mouseY >= listTop && mouseY <= listBottom) {
             scrollY = Math.max(0, scrollY - (int) (delta * 16));
             return true;
         }

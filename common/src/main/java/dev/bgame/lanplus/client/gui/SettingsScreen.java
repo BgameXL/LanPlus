@@ -6,6 +6,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,8 +23,6 @@ public final class SettingsScreen extends Screen {
     }
 
     private static final int SIDEBAR_W = 118;
-    private static final int ROW_GAP = 6;
-    private static final int CARD_H = 38;
     private final Screen parent;
     private Cat selected = Cat.GENERAL;
     private EditBox backendBox;
@@ -152,9 +151,16 @@ public final class SettingsScreen extends Screen {
         int x = contentX;
         int w = contentW;
         int rh = 40;
+        int textW = w - 34;
 
         g.drawString(this.font, Component.translatable("gui.lanplus.settings." + key), x, y + 5, LanPlusUI.TEXT, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings." + key + ".desc"), x, y + 16, LanPlusUI.MUTED, false);
+        List<FormattedCharSequence> desc = this.font.split(
+                Component.translatable("gui.lanplus.settings." + key + ".desc"), textW);
+        int dy = y + 16;
+        for (int i = 0; i < desc.size() && i < 2; i++) {
+            g.drawString(this.font, desc.get(i), x, dy, LanPlusUI.MUTED, false);
+            dy += 10;
+        }
         toggle(g, x + w - 28, y + 8, on);
         g.fill(x, y + rh, x + w, y + rh + 1, LanPlusUI.DIVIDER);
         rows.add(new Row(x, y, w, rh, act));

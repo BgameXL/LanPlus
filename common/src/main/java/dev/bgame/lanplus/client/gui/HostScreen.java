@@ -36,10 +36,8 @@ public final class HostScreen extends Screen {
     private static final int ROW_GAP = 26;
     private static final int LABEL_PAD = 12;
     private static final int CTRL_W = 110;
-
     private static final GameType[] GAME_TYPES = GameType.values();
     private static final Difficulty[] DIFFICULTIES = Difficulty.values();
-
     private final Screen parent;
     private final boolean inWorld;
     private final Map<String, FaviconTexture> icons = new HashMap<>();
@@ -49,7 +47,6 @@ public final class HostScreen extends Screen {
     private int listScroll;
     private HostAccessMode accessMode = HostAccessMode.FRIENDS;
     private boolean allowNonPremium = false;
-
     private GameType gameType = GameType.SURVIVAL;
     private Difficulty difficulty = Difficulty.NORMAL;
     private boolean allowCheats;
@@ -79,7 +76,8 @@ public final class HostScreen extends Screen {
         int y = PAD + 24;
 
         if (!inWorld) {
-            int listRows = Math.max(3, Math.min(visibleRowsWanted(), (this.height - 190) / ROW_H));
+            int fitRows = (this.height - 260) / ROW_H;
+            int listRows = Math.max(2, Math.min(visibleRowsWanted(), fitRows));
             int listH = listRows * ROW_H + 4;
             listTop = y;
             listBottom = listTop + listH;

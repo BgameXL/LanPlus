@@ -171,7 +171,6 @@ public final class ProfileScreen extends Screen {
     private static final int LINK_PICK_W = 76;
     private int linkPickerOpen = -1;
     private final List<int[]> linkPickerCells = new ArrayList<>();
-    private static final int COL_GAP = 16;
     private static final int EDIT_SECTION_GAP = 18;
     private static final int EDIT_W = 440;
     private static final int EDIT_TAB_Y = 30;
@@ -1625,7 +1624,7 @@ public final class ProfileScreen extends Screen {
                     default -> "gui.lanplus.profile.bg.dark";
                 });
             }
-            g.drawString(this.font, sub, sx + 7, sy + 15, FAINT);
+            g.drawString(this.font, ellipsize(sub.getString(), sw - 14), sx + 7, sy + 15, FAINT);
         }
         int slotsH = COSMETIC_SLOTS.length * (slotH + slotGap) - slotGap;
         return y + Math.max(renderH, slotsH);

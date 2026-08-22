@@ -1,6 +1,6 @@
 package dev.bgame.lanplus.api;
 
-public record Announcement(int id, Type type, String title, String body, long createdAt) {
+public record Announcement(int id, Type type, String title, String body, long createdAt, CatalogImage image) {
 
     public enum Type {
         UPDATE,

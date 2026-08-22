@@ -74,4 +74,16 @@ final class ProfileImages {
         int v = (tex.height() - srcH) / 2;
         g.blit(tex.location(), x, y, w, h, u, v, srcW, srcH, tex.width(), tex.height());
     }
+
+    static void blitContain(GuiGraphics g, Tex tex, int x, int y, int w, int h) {
+        if (tex == null || w <= 0 || h <= 0) {
+            return;
+        }
+        float scale = Math.min(w / (float) tex.width(), h / (float) tex.height());
+        int dw = Math.max(1, Math.round(tex.width() * scale));
+        int dh = Math.max(1, Math.round(tex.height() * scale));
+        int dx = x + (w - dw) / 2;
+        int dy = y + (h - dh) / 2;
+        g.blit(tex.location(), dx, dy, dw, dh, 0f, 0f, tex.width(), tex.height(), tex.width(), tex.height());
+    }
 }

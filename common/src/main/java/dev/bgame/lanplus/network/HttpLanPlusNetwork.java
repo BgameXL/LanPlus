@@ -280,7 +280,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                         if (d == null) {
                             continue;
                         }
-                        Announcement a = d.toApi();
+                        Announcement a = d.toApi(base());
                         if (a != null) {
                             out.add(a);
                         }
@@ -930,13 +930,19 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                     }
                     case "ANNOUNCEMENT" -> {
                         JsonObject d = obj.getAsJsonObject("data");
+                        String imgId = optionalString(d, "imageId");
+                        String imgPath = optionalString(d, "image");
+                        String imgHash = optionalString(d, "imageHash");
+                        CatalogImage img = imgId == null || imgPath == null ? null
+                                : new CatalogImage(imgId, Wire.versionedUrl(base(), imgPath, imgHash), imgHash);
                         Announcement a = new Announcement(
                                 d.has("id") && !d.get("id").isJsonNull() ? d.get("id").getAsInt() : 0,
                                 Announcement.Type.fromWire(optionalString(d, "type")),
                                 optionalString(d, "title"),
                                 optionalString(d, "body"),
                                 d.has("createdAt") && !d.get("createdAt").isJsonNull()
-                                        ? d.get("createdAt").getAsLong() : 0L);
+                                        ? d.get("createdAt").getAsLong() : 0L,
+                                img);
                         fanout(l -> l.onAnnouncement(a));
                     }
                     case "ANNOUNCEMENT_DELETE" -> {
