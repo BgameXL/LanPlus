@@ -55,7 +55,6 @@ public final class HostScreen extends Screen {
     private boolean allowCheats;
     private boolean gameTypeOpen;
     private boolean difficultyOpen;
-
     private int cardX, cardY, cardW, cardH;
     private int listTop, listBottom;
     private int gameRowY, cmdRowY, diffRowY;

@@ -244,9 +244,11 @@ public final class FriendsScreen extends Screen {
         LanPlusUI.panel(g, leftX, paneTop, contentRight, footerBottom);
         g.fill(dividerX, paneTop + 1, dividerX + 1, paneBottom, LanPlusUI.DIVIDER);
         g.fill(leftX + 1, paneBottom, contentRight - 1, paneBottom + 1, LanPlusUI.DIVIDER);
+        int listmouseX = contextUuid != null ? -1 : mouseX;
+        int listmouseY = contextUuid != null ? -1 : mouseY;
 
         switch (tab) {
-            case FRIENDS -> renderFriendList(g, mouseX, mouseY, paneBottom);
+            case FRIENDS -> renderFriendList(g, listmouseX, listmouseY, paneBottom);
             case ADD -> renderRequests(g, paneBottom);
             case JOIN -> renderJoinList(g, mouseX, mouseY, paneBottom);
             case DETAILS -> {
@@ -802,7 +804,6 @@ public final class FriendsScreen extends Screen {
                 this::doToggleBlock, true));
         entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.remove"), this::doRemove, true));
         contextEntries = entries;
-        rebuildWidgets();
     }
 
     private void closeContextMenu() {
@@ -900,6 +901,8 @@ public final class FriendsScreen extends Screen {
         int y = menuY();
         int w = menuWidth();
         int h = menuHeight();
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 400);
         g.fill(x, y, x + w, y + h, LanPlusUI.SURFACE_RAISED);
         LanPlusUI.border(g, x, y, x + w, y + h);
         int ey = y + 2;
@@ -912,6 +915,7 @@ public final class FriendsScreen extends Screen {
             g.drawString(this.font, e.label(), x + 6, ey + 3, color, false);
             ey += MENU_ROW_H;
         }
+        g.pose().popPose();
     }
 
     @Override
