@@ -77,19 +77,19 @@ final class LanPlusUI {
 
     static void panel(GuiGraphics g, int x0, int y0, int x1, int y1) {
         g.fill(x0, y0, x1, y1, SURFACE);
-        bevelRaised(g, x0, y0, x1, y1);
+        bevelR(g, x0, y0, x1, y1);
         g.fill(x0, y0, x1, y0 + 1, ACCENT_LINE);
     }
 
     static void border(GuiGraphics g, int x0, int y0, int x1, int y1) {
-        bevelRaised(g, x0, y0, x1, y1);
+        bevelR(g, x0, y0, x1, y1);
     }
 
-    static void bevelRaised(GuiGraphics g, int x0, int y0, int x1, int y1) {
+    static void bevelR(GuiGraphics g, int x0, int y0, int x1, int y1) {
         bevel(g, x0, y0, x1, y1, EDGE_LIGHT, EDGE_DARK);
     }
 
-    static void bevelInset(GuiGraphics g, int x0, int y0, int x1, int y1) {
+    static void bevelI(GuiGraphics g, int x0, int y0, int x1, int y1) {
         bevel(g, x0, y0, x1, y1, EDGE_DARK, EDGE_LIGHT);
     }
 
@@ -116,7 +116,7 @@ final class LanPlusUI {
                      boolean selected, boolean enabled, boolean hover) {
         int bg = !enabled ? SURFACE_DISABLED : selected ? ACCENT_STRONG : (hover ? SURFACE_HOVER : SURFACE_RAISED);
         g.fill(x, y, x + w, y + h, bg);
-        bevelRaised(g, x, y, x + w, y + h);
+        LanPlusUI.bevelR(g, x, y, x + w, y + h);
         int color = !enabled ? FAINT : selected || hover ? TEXT : MUTED;
         int tx = x + (w - font.width(label)) / 2;
         g.drawString(font, label, tx, y + (h - 8) / 2, color, false);

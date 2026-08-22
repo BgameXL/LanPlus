@@ -12,7 +12,7 @@ import net.minecraft.util.FormattedCharSequence;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class AnnouncementsScreen extends Screen {
+public final class Announcements extends Screen {
 
     private static final int MARGIN = 20;
     private static final int MAX_W = 360;
@@ -24,7 +24,7 @@ public final class AnnouncementsScreen extends Screen {
     private int listTop, listBottom, contentW;
     private int scrollY;
 
-    public AnnouncementsScreen(Screen parent) {
+    public Announcements(Screen parent) {
         super(Component.translatable("gui.lanplus.announcements.title"));
         this.parent = parent;
     }
@@ -32,7 +32,7 @@ public final class AnnouncementsScreen extends Screen {
     @Override
     protected void init() {
         layout();
-        addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_DONE, b -> onClose())
+        addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                 .bounds(cardX + cardW - 90, cardY + cardH + 6, 90, 20).build());
         markAllSeen();
     }

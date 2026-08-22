@@ -112,7 +112,6 @@ public final class FriendsScreen extends Screen {
             if (Minecraft.getInstance().screen != this) {
                 return;
             }
-            setStatus(Component.translatable("gui.lanplus.status.refreshing"));
             if (tab != Tab.ADD && tab != Tab.JOIN) {
                 rebuildWidgets();
             }
@@ -152,14 +151,14 @@ public final class FriendsScreen extends Screen {
         layout();
 
         int btnY = paneBottom + 4;
-        addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_DONE, b -> onClose())
+        addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                 .bounds(leftX + 8, btnY, 88, 20).build());
         if (tab == Tab.ADD) {
             addBox = new EditBox(this.font, rightX + 6, paneTop + 22, rightW - 84, 20,
                     Component.translatable("gui.lanplus.add.hint"));
             addBox.setHint(Component.translatable("gui.lanplus.add.hint"));
             addRenderableWidget(addBox);
-            addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.add.button"), b -> doAdd())
+            addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.add.button"), b -> doAdd())
                     .bounds(rightX + rightW - 72, paneTop + 22, 66, 20).primary().build());
         } else if (tab == Tab.JOIN) {
             int joinRowY = paneBottom - 40;
@@ -167,48 +166,48 @@ public final class FriendsScreen extends Screen {
                     Component.translatable("gui.lanplus.join.hint"));
             joinBox.setHint(Component.translatable("gui.lanplus.join.hint"));
             addRenderableWidget(joinBox);
-            addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.join.button"), b -> doJoinByCode())
+            addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.join.button"), b -> doJoinByCode())
                     .bounds(rightX + rightW - 72, joinRowY, 66, 20).primary().build());
             Friend sel = selectedHostingFriend();
             if (sel != null) {
                 int jw = Math.min(rightW - 16, 140);
                 int jx = rightX + (rightW - jw) / 2;
-                addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.action.join"), b -> joinFriend(sel))
+                addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.action.join"), b -> joinFriend(sel))
                         .bounds(jx, paneTop + 44, jw, 20).primary().build());
             }
         } else if (tab == Tab.DETAILS) {
             HostInfo info = hostInfo();
             if (info != null) {
                 int bx = rightX + rightW - 116;
-                addRenderableWidget(LanPlusButton.create(showLabel(showAddress), b -> {
+                addRenderableWidget(LanplusButton.create(showLabel(showAddress), b -> {
                             showAddress = !showAddress;
                             rebuildWidgets();
                         })
                         .bounds(bx, paneTop + 62, 52, 18).build());
-                addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.address()))
+                addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.address()))
                         .bounds(bx + 56, paneTop + 62, 52, 18).build());
-                addRenderableWidget(LanPlusButton.create(showLabel(showCode), b -> {
+                addRenderableWidget(LanplusButton.create(showLabel(showCode), b -> {
                             showCode = !showCode;
                             rebuildWidgets();
                         })
                         .bounds(bx, paneTop + 94, 52, 18).build());
-                addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.code()))
+                addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.code()))
                         .bounds(bx + 56, paneTop + 94, 52, 18).build());
             }
         } else if (tab == Tab.FRIENDS) {
             Friend sel = selectedFriend();
             if (sel != null && sel.state() == GameplayState.HOSTING && sel.joinCode() != null) {
-                addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.action.join"), b -> doJoin())
+                addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.action.join"), b -> doJoin())
                         .bounds(rightX + 8, paneTop + 74, 80, 20).primary().build());
             } else if (sel == null) {
                 Friend hosting = hubFriendHosting();
                 int ctaW = Math.min(rightW - 16, 140);
                 int ctaX = rightX + (rightW - ctaW) / 2;
                 if (hostInfo() == null && hosting != null) {
-                    addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.hub.join"), b -> joinFriend(hosting))
+                    addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.hub.join"), b -> joinFriend(hosting))
                             .bounds(ctaX, paneTop + 44, ctaW, 20).primary().build());
                 } else if (hostInfo() == null) {
-                    addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.hub.host"), b -> openHost())
+                    addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.hub.host"), b -> openHost())
                             .bounds(ctaX, paneTop + 44, ctaW, 20).primary().build());
                 }
             }

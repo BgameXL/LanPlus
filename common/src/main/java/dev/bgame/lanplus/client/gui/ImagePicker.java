@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-public final class ImagePickerScreen extends Screen {
+public final class ImagePicker extends Screen {
 
     private static final int MARGIN = 20;
     private static final int MAX_W = 460;
@@ -41,8 +41,8 @@ public final class ImagePickerScreen extends Screen {
         }
     }
 
-    public ImagePickerScreen(Screen parent, Component heading, List<CatalogImage> items, String currentId,
-                             boolean allowNone, int columns, float aspect, Consumer<CatalogImage> onPick) {
+    public ImagePicker(Screen parent, Component heading, List<CatalogImage> items, String currentId,
+                       boolean allowNone, int columns, float aspect, Consumer<CatalogImage> onPick) {
         super(heading);
         this.parent = parent;
         this.heading = heading;
@@ -66,7 +66,7 @@ public final class ImagePickerScreen extends Screen {
         cellH = Math.round(cellW / aspect);
         rowH = cellH + LABEL_H + CELL_GAP;
 
-        addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_CANCEL, b -> onClose())
+        addRenderableWidget(LanplusButton.create(CommonComponents.GUI_CANCEL, b -> onClose())
                 .bounds(boxX + contentW - 90, panelBottom + 8, 90, 20).build());
     }
 

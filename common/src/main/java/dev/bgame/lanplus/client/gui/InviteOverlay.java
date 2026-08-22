@@ -7,7 +7,6 @@ import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.PauseMenuButtons;
 import dev.bgame.lanplus.friends.FriendsService;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.storage.LevelSummary;
@@ -17,7 +16,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-public final class InviteOverlayScreen extends Screen {
+public final class InviteOverlay extends Screen {
 
     private static final int PANEL_W = 240;
     private static final int PANEL_H = 200;
@@ -34,16 +33,16 @@ public final class InviteOverlayScreen extends Screen {
     private int panelX;
     private int panelY;
 
-    public InviteOverlayScreen(Screen parent, LevelSummary world, HostAccessMode mode, boolean allowNonPremium) {
+    public InviteOverlay(Screen parent, LevelSummary world, HostAccessMode mode, boolean allowNonPremium) {
         this(parent, world, mode, allowNonPremium, null);
     }
 
-    public InviteOverlayScreen(Screen parent, HostController.HostSettings inWorldBase) {
+    public InviteOverlay(Screen parent, HostController.HostSettings inWorldBase) {
         this(parent, null, inWorldBase.mode(), inWorldBase.allowNonPremium(), inWorldBase);
     }
 
-    private InviteOverlayScreen(Screen parent, LevelSummary world, HostAccessMode mode,
-                                boolean allowNonPremium, HostController.HostSettings inWorldBase) {
+    private InviteOverlay(Screen parent, LevelSummary world, HostAccessMode mode,
+                          boolean allowNonPremium, HostController.HostSettings inWorldBase) {
         super(Component.translatable("gui.lanplus.invite.title"));
         this.parent = parent;
         this.world = world;
@@ -56,10 +55,10 @@ public final class InviteOverlayScreen extends Screen {
     protected void init() {
         panelX = (this.width - PANEL_W) / 2;
         panelY = (this.height - PANEL_H) / 2;
-        addRenderableWidget(Button.builder(Component.literal("X"), b -> hostNow())
+        addRenderableWidget(LanplusButton.create(Component.literal("X"), b -> hostNow())
                 .bounds(panelX + PANEL_W - 18, panelY + 4, 14, 14).build());
-        addRenderableWidget(Button.builder(Component.translatable("gui.lanplus.invite.hostnow"), b -> hostNow())
-                .bounds(panelX + PANEL_W / 2 - 50, panelY + PANEL_H - 26, 100, 20).build());
+        addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.invite.hostnow"), b -> hostNow())
+                .bounds(panelX + PANEL_W / 2 - 50, panelY + PANEL_H - 26, 100, 20).primary().build());
     }
 
     @Override

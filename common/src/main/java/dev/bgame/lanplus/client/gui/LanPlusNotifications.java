@@ -70,7 +70,7 @@ public final class LanPlusNotifications {
                 Component.translatable("gui.lanplus.notif.view"),
                 () -> {
                     Minecraft mc = Minecraft.getInstance();
-                    mc.setScreen(new AnnouncementsScreen(mc.screen));
+                    mc.setScreen(new Announcements(mc.screen));
                 }, HOLD_ACTION_MS));
     }
 

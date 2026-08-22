@@ -56,7 +56,7 @@ public final class SettingsScreen extends Screen {
     @Override
     protected void init() {
         layout();
-        addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.settings.back"), b -> onClose())
+        addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.settings.back"), b -> onClose())
                 .bounds(px + 8, py + 7, 54, 18).build());
 
         if (selected == Cat.ADVANCED) {
@@ -102,7 +102,7 @@ public final class SettingsScreen extends Screen {
         rows.clear();
 
         g.fill(px, py, px + pw, py + ph, LanPlusUI.SURFACE);
-        LanPlusUI.bevelRaised(g, px, py, px + pw, py + ph);
+        LanPlusUI.bevelR(g, px, py, px + pw, py + ph);
         g.fill(px, py, px + pw, py + 2, LanPlusUI.LIME);
 
         int wx = LanPlusUI.wordmark(g, this.font, px + 70, py + 12);
@@ -165,7 +165,7 @@ public final class SettingsScreen extends Screen {
         int w = 28;
         int h = 14;
         g.fill(x, y, x + w, y + h, on ? LanPlusUI.LIME : LanPlusUI.SLOT);
-        LanPlusUI.bevelInset(g, x, y, x + w, y + h);
+        LanPlusUI.bevelI(g, x, y, x + w, y + h);
         int kx = on ? x + w - 2 - 10 : x + 2;
         g.fill(kx, y + 2, kx + 10, y + h - 2, on ? LanPlusUI.SURFACE : LanPlusUI.MUTED);
     }

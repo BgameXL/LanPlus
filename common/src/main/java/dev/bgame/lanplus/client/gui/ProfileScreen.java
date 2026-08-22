@@ -14,7 +14,7 @@ import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
-import dev.bgame.lanplus.client.gui.ProfilePromptCatalog.Prompt;
+import dev.bgame.lanplus.client.gui.ProfilePrompt.Prompt;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.network.LanPlusNetwork;
 import dev.bgame.lanplus.profiles.ProfilesService;
@@ -345,13 +345,13 @@ public final class ProfileScreen extends Screen {
 
         if (loaded && profile != null && editing) {
             editTop = computeEditTop();
-            buildEditWidgets();
+            buildEdit();
 
             int by = Math.min(editFormBottom() + 10, this.height - 28);
             int bx = eL - 10;
-            addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.save"), b -> doSave())
+            addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.save"), b -> doSave())
                     .bounds(bx, by, 90, 20).primary().build());
-            addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.cancel"),
+            addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.cancel"),
                             b -> {
                                 editing = false;
                                 status = null;
@@ -361,13 +361,13 @@ public final class ProfileScreen extends Screen {
                             })
                     .bounds(bx + 96, by, 90, 20).build());
         } else {
-            addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_DONE, b -> onClose())
+            addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                     .bounds(right - 80, this.height - 28, 80, 20).build());
             if (loaded && profile != null) {
-                addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.back"), b -> onClose())
+                addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.back"), b -> onClose())
                         .bounds(left, 6, 80, 20).build());
                 if (own) {
-                    addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.edit"),
+                    addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.edit"),
                                     b -> {
                                         editing = true;
                                         primeEdit();
@@ -375,7 +375,7 @@ public final class ProfileScreen extends Screen {
                                     })
                             .bounds(left, this.height - 28, 110, 20).build());
                 } else {
-                    addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.report"),
+                    addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.report"),
                                     b -> this.minecraft.setScreen(new ReportScreen(this, uuid,
                                             profile.username() == null ? "" : profile.username())))
                             .bounds(left, this.height - 28, 110, 20).build());
@@ -384,7 +384,7 @@ public final class ProfileScreen extends Screen {
         }
     }
 
-    private void buildEditWidgets() {
+    private void buildEdit() {
         layoutEditAnchors();
         switch (editTab) {
             case 0 -> {
@@ -399,12 +399,12 @@ public final class ProfileScreen extends Screen {
             }
             case 1 -> {
                 int half = (colW - 6) / 2;
-                pronounButton = LanPlusButton.create(pronounLabel(), b -> {
+                pronounButton = LanplusButton.create(pronounLabel(), b -> {
                     pronounIndex = (pronounIndex + 1) % PRONOUN_CYCLE.length;
                     pronounButton.setMessage(pronounLabel());
                 }).bounds(colLX, aIdentityY, half, 20).build();
                 addRenderableWidget(pronounButton);
-                invisibleButton = LanPlusButton.create(invisibleLabel(), b -> {
+                invisibleButton = LanplusButton.create(invisibleLabel(), b -> {
                     invisibleToggle = !invisibleToggle;
                     invisibleButton.setMessage(invisibleLabel());
                 }).bounds(colLX + half + 6, aIdentityY, colW - half - 6, 20).build();
@@ -424,15 +424,15 @@ public final class ProfileScreen extends Screen {
         }
         int half = (colW - 6) / 2;
         int row = aSkinRowY + 14;
-        skinSourceButton = LanPlusButton.create(skinSourceLabel(), b -> toggleSkinSource())
+        skinSourceButton = LanplusButton.create(skinSourceLabel(), b -> toggleSkinSource())
                 .bounds(colRX, row, half, 20).build();
         addRenderableWidget(skinSourceButton);
 
-        skinSlimButton = LanPlusButton.create(skinSlimLabel(), b -> toggleSkinSlim())
+        skinSlimButton = LanplusButton.create(skinSlimLabel(), b -> toggleSkinSlim())
                 .bounds(colRX + half + 6, row, colW - half - 6, 20).build();
         addRenderableWidget(skinSlimButton);
 
-        skinRemoveButton = LanPlusButton.create(Component.translatable("gui.lanplus.profile.skin.remove"),
+        skinRemoveButton = LanplusButton.create(Component.translatable("gui.lanplus.profile.skin.remove"),
                         b -> removeHostedSkin())
                 .bounds(colRX, row + 24, half, 20).build();
         addRenderableWidget(skinRemoveButton);
@@ -550,11 +550,11 @@ public final class ProfileScreen extends Screen {
     }
 
     private void buildBackgroundWidgets() {
-        Button bgStyleButton = LanPlusButton.create(Component.translatable("gui.lanplus.profile.bg.color"), b -> picker())
+        Button bgStyleButton = LanplusButton.create(Component.translatable("gui.lanplus.profile.bg.color"), b -> picker())
                 .bounds(colLX, aBgRowY, 72, 20).build();
         addRenderableWidget(bgStyleButton);
 
-        bgColorButton = LanPlusButton.create(bgImageLabel(), b -> openBackgroundPicker())
+        bgColorButton = LanplusButton.create(bgImageLabel(), b -> openBackgroundPicker())
                 .bounds(colLX + 78, aBgRowY, 170, 20).primary().build();
         addRenderableWidget(bgColorButton);
     }
@@ -567,14 +567,14 @@ public final class ProfileScreen extends Screen {
     }
 
     private void buildBannerWidgets() {
-        bannerButton = LanPlusButton.create(bannerLabel(), b -> openBannerPicker())
+        bannerButton = LanplusButton.create(bannerLabel(), b -> openBannerPicker())
                 .bounds(colRX, aBannerRowY, 170, 20).primary().build();
         bannerButton.active = !bannerCatalog.isEmpty() || banner != null;
         addRenderableWidget(bannerButton);
     }
 
     private void openBackgroundPicker() {
-        this.minecraft.setScreen(new ImagePickerScreen(this,
+        this.minecraft.setScreen(new ImagePicker(this,
                 Component.translatable("gui.lanplus.profile.bg.pick.title"),
                 bgCatalog, bgStyle == BG_NONE ? null : bgImageId, true, 3, 16f / 9f, img -> {
             if (img == null) {
@@ -606,7 +606,7 @@ public final class ProfileScreen extends Screen {
     }
 
     private void openBannerPicker() {
-        this.minecraft.setScreen(new ImagePickerScreen(this,
+        this.minecraft.setScreen(new ImagePicker(this,
                 Component.translatable("gui.lanplus.profile.banner.pick.title"),
                 bannerCatalog, banner == null ? null : banner.id(), true, 2, 4f, img -> banner = img));
     }
@@ -648,7 +648,7 @@ public final class ProfileScreen extends Screen {
             LinkRow r = linkRows.get(i);
             int y = aLinksRowsY + i * 24;
             final int idx = i;
-            addRenderableWidget(LanPlusButton.create(Component.literal(platformLabel(PLATFORMS[r.platform])),
+            addRenderableWidget(LanplusButton.create(Component.literal(platformLabel(PLATFORMS[r.platform])),
                     b -> openLinkPicker(idx)).bounds(colLX, y, pickW, 20).build());
             EditBox box = new EditBox(this.font, boxX, y + 1, boxW, 18, Component.literal(PLATFORMS[r.platform]));
             box.setMaxLength(40);
@@ -656,11 +656,11 @@ public final class ProfileScreen extends Screen {
             box.setValue(r.value == null ? "" : r.value);
             r.box = box;
             addRenderableWidget(box);
-            addRenderableWidget(LanPlusButton.create(Component.literal("x"), b -> removeLinkRow(idx))
+            addRenderableWidget(LanplusButton.create(Component.literal("x"), b -> removeLinkRow(idx))
                     .bounds(colLX + colW - rmW, y, rmW, 20).build());
         }
         if (linkRows.size() < PLATFORMS.length) {
-            addRenderableWidget(LanPlusButton.create(Component.translatable("gui.lanplus.profile.link.add"),
+            addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.link.add"),
                     b -> addLinkRow()).bounds(colLX, aAddLinkY, colW, 18).build());
         }
     }
@@ -745,14 +745,14 @@ public final class ProfileScreen extends Screen {
             slotFreeBox[i] = null;
             int y = aQRowsY + i * 24;
             final int slot = i;
-            addRenderableWidget(LanPlusButton.create(pickerLabel(slot), b -> changeSlotPrompt(slot))
+            addRenderableWidget(LanplusButton.create(pickerLabel(slot), b -> changeSlotPrompt(slot))
                     .bounds(colLX, y, pickerW, 20).build());
 
-            Prompt p = ProfilePromptCatalog.byId(slotPromptId[i]);
+            Prompt p = ProfilePrompt.byId(slotPromptId[i]);
             if (p == null) {
                 continue;
             }
-            if (p.type() == ProfilePromptCatalog.Type.FREE) {
+            if (p.type() == ProfilePrompt.Type.FREE) {
                 EditBox box = new EditBox(this.font, answerX, y + 1, answerW, 18, Component.empty());
                 box.setMaxLength(140);
                 box.setHint(Component.translatable("gui.lanplus.profile.questions.hint"));
@@ -760,7 +760,7 @@ public final class ProfileScreen extends Screen {
                 slotFreeBox[i] = box;
                 addRenderableWidget(box);
             } else {
-                addRenderableWidget(LanPlusButton.create(choiceLabel(slot), b -> cycleChoice(slot))
+                addRenderableWidget(LanplusButton.create(choiceLabel(slot), b -> cycleChoice(slot))
                         .bounds(answerX, y, answerW, 20).build());
             }
         }
@@ -770,11 +770,11 @@ public final class ProfileScreen extends Screen {
         captureFreeValues();
         String next = nextPrompt(slot);
         slotPromptId[slot] = next;
-        Prompt p = ProfilePromptCatalog.byId(next);
+        Prompt p = ProfilePrompt.byId(next);
         if (p == null) {
             slotFreeValue[slot] = null;
             slotChoiceToken[slot] = null;
-        } else if (p.type() == ProfilePromptCatalog.Type.FREE) {
+        } else if (p.type() == ProfilePrompt.Type.FREE) {
             slotFreeValue[slot] = "";
         } else {
             slotChoiceToken[slot] = p.choices().get(0);
@@ -783,7 +783,7 @@ public final class ProfileScreen extends Screen {
     }
 
     private void cycleChoice(int slot) {
-        Prompt p = ProfilePromptCatalog.byId(slotPromptId[slot]);
+        Prompt p = ProfilePrompt.byId(slotPromptId[slot]);
         if (p == null || p.choices().isEmpty()) {
             return;
         }
@@ -795,7 +795,7 @@ public final class ProfileScreen extends Screen {
     private String nextPrompt(int slot) {
         List<String> options = new ArrayList<>();
         options.add(null);
-        for (Prompt p : ProfilePromptCatalog.PROMPTS) {
+        for (Prompt p : ProfilePrompt.PROMPTS) {
             if (!usedInOtherSlot(p.id(), slot)) {
                 options.add(p.id());
             }
@@ -849,7 +849,7 @@ public final class ProfileScreen extends Screen {
             slotChoiceToken[i] = null;
         }
         int slot = 0;
-        for (Prompt p : ProfilePromptCatalog.PROMPTS) {
+        for (Prompt p : ProfilePrompt.PROMPTS) {
             if (slot >= MAX_SLOTS) {
                 break;
             }
@@ -858,7 +858,7 @@ public final class ProfileScreen extends Screen {
                 continue;
             }
             slotPromptId[slot] = p.id();
-            if (p.type() == ProfilePromptCatalog.Type.FREE) {
+            if (p.type() == ProfilePrompt.Type.FREE) {
                 slotFreeValue[slot] = answer;
             } else {
                 slotChoiceToken[slot] = p.choices().contains(answer) ? answer : p.choices().get(0);
@@ -1003,13 +1003,13 @@ public final class ProfileScreen extends Screen {
         int cbot = editBodyBottom + 6;
         renderEditTabs(g, mouseX, mouseY);
         g.fill(cl, ctop, cr, cbot, PANEL_BG);
-        LanPlusUI.bevelRaised(g, cl, ctop, cr, cbot);
+        LanPlusUI.bevelR(g, cl, ctop, cr, cbot);
         g.fill(cl, ctop, cr, ctop + 1, LanPlusUI.ACCENT_LINE);
 
         switch (editTab) {
             case 0 -> {
                 editHeader(g, Component.translatable("gui.lanplus.profile.about"), colLX, colW, aAboutHdrY);
-                renderBioToolbar(g, mouseX, mouseY);
+                renderBio(g, mouseX, mouseY);
                 renderBioPreview(g);
                 editHeader(g, Component.translatable("gui.lanplus.profile.links"), colLX, colW, aLinksHdrY);
                 editHeader(g, Component.translatable("gui.lanplus.profile.questions"), colLX, colW, aQHdrY);
@@ -1080,7 +1080,7 @@ public final class ProfileScreen extends Screen {
         g.fill(x, y + 12, x + w, y + 13, DIVIDER);
     }
 
-    private void renderBioToolbar(GuiGraphics g, int mouseX, int mouseY) {
+    private void renderBio(GuiGraphics g, int mouseX, int mouseY) {
         int x = colLX;
         int y = aBioToolbarY;
         int h = 16;
@@ -1285,7 +1285,7 @@ public final class ProfileScreen extends Screen {
             ProfileImages.blitCover(g, tex, left, top, right - left, bottom - top);
         }
         g.fillGradient(left, bottom - 26, right, bottom, 0x00000000, 0xA0000000);
-        LanPlusUI.bevelInset(g, left, top, right, bottom);
+        LanPlusUI.bevelI(g, left, top, right, bottom);
     }
 
     private void renderBannerIdentity(GuiGraphics g) {
@@ -1299,7 +1299,7 @@ public final class ProfileScreen extends Screen {
         int ax = left + 10;
         int ay = bottom - av + 10;
         g.fill(ax - 2, ay - 2, ax + av + 2, ay + av + 2, SLOT);
-        LanPlusUI.bevelInset(g, ax - 2, ay - 2, ax + av + 2, ay + av + 2);
+        LanPlusUI.bevelI(g, ax - 2, ay - 2, ax + av + 2, ay + av + 2);
         drawAvatar(g, uuid, ax, ay, av);
         int hx = ax + av + 8;
         String name = profile.username() == null ? "?" : profile.username();
@@ -1423,7 +1423,7 @@ public final class ProfileScreen extends Screen {
 
     private void drawModpackIcon(GuiGraphics g, int x, int y, int size, ModpackRef ref) {
         g.fill(x, y, x + size, y + size, SLOT);
-        LanPlusUI.bevelInset(g, x, y, x + size, y + size);
+        LanPlusUI.bevelI(g, x, y, x + size, y + size);
         int strip = Math.max(2, size / 9);
         g.fill(x, y, x + size, y + strip, ACCENT);
         String name = ref.name() == null ? "" : ref.name().trim();
@@ -1445,7 +1445,6 @@ public final class ProfileScreen extends Screen {
         svc.setFavoriteModpack(modpackId).whenComplete((error, ex) -> this.minecraft.execute(() -> {
             if (ex == null && error == null) {
                 loaded = false;
-                setStatus(Component.translatable("gui.lanplus.profile.saved"));
                 loadProfile();
             } else {
                 setStatus(Component.translatable(errorKey(error)));
@@ -1492,7 +1491,7 @@ public final class ProfileScreen extends Screen {
                 int bx = r - lw;
                 g.fill(bx, y + 2, bx + lw, y + 13, ACCENT_TINT);
                 g.drawString(this.font, lv, bx + 4, y + 4, LINK);
-                nameRight = bx - 4;
+                nameRight = bx - 2;
             }
             g.drawString(this.font, ellipsize(f.username(), nameRight - tx), tx, y + 2, 0xFFD3D6DC);
             g.drawString(this.font, friendStatus(f), tx, y + 12, FAINT);
@@ -1517,7 +1516,7 @@ public final class ProfileScreen extends Screen {
         int bottom = this.height - 34;
         int divX = left + SIDEBAR_W;
         g.fill(divX, top + 1, divX + 1, bottom, LanPlusUI.DIVIDER);
-        LanPlusUI.bevelRaised(g, left, top, right, bottom);
+        LanPlusUI.bevelR(g, left, top, right, bottom);
         g.fill(left, top, right, top + 1, LanPlusUI.ACCENT_LINE);
     }
 
@@ -1540,7 +1539,7 @@ public final class ProfileScreen extends Screen {
 
         y = sectionHeader(g, x, y, x + textW, Component.translatable("gui.lanplus.profile.questions"));
         boolean anyPrompt = false;
-        for (Prompt p : ProfilePromptCatalog.PROMPTS) {
+        for (Prompt p : ProfilePrompt.PROMPTS) {
             String answer = profile.prompt(p.id());
             if (answer == null) {
                 continue;
@@ -1550,7 +1549,7 @@ public final class ProfileScreen extends Screen {
                 g.drawString(this.font, line, x, y, MUTED);
                 y += 10;
             }
-            for (FormattedCharSequence line : this.font.split(ProfilePromptCatalog.answerText(p, answer), textW)) {
+            for (FormattedCharSequence line : this.font.split(ProfilePrompt.answerText(p, answer), textW)) {
                 g.drawString(this.font, line, x, y, 0xFFD3D6DC);
                 y += 11;
             }
@@ -1595,7 +1594,7 @@ public final class ProfileScreen extends Screen {
         cmBoxH = renderH;
 
         g.fill(x, y, x + renderW, y + renderH, SLOT);
-        LanPlusUI.bevelInset(g, x, y, x + renderW, y + renderH);
+        LanPlusUI.bevelI(g, x, y, x + renderW, y + renderH);
         g.fill(x, y, x + renderW, y + 2, ACCENT);
         g.flush();
         g.enableScissor(x + 1, y + 2, x + renderW - 1, y + renderH - 1);
@@ -1786,11 +1785,11 @@ public final class ProfileScreen extends Screen {
         }
         Map<String, String> prompts = new LinkedHashMap<>();
         for (int i = 0; i < MAX_SLOTS; i++) {
-            Prompt p = ProfilePromptCatalog.byId(slotPromptId[i]);
+            Prompt p = ProfilePrompt.byId(slotPromptId[i]);
             if (p == null) {
                 continue;
             }
-            if (p.type() == ProfilePromptCatalog.Type.FREE) {
+            if (p.type() == ProfilePrompt.Type.FREE) {
                 String value = slotFreeValue[i] == null ? "" : slotFreeValue[i].trim();
                 if (!value.isEmpty()) {
                     prompts.put(p.id(), value);
@@ -1811,7 +1810,6 @@ public final class ProfileScreen extends Screen {
             if (error == null) {
                 editing = false;
                 loaded = false;
-                setStatus(Component.translatable("gui.lanplus.profile.saved"));
                 loadProfile();
             } else {
                 setStatus(Component.translatable(errorKey(error)));
@@ -1960,7 +1958,7 @@ public final class ProfileScreen extends Screen {
     }
 
     private Component pickerLabel(int slot) {
-        Prompt p = ProfilePromptCatalog.byId(slotPromptId[slot]);
+        Prompt p = ProfilePrompt.byId(slotPromptId[slot]);
         if (p == null) {
             return Component.translatable("gui.lanplus.profile.questions.pick");
         }
@@ -1975,11 +1973,11 @@ public final class ProfileScreen extends Screen {
     }
 
     private Component choiceLabel(int slot) {
-        Prompt p = ProfilePromptCatalog.byId(slotPromptId[slot]);
+        Prompt p = ProfilePrompt.byId(slotPromptId[slot]);
         if (p == null || slotChoiceToken[slot] == null) {
             return Component.empty();
         }
-        return ProfilePromptCatalog.choiceLabel(p, slotChoiceToken[slot]);
+        return ProfilePrompt.choiceLabel(p, slotChoiceToken[slot]);
     }
 
     private Component presenceLabel() {

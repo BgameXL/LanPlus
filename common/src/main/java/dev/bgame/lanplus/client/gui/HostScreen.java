@@ -61,8 +61,8 @@ public final class HostScreen extends Screen {
     private int accessLabelY, accessRowY, premiumRowY;
     private int ctrlX, ctrlW;
     private int buttonsY;
-    private LanPlusButton hostButton;
-    private LanPlusButton cancelButton;
+    private LanplusButton hostButton;
+    private LanplusButton cancelButton;
 
     public HostScreen(Screen parent) {
         this(parent, false);
@@ -141,10 +141,10 @@ public final class HostScreen extends Screen {
         }
         layout();
 
-        hostButton = LanPlusButton.create(Component.translatable("gui.lanplus.host.start"), b -> doStart())
+        hostButton = LanplusButton.create(Component.translatable("gui.lanplus.host.start"), b -> doStart())
                 .height(20).primary().build();
         hostButton.active = inWorld || selected >= 0;
-        cancelButton = LanPlusButton.create(CommonComponents.GUI_CANCEL, b -> onClose())
+        cancelButton = LanplusButton.create(CommonComponents.GUI_CANCEL, b -> onClose())
                 .height(20).build();
         addRenderableWidget(hostButton);
         addRenderableWidget(cancelButton);
@@ -516,7 +516,7 @@ public final class HostScreen extends Screen {
             HostController.HostSettings settings = new HostController.HostSettings(
                     accessMode, Set.of(), allowNonPremium, gameType, difficulty, allowCheats);
             if (accessMode == HostAccessMode.INVITED) {
-                this.minecraft.setScreen(new InviteOverlayScreen(this, settings));
+                this.minecraft.setScreen(new InviteOverlay(this, settings));
                 return;
             }
             PauseMenuButtons.markHostedInWorld();
@@ -529,7 +529,7 @@ public final class HostScreen extends Screen {
             return;
         }
         if (accessMode == HostAccessMode.INVITED) {
-            this.minecraft.setScreen(new InviteOverlayScreen(this, world, accessMode, allowNonPremium));
+            this.minecraft.setScreen(new InviteOverlay(this, world, accessMode, allowNonPremium));
         } else {
             HostController.requestHost(accessMode, Set.of(), allowNonPremium);
             this.minecraft.createWorldOpenFlows().loadLevel(this, world.getLevelId());

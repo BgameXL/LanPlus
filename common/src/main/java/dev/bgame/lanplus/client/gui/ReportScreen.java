@@ -8,7 +8,6 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
-import java.util.List;
 import java.util.UUID;
 
 public final class ReportScreen extends Screen {
@@ -42,7 +41,7 @@ public final class ReportScreen extends Screen {
     protected void init() {
         layout();
         if (sent) {
-            addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_DONE, b -> onClose())
+            addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                     .bounds(cardX + cardW - 90, cardY + cardH + 6, 90, 20).build());
             return;
         }
@@ -50,13 +49,13 @@ public final class ReportScreen extends Screen {
         int bw = cardW - 2 * PAD;
         int y = cardY + 34;
         for (String reason : REASONS) {
-            addRenderableWidget(LanPlusButton.create(
+            addRenderableWidget(LanplusButton.create(
                             Component.translatable("gui.lanplus.report.reason." + reason),
                             b -> send(reason))
                     .bounds(bx, y, bw, 20).build());
             y += 26;
         }
-        addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_CANCEL, b -> onClose())
+        addRenderableWidget(LanplusButton.create(CommonComponents.GUI_CANCEL, b -> onClose())
                 .bounds(bx, y + 4, bw, 20).build());
     }
 

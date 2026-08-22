@@ -11,7 +11,6 @@
 
   "gui.lanplus.status.connected": "Connected",
   "gui.lanplus.status.local": "Local-only",
-  "gui.lanplus.status.refreshing": "Refreshing…",
 
   "gui.lanplus.friends.empty": "No friends yet",
   "gui.lanplus.friends.offline": "Offline (%s)",
@@ -143,7 +142,6 @@
   "gui.lanplus.profile.save": "Save",
   "gui.lanplus.profile.cancel": "Cancel",
   "gui.lanplus.profile.saving": "Saving…",
-  "gui.lanplus.profile.saved": "Profile saved",
   "gui.lanplus.toast.hosting": "Hosting a world",
   "gui.lanplus.toast.request": "Sent a friend request",
   "gui.lanplus.toast.invited.title": "World hosted",

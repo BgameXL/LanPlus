@@ -5,11 +5,11 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 
-public final class LanPlusButton extends Button {
+public final class LanplusButton extends Button {
 
     private final boolean primary;
 
-    private LanPlusButton(Builder builder) {
+    private LanplusButton(Builder builder) {
         super(builder.x, builder.y, builder.width, builder.height,
                 builder.message, builder.onPress, DEFAULT_NARRATION);
         this.primary = builder.primary;
@@ -38,7 +38,7 @@ public final class LanPlusButton extends Button {
             color = isHovered() ? LanPlusUI.TEXT : LanPlusUI.MUTED;
         }
         g.fill(x, y, x + w, y + h, bg);
-        LanPlusUI.bevelRaised(g, x, y, x + w, y + h);
+        LanPlusUI.bevelR(g, x, y, x + w, y + h);
         int tx = x + (w - Minecraft.getInstance().font.width(getMessage())) / 2;
         g.drawString(Minecraft.getInstance().font, getMessage(), tx, y + (h - 8) / 2, color, false);
     }
@@ -80,8 +80,8 @@ public final class LanPlusButton extends Button {
             return this;
         }
 
-        public LanPlusButton build() {
-            return new LanPlusButton(this);
+        public LanplusButton build() {
+            return new LanplusButton(this);
         }
     }
 }

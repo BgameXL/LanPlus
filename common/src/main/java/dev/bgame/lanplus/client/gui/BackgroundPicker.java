@@ -46,7 +46,7 @@ public final class BackgroundPicker extends Screen {
         panelBottom = this.height - 40;
         swatchTop = panelTop + 30;
 
-        addRenderableWidget(LanPlusButton.create(CommonComponents.GUI_DONE, b -> onClose())
+        addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                 .bounds(boxX + contentW - 90, panelBottom + 8, 90, 20).primary().build());
     }
 

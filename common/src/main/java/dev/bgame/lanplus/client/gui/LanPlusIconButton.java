@@ -29,7 +29,9 @@ public final class LanPlusIconButton extends Button {
 
     @Override
     public void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        super.renderWidget(g, mouseX, mouseY, partialTick);
+        int bg = isHovered() ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
+        g.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), bg);
+        LanPlusUI.bevelR(g, getX(), getY(), getX() + getWidth(), getY() + getHeight());
         g.blit(icon, getX() + 2, getY() + 2, 0, 0, 16, 16, 16, 16);
         if (badge == null) {
             return;

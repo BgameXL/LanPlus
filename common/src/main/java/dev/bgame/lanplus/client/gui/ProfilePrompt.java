@@ -4,7 +4,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
-public final class ProfilePromptCatalog {
+public final class ProfilePrompt {
 
     public enum Type {FREE, CHOICE}
 
@@ -50,6 +50,6 @@ public final class ProfilePromptCatalog {
         return Component.literal(answer);
     }
 
-    private ProfilePromptCatalog() {
+    private ProfilePrompt() {
     }
 }
