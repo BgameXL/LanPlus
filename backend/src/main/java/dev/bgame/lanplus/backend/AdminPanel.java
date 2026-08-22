@@ -95,6 +95,10 @@ final class AdminPanel {
                     <input id="annTitle" type="text" placeholder="Title">
                     <input id="annImage" type="text" placeholder="Image id (optional)">
                   </div>
+                  <div class="grid2">
+                    <input id="annImageFile" type="file" accept="image/png">
+                    <button class="ghost" onclick="uploadAnnImage()">Upload image</button>
+                  </div>
                   <textarea id="annBody" placeholder="Body (& or section color codes allowed)"></textarea>
                   <div class="actions">
                     <button class="accent" onclick="publishAnnouncement()">Publish</button>
@@ -208,7 +212,26 @@ final class AdminPanel {
                 loadAnnouncements();
               } catch (e) { msg('Network error', true); }
             }
-            
+
+            async function uploadAnnImage() {
+              const f = document.getElementById('annImageFile').files[0];
+              if (!f) { msg('Pick a PNG first', true); return; }
+              let id = document.getElementById('annImage').value.trim();
+              if (!id) { id = f.name.replace(/\\.png$/i, '').toLowerCase().replace(/[^a-z0-9_-]/g, '-').slice(0, 64); }
+              try {
+                const bytes = new Uint8Array(await f.arrayBuffer());
+                let bin = '';
+                for (let i = 0; i < bytes.length; i++) { bin += String.fromCharCode(bytes[i]); }
+                const r = await api('/admin/announcement-image', { id, png: btoa(bin) });
+                if (r.status === 401) { msg('Invalid admin key', true); show(false); return; }
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || data.error) { msg('Upload failed' + (data.error ? ': ' + data.error : ''), true); return; }
+                document.getElementById('annImage').value = data.id;
+                document.getElementById('annImageFile').value = '';
+                msg('Image uploaded: ' + data.id);
+              } catch (e) { msg('Network error', true); }
+            }
+
             async function loadAnnouncements() {
               let r;
               try { r = await api('/admin/announcements'); } catch (e) { return; }

@@ -515,6 +515,9 @@ public final class BackendServer {
         if (m.equals("POST") && path.equals("/admin/announcement")) {
             return adminAnnouncement(req);
         }
+        if (m.equals("POST") && path.equals("/admin/announcement-image")) {
+            return adminAnnouncementImage(req);
+        }
         if (m.equals("GET") && path.equals("/admin/announcements")) {
             return ok(store.announcementsAll());
         }
@@ -568,6 +571,40 @@ public final class BackendServer {
         hub.sendAll(ordered("type", "ANNOUNCEMENT", "data", row));
         log("admin announcement published: " + type + " / " + title);
         return ok(row);
+    }
+
+    private static final int MAX_ANN_IMAGE_B64_CHARS = 700 * 1024;
+
+    private Resp adminAnnouncementImage(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        String id = b.get("id") == null ? null : String.valueOf(b.get("id"));
+        if (!AssetCatalog.validId(id)) {
+            return ok(error("bad_id"));
+        }
+        if (!(b.get("png") instanceof String b64) || b64.isEmpty()) {
+            return ok(error("bad_png"));
+        }
+        if (b64.length() > MAX_ANN_IMAGE_B64_CHARS) {
+            return ok(error("too_large"));
+        }
+        byte[] png;
+        try {
+            png = Base64.getDecoder().decode(b64);
+        } catch (IllegalArgumentException e) {
+            return ok(error("bad_png"));
+        }
+        if (png.length > AssetCatalog.MAX_BYTES) {
+            return ok(error("too_large"));
+        }
+        if (pngDimensions(png) == null) {
+            return ok(error("bad_png"));
+        }
+        String hash = announcementImages.write(id, png);
+        if (hash == null) {
+            return ok(error("write_failed"));
+        }
+        log("admin announcement image uploaded: " + id);
+        return ok(ordered("id", id, "url", announcementImages.url(id), "hash", hash));
     }
 
     private Resp adminScrub(Http.Request req) {

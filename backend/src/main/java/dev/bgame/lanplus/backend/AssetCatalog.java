@@ -101,6 +101,25 @@ final class AssetCatalog {
         }
     }
 
+    static boolean validId(String id) {
+        return id != null && ID.matcher(id).matches();
+    }
+
+    synchronized String write(String id, byte[] bytes) {
+        Path file = fileOf(id);
+        if (file == null || bytes == null || bytes.length == 0 || bytes.length > MAX_BYTES) {
+            return null;
+        }
+        try {
+            Files.createDirectories(dir);
+            Files.write(file, bytes);
+            hashes.remove(id);
+            return hash(id);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
     private Path fileOf(String id) {
         if (id == null || !ID.matcher(id).matches()) {
             return null;
