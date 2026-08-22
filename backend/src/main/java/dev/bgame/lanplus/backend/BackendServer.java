@@ -34,14 +34,16 @@ public final class BackendServer {
     private final EventHub hub = new EventHub();
     private final AssetCatalog backgrounds;
     private final AssetCatalog banners;
+    private final AssetCatalog announcementImages;
 
     private BackendServer(BackendConfig cfg) {
         this.cfg = cfg;
         this.backgrounds = new AssetCatalog(java.nio.file.Path.of(cfg.backgroundsDir), "/backgrounds/");
         this.banners = new AssetCatalog(java.nio.file.Path.of(cfg.bannersDir), "/banners/");
+        this.announcementImages = new AssetCatalog(java.nio.file.Path.of(cfg.announcementImagesDir), "/announcements/img/");
         this.store = new Store(cfg.heartbeatTtlMs, cfg.baseDomain, cfg.dataFile,
                 cfg.sessionServerUrl, cfg.allowOffline, cfg.sessionTtlMs, backgrounds, banners,
-                cfg.discordWebhook);
+                announcementImages, cfg.discordWebhook);
     }
 
     public static void main(String[] args) throws Exception {
@@ -164,6 +166,10 @@ public final class BackendServer {
             }
             if (m.equals("GET") && path.startsWith("/banners/") && path.endsWith(".png")) {
                 return catalogPng(banners, path.substring("/banners/".length(), path.length() - ".png".length()));
+            }
+            if (m.equals("GET") && path.startsWith("/announcements/img/") && path.endsWith(".png")) {
+                return catalogPng(announcementImages,
+                        path.substring("/announcements/img/".length(), path.length() - ".png".length()));
             }
             if (m.equals("GET") && path.equals("/admin/panel")) {
                 return new Resp(200, null,
@@ -509,7 +515,24 @@ public final class BackendServer {
         if (m.equals("POST") && path.equals("/admin/announcement")) {
             return adminAnnouncement(req);
         }
+        if (m.equals("GET") && path.equals("/admin/announcements")) {
+            return ok(store.announcementsAll());
+        }
+        if (m.equals("POST") && path.equals("/admin/announcement/delete")) {
+            return adminDeleteAnnouncement(req);
+        }
         return NOT_FOUND;
+    }
+
+    private Resp adminDeleteAnnouncement(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        if (!(b.get("id") instanceof Number n)) {
+            return BAD;
+        }
+        store.deactivateAnnouncement(n.intValue());
+        hub.sendAll(ordered("type", "ANNOUNCEMENT_DELETE", "data", ordered("id", n.intValue())));
+        log("admin announcement deleted: " + n.intValue());
+        return ok(ordered("success", true));
     }
 
     private static final Set<String> ANNOUNCEMENT_TYPES = Set.of("UPDATE", "MAINTENANCE", "GENERAL", "FREE");
@@ -533,11 +556,15 @@ public final class BackendServer {
         String type = b.get("type") == null ? null : String.valueOf(b.get("type"));
         String title = b.get("title") == null ? null : String.valueOf(b.get("title"));
         String body = b.get("body") == null ? null : String.valueOf(b.get("body"));
+        String imageId = b.get("imageId") == null ? null : String.valueOf(b.get("imageId"));
         if (type == null || !ANNOUNCEMENT_TYPES.contains(type)
                 || title == null || title.isBlank() || body == null || body.isBlank()) {
             return BAD;
         }
-        Map<String, Object> row = store.publishAnnouncement(type, title, body);
+        if (imageId != null && (imageId.isBlank() || !announcementImages.has(imageId))) {
+            imageId = null;
+        }
+        Map<String, Object> row = store.publishAnnouncement(type, title, body, imageId);
         hub.sendAll(ordered("type", "ANNOUNCEMENT", "data", row));
         log("admin announcement published: " + type + " / " + title);
         return ok(row);

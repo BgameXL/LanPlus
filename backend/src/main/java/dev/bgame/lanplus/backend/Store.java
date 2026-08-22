@@ -29,7 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Backend state. Durable identity and social graph lives in SQLite;
  * presence, invites, and relay tickets stay in memory because they are ephemeral and correct to lose on restart.
- * */
+ *
+ */
 final class Store {
 
     private static final String[] WORDS = {
@@ -105,6 +106,7 @@ final class Store {
     private final Connection connection;
     private final AssetCatalog backgrounds;
     private final AssetCatalog banners;
+    private final AssetCatalog announcementImages;
     private final String discordWebhook;
 
     private final Map<UUID, Presence> presences = new ConcurrentHashMap<>();
@@ -115,7 +117,8 @@ final class Store {
 
     Store(long ttlMs, String baseDomain, String dataFile,
           String sessionServerUrl, boolean allowOffline, long sessionTtlMs,
-          AssetCatalog backgrounds, AssetCatalog banners, String discordWebhook) {
+          AssetCatalog backgrounds, AssetCatalog banners, AssetCatalog announcementImages,
+          String discordWebhook) {
         this.ttlMs = ttlMs;
         this.baseDomain = baseDomain;
         this.sessionServerUrl = sessionServerUrl;
@@ -123,6 +126,7 @@ final class Store {
         this.sessionTtlMs = sessionTtlMs;
         this.backgrounds = backgrounds;
         this.banners = banners;
+        this.announcementImages = announcementImages;
         this.discordWebhook = discordWebhook;
         String path = (dataFile == null || dataFile.isBlank()) ? ":memory:" : dataFile;
         this.connection = openDb(path);
@@ -243,6 +247,9 @@ final class Store {
                         + "user_uuid TEXT NOT NULL, announcement_id INTEGER NOT NULL, "
                         + "PRIMARY KEY (user_uuid, announcement_id), "
                         + "FOREIGN KEY (announcement_id) REFERENCES announcements(id))");
+                if (!columnExists(st, "announcements", "image_id")) {
+                    st.executeUpdate("ALTER TABLE announcements ADD COLUMN image_id TEXT");
+                }
                 st.executeUpdate("UPDATE presence_state SET online=0");
             }
             return c;
@@ -386,6 +393,9 @@ final class Store {
         p.allowCommands = allowCommands;
         p.lastHeartbeat = now;
         p.hosting = "HOSTING".equals(state);
+        if (p.hosting && joinCode != null) {
+            renewInvite(joinCode, now + 3_600_000);
+        }
         if (!p.onlinePersisted) {
             p.onlinePersisted = true;
             p.disconnectRecorded = false;
@@ -1556,7 +1566,7 @@ final class Store {
     List<Object> announcementsUnseen(UUID viewer) {
         synchronized (lock) {
             try (PreparedStatement ps = connection.prepareStatement(
-                    "SELECT id, type, title, body, created_at FROM announcements "
+                    "SELECT id, type, title, body, created_at, image_id FROM announcements "
                             + "WHERE active = 1 AND id NOT IN "
                             + "(SELECT announcement_id FROM announcement_seen WHERE user_uuid = ?) "
                             + "ORDER BY created_at ASC")) {
@@ -1571,7 +1581,7 @@ final class Store {
     List<Object> announcementsAll() {
         synchronized (lock) {
             try (PreparedStatement ps = connection.prepareStatement(
-                    "SELECT id, type, title, body, created_at FROM announcements "
+                    "SELECT id, type, title, body, created_at, image_id FROM announcements "
                             + "WHERE active = 1 ORDER BY created_at DESC")) {
                 return announcementRows(ps);
             } catch (SQLException e) {
@@ -1580,13 +1590,29 @@ final class Store {
         }
     }
 
-    private static List<Object> announcementRows(PreparedStatement ps) throws SQLException {
+    void deactivateAnnouncement(int id) {
+        synchronized (lock) {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "UPDATE announcements SET active = 0 WHERE id = ?")) {
+                ps.setInt(1, id);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("deactivateAnnouncement", e);
+            }
+        }
+    }
+
+    private List<Object> announcementRows(PreparedStatement ps) throws SQLException {
         List<Object> out = new ArrayList<>();
         try (ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
+                String imageId = rs.getString(6);
                 out.add(ordered("id", rs.getInt(1), "type", rs.getString(2),
                         "title", rs.getString(3), "body", rs.getString(4),
-                        "createdAt", rs.getLong(5)));
+                        "createdAt", rs.getLong(5),
+                        "imageId", imageId,
+                        "image", imageId == null || announcementImages == null ? null : announcementImages.url(imageId),
+                        "imageHash", imageId == null || announcementImages == null ? null : announcementImages.hash(imageId)));
             }
         }
         return out;
@@ -1613,22 +1639,26 @@ final class Store {
         }
     }
 
-    Map<String, Object> publishAnnouncement(String type, String title, String body) {
+    Map<String, Object> publishAnnouncement(String type, String title, String body, String imageId) {
         long now = System.currentTimeMillis();
         synchronized (lock) {
             try (PreparedStatement ps = connection.prepareStatement(
-                    "INSERT INTO announcements (type, title, body, created_at, active) VALUES (?,?,?,?,1)",
+                    "INSERT INTO announcements (type, title, body, created_at, active, image_id) VALUES (?,?,?,?,1,?)",
                     Statement.RETURN_GENERATED_KEYS)) {
                 ps.setString(1, type);
                 ps.setString(2, title);
                 ps.setString(3, body);
                 ps.setLong(4, now);
+                ps.setString(5, imageId);
                 ps.executeUpdate();
                 int id;
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     id = rs.next() ? rs.getInt(1) : 0;
                 }
-                return ordered("id", id, "type", type, "title", title, "body", body, "createdAt", now);
+                return ordered("id", id, "type", type, "title", title, "body", body, "createdAt", now,
+                        "imageId", imageId,
+                        "image", imageId == null || announcementImages == null ? null : announcementImages.url(imageId),
+                        "imageHash", imageId == null || announcementImages == null ? null : announcementImages.hash(imageId));
             } catch (SQLException e) {
                 throw fail("publishAnnouncement", e);
             }
@@ -2095,6 +2125,19 @@ final class Store {
             code = randomCode();
         } while (invites.putIfAbsent(code, new Invite(hostUuid, guestAddress, worldName, expiresAt)) != null);
         return code;
+    }
+
+    private void renewInvite(String code, long expiresAt) {
+        Invite i = invites.computeIfPresent(code,
+                (k, v) -> new Invite(v.hostUuid(), v.address(), v.worldName(), expiresAt));
+        if (i == null) {
+            return;
+        }
+        int dot = i.address().indexOf('.');
+        if (dot > 0) {
+            guestTokens.computeIfPresent(i.address().substring(0, dot),
+                    (k, v) -> new GuestToken(v.hostDomain(), expiresAt));
+        }
     }
 
     String validateGuestToken(String token) {
