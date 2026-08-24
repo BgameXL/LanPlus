@@ -2,6 +2,9 @@
 
 LAN+ is a Minecraft mod for playing with friends without the usual hassle. Add friends, invite them into your world, and let them join over the internet with no port forwarding.
 
+### Free
+> Lan+ is hosted on a VPS that i pay $24 a month for, and Lan+ will remain free because of my love for this project. If you'd like, you can donate to this mod it's your decision after all, but i appreciate it.
+
 ## What it does
 
 - **Friends list:** add friends and see who's online and what they're playing, right from the main menu.
