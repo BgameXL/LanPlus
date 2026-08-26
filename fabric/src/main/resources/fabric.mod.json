@@ -28,7 +28,7 @@
     "${mod_id}.fabric.mixins.json"
   ],
   "depends": {
-    "fabricloader": ">=0.15.0",
+    "fabricloader": ">=0.16.0",
     "minecraft": "${fabric_minecraft_version_range}",
     "fabric-api": "*"
   }

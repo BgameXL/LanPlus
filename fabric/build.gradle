@@ -7,7 +7,6 @@ base {
 }
 
 loom {
-    silentMojangMappingsLicense()
     mixin {
         defaultRefmapName = "lanplus.refmap.json"
     }

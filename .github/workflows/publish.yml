@@ -21,11 +21,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -53,7 +53,7 @@ jobs:
           name: build-artifacts
           path: |
             fabric/build/libs/
-            forge/build/libs/
+            neoforge/build/libs/
           retention-days: 7
 
       - name: Attach jars to GitHub release
@@ -63,7 +63,7 @@ jobs:
         run: |
           gh release upload "${{ github.event.release.tag_name }}" \
             "fabric/build/libs/LanPlus-fabric-${{ steps.version.outputs.version }}.jar" \
-            "forge/build/libs/LanPlus-forge-${{ steps.version.outputs.version }}.jar" \
+            "neoforge/build/libs/LanPlus-neoforge-${{ steps.version.outputs.version }}.jar" \
             --clobber
 
   publish-fabric:
@@ -85,24 +85,26 @@ jobs:
           modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
-          name: ${{ github.event.release.name || format('LAN+ {0}', needs.build.outputs.version) }} (Fabric)
+          name: ${{ github.event.release.name || format('LAN+ {0}', needs.build.outputs.version) }} (Fabric/Quilt)
           changelog: ${{ github.event.release.body }}
 
           files: fabric/build/libs/LanPlus-fabric-${{ needs.build.outputs.version }}.jar
-          loaders: fabric
+          loaders: |
+            fabric
+            quilt
           environment: client
           version: ${{ needs.build.outputs.version }}-fabric
           version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
-          game-versions: '1.20.1'
+          game-versions: '1.21.1'
           game-version-filter: none
-          java: '17'
+          java: '21'
 
           retry-attempts: 3
           retry-delay: 10000
           fail-mode: fail
 
-  publish-forge:
-    name: Publish Forge
+  publish-neoforge:
+    name: Publish NeoForge
     needs: build
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
@@ -120,17 +122,17 @@ jobs:
           modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
 
-          name: ${{ github.event.release.name || format('LAN+ {0}', needs.build.outputs.version) }} (Forge)
+          name: ${{ github.event.release.name || format('LAN+ {0}', needs.build.outputs.version) }} (NeoForge)
           changelog: ${{ github.event.release.body }}
 
-          files: forge/build/libs/LanPlus-forge-${{ needs.build.outputs.version }}.jar
-          loaders: forge
+          files: neoforge/build/libs/LanPlus-neoforge-${{ needs.build.outputs.version }}.jar
+          loaders: neoforge
           environment: client
-          version: ${{ needs.build.outputs.version }}-forge
+          version: ${{ needs.build.outputs.version }}-neoforge
           version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
-          game-versions: '1.20.1'
+          game-versions: '1.21.1'
           game-version-filter: none
-          java: '17'
+          java: '21'
 
           retry-attempts: 3
           retry-delay: 10000

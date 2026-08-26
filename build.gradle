@@ -9,7 +9,7 @@ buildscript {
 
 plugins {
     id 'architectury-plugin' version '3.4.164'
-    id 'dev.architectury.loom' version '1.5.391' apply false
+    id 'dev.architectury.loom' version '1.7.435' apply false
 }
 
 architectury {
@@ -24,9 +24,15 @@ allprojects {
     group = rootProject.mod_group_id
     version = rootProject.mod_version
 
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
     tasks.withType(JavaCompile) {
         options.encoding = 'UTF-8'
-        options.release = 17
+        options.release = 21
     }
 }
 

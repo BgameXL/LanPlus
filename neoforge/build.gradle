@@ -6,15 +6,39 @@ base {
     archivesName = rootProject.name + '-neoforge'
 }
 
+repositories {
+    maven { url 'https://maven.neoforged.net/releases/' }
+}
+
 loom {
-    silentMojangMappingsLicense()
     neoForge {
-        mixinConfig "${rootProject.mod_id}.mixins.json"
+    }
+    mixin {
+        useLegacyMixinAp = true
+        defaultRefmapName = "lanplus.refmap.json"
+    }
+    mods {
+        main {
+            sourceSet sourceSets.main
+            sourceSet project(':common').sourceSets.main
+        }
     }
 }
 
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from project(':common').sourceSets.main.output
+}
+
+configurations {
+    common
+    compileClasspath.extendsFrom common
+    runtimeClasspath.extendsFrom common
+    developmentNeoForge.extendsFrom common
+}
+
 dependencies {
-    implementation project(path: ':common', configuration: 'namedElements')
+    common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
     neoForge "net.neoforged:neoforge:${rootProject.neoforge_version}"
 }
 
@@ -22,6 +46,8 @@ processResources {
     var replaceProperties = [
             minecraft_version       : rootProject.minecraft_version,
             minecraft_version_range : rootProject.minecraft_version_range,
+            neoforge_version        : rootProject.neoforge_version,
+            neoforge_version_range  : rootProject.neoforge_version_range,
             mod_id                  : rootProject.mod_id,
             mod_name                : rootProject.mod_name,
             mod_license             : rootProject.mod_license,
