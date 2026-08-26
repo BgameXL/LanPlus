@@ -574,6 +574,7 @@ public final class BackendServer {
     }
 
     private static final int MAX_ANN_IMAGE_B64_CHARS = 700 * 1024;
+    private static final int MAX_ANN_IMAGE_DIM = 4096;
 
     private Resp adminAnnouncementImage(Http.Request req) {
         Map<String, Object> b = Json.parseObject(req.body());
@@ -596,8 +597,12 @@ public final class BackendServer {
         if (png.length > AssetCatalog.MAX_BYTES) {
             return ok(error("too_large"));
         }
-        if (pngDimensions(png) == null) {
+        int[] dims = pngDimensions(png);
+        if (dims == null) {
             return ok(error("bad_png"));
+        }
+        if (dims[0] < 1 || dims[1] < 1 || dims[0] > MAX_ANN_IMAGE_DIM || dims[1] > MAX_ANN_IMAGE_DIM) {
+            return ok(error("bad_dimensions"));
         }
         String hash = announcementImages.write(id, png);
         if (hash == null) {
