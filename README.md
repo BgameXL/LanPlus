@@ -1,6 +1,10 @@
-# LAN+
+<h1 align="center">
+  <img src="https://raw.githubusercontent.com/BgameXL/LanPlus/main/assets/logo.png" alt="LAN+" width="380">
+</h1>
 
-LAN+ is a Minecraft mod for playing with friends without the usual hassle. Add friends, invite them into your world, and let them join over the internet with no port forwarding.
+<p align="center">
+  Play Minecraft with friends without the usual hassle. Add friends, invite them into your world, and let them join over the internet with no port forwarding.
+</p>
 
 <p align="left">
   <a href="https://www.curseforge.com/minecraft/mc-mods/lan">
