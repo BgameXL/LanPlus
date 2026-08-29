@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="common/src/main/resources/assets/lanplus/textures/lan_logo.png" alt="LAN+" width="280">
+  <img src="https://raw.githubusercontent.com/BgameXL/LanPlus/main/common/src/main/resources/assets/lanplus/textures/lan_logo.png" alt="LAN+" width="280">
 </h1>
 
 <p align="center">
