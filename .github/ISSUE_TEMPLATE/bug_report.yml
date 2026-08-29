@@ -12,15 +12,6 @@ body:
         - label: I have checked that there is no existing issue similar to this one
           required: true
 
-  - type: checkboxes
-    id: tested-latest
-    attributes:
-      label: Latest version
-      description: Confirm that you have tested that the bug occurs in the latest version of the mod.
-      options:
-        - label: I confirm that this occurs in the latest version
-          required: true
-
   - type: input
     id: mod-version
     attributes:
