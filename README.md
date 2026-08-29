@@ -43,9 +43,6 @@
 
 ## FAQ
 
-**Does it work on other loaders?** 
-Yes, it does work in other loaders.
-
 **Do my friends need LAN+ to join?**
 Nope. Anyone can connect with the address, like a normal server.
 
