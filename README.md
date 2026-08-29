@@ -15,9 +15,6 @@ LAN+ is a Minecraft mod for playing with friends without the usual hassle. Add f
 
 <p align="center"> <img src="assets/divider.png" alt="" width="1000"> </p>
 
-### Free
-> Lan+ is hosted on a VPS that i pay for, and Lan+ will remain free because of my love for this project. If you'd like, you can donate to this mod it's your decision after all, but i appreciate it.
-
 ## What it does
 
 - **Friends list:** add friends and see who's online and what they're playing, right from the main menu.
@@ -34,6 +31,9 @@ LAN+ is a Minecraft mod for playing with friends without the usual hassle. Add f
 - If the backend is down or unreachable, the mod just falls back to local-only. Your game keeps working either way.
 - Everything's configurable in `config/lanplus-client.toml`, including the backend URL. You can turn off the online features or Discord entirely.
 - People without LAN+ can still join your world while you're hosting, they just won't have profiles.
+
+### Free
+> Lan+ is hosted on a VPS that i pay for, and Lan+ will remain free because of my love for this project. If you'd like, you can donate to this mod it's your decision after all, but i appreciate it.
 
 <p align="center"> <img src="assets/divider.png" alt="" width="800"> </p>
 
