@@ -3,7 +3,7 @@ package dev.bgame.lanplus.mixin.client;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
 import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.resources.PlayerSkin;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -12,19 +12,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(AbstractClientPlayer.class)
 public abstract class AbstractClientPlayerMixin {
 
-    @Inject(method = "getSkinTextureLocation", at = @At("HEAD"), cancellable = true)
-    private void lanplus$skinTexture(CallbackInfoReturnable<ResourceLocation> cir) {
+    @Inject(method = "getSkin", at = @At("HEAD"), cancellable = true)
+    private void lanplus$skin(CallbackInfoReturnable<PlayerSkin> cir) {
         SkinTextures.Resolved resolved = lanplus$resolved();
         if (resolved != null) {
-            cir.setReturnValue(resolved.texture());
-        }
-    }
-
-    @Inject(method = "getModelName", at = @At("HEAD"), cancellable = true)
-    private void lanplus$modelName(CallbackInfoReturnable<String> cir) {
-        SkinTextures.Resolved resolved = lanplus$resolved();
-        if (resolved != null) {
-            cir.setReturnValue(resolved.slim() ? "slim" : "default");
+            cir.setReturnValue(new PlayerSkin(
+                    resolved.texture(),
+                    null,
+                    null,
+                    null,
+                    resolved.slim() ? PlayerSkin.Model.SLIM : PlayerSkin.Model.WIDE,
+                    true));
         }
     }
 

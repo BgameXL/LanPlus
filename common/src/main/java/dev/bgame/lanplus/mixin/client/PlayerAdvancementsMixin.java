@@ -1,7 +1,7 @@
 package dev.bgame.lanplus.mixin.client;
 
 import dev.bgame.lanplus.client.ClientAdvancementDetector;
-import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.PlayerAdvancements;
 import net.minecraft.server.level.ServerPlayer;
@@ -20,11 +20,11 @@ public abstract class PlayerAdvancementsMixin {
     private ServerPlayer player;
 
     @Inject(
-            method = "award(Lnet/minecraft/advancements/Advancement;Ljava/lang/String;)Z",
+            method = "award(Lnet/minecraft/advancements/AdvancementHolder;Ljava/lang/String;)Z",
             at = @At(value = "INVOKE",
                     target = "Lnet/minecraft/advancements/AdvancementRewards;grant(Lnet/minecraft/server/level/ServerPlayer;)V")
     )
-    private void lanplus$onAdvancementEarned(Advancement advancement, String criterion,
+    private void lanplus$onAdvancementEarned(AdvancementHolder advancement, String criterion,
                                              CallbackInfoReturnable<Boolean> cir) {
         UUID local = localUuid();
         if (advancement == null || this.player == null || local == null
@@ -32,7 +32,7 @@ public abstract class PlayerAdvancementsMixin {
             return;
         }
         ClientAdvancementDetector.onAdvancementEarn(
-                advancement.getId().toString(), advancement.getDisplay() != null);
+                advancement.id().toString(), advancement.value().display().isPresent());
     }
 
     private static UUID localUuid() {
