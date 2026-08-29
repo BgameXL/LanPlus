@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public final class Announcements extends Screen {
+public final class Announcements extends LanPlusScreen {
 
     private enum Filter {ALL, UPDATE, MAINTENANCE, GENERAL, FREE}
 
@@ -21,10 +21,10 @@ public final class Announcements extends Screen {
     private static final int MARGIN = 20;
     private static final int MAX_W = 420;
     private static final int PAD = 10;
-    private static final int SIDEBAR_W = 84;
+    private static final int SIDEBAR_W = 80;
     private static final int SB_ROW_H = 18;
     private static final int ENTRY_GAP = 8;
-    private static final int LINE_H = 9;
+    private static final int LINE_H = 13;
     private static final int MAX_IMG_H = 120;
     private static final int MIN_IMG_H = 42;
     private final Screen parent;
@@ -89,8 +89,7 @@ public final class Announcements extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        drawBackdrop(g);
         layout();
 
         LanPlusUI.panel(g, cardX, cardY, cardX + cardW, cardY + cardH);
@@ -230,12 +229,12 @@ public final class Announcements extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double delta) {
         if (mouseX >= listX && mouseX <= cardX + cardW && mouseY >= listTop && mouseY <= listBottom) {
             scrollY = Math.max(0, scrollY - (int) (delta * 16));
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, delta);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, delta);
     }
 
     @Override

@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntConsumer;
 
-public final class BackgroundPicker extends Screen {
+public final class BackgroundPicker extends LanPlusScreen {
 
     private static final int MARGIN = 20;
     private static final int MAX_W = 460;
@@ -52,8 +52,7 @@ public final class BackgroundPicker extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        drawBackdrop(g);
         LanPlusUI.panel(g, boxX, panelTop, boxX + contentW, panelBottom);
 
         int wx = LanPlusUI.wordmark(g, this.font, boxX + 10, panelTop + 8);

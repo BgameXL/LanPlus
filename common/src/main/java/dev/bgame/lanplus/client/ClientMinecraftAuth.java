@@ -1,6 +1,5 @@
 package dev.bgame.lanplus.client;
 
-import com.mojang.authlib.GameProfile;
 import dev.bgame.lanplus.network.MinecraftAuth;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
@@ -29,7 +28,6 @@ final class ClientMinecraftAuth implements MinecraftAuth {
     public void joinServer(String serverId) throws Exception {
         Minecraft mc = Minecraft.getInstance();
         User user = mc.getUser();
-        GameProfile profile = new GameProfile(user.getProfileId(), user.getName());
-        mc.getMinecraftSessionService().joinServer(profile, user.getAccessToken(), serverId);
+        mc.getMinecraftSessionService().joinServer(user.getProfileId(), user.getAccessToken(), serverId);
     }
 }

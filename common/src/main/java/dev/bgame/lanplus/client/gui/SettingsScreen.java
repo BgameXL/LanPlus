@@ -11,7 +11,7 @@ import net.minecraft.util.FormattedCharSequence;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class SettingsScreen extends Screen {
+public final class SettingsScreen extends LanPlusScreen {
 
     private enum Cat {
         GENERAL("general"), THEME("Theme"), ADVANCED("advanced");
@@ -95,8 +95,7 @@ public final class SettingsScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        drawBackdrop(g);
         layout();
         rows.clear();
 

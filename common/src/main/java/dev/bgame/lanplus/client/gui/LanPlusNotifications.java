@@ -6,8 +6,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
-import net.minecraft.client.gui.screens.OptionsScreen;
-import net.minecraft.client.gui.screens.OptionsSubScreen;
+import net.minecraft.client.gui.screens.options.OptionsScreen;
+import net.minecraft.client.gui.screens.options.OptionsSubScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
@@ -168,7 +168,7 @@ public final class LanPlusNotifications {
         if (n.avatar != null) {
             SkinTextures textures = LanPlusClient.skinTextures();
             SkinTextures.Resolved resolved = textures == null ? null : textures.get(n.avatar);
-            ResourceLocation tex = resolved != null ? resolved.texture() : DefaultPlayerSkin.getDefaultSkin(n.avatar);
+            ResourceLocation tex = resolved != null ? resolved.texture() : DefaultPlayerSkin.get(n.avatar).texture();
             g.setColor(1f, 1f, 1f, alpha);
             PlayerFaceRenderer.draw(g, tex, x + 8, y + 10, 24);
             g.setColor(1f, 1f, 1f, 1f);

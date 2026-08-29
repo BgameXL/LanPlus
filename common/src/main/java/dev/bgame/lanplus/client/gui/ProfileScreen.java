@@ -56,7 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public final class ProfileScreen extends Screen {
+public final class ProfileScreen extends LanPlusScreen {
 
     private static int SURFACE = LanPlusUI.SURFACE;
     private static int SURFACE_RAISED = LanPlusUI.SURFACE_RAISED;
@@ -971,7 +971,7 @@ public final class ProfileScreen extends Screen {
     }
 
     void renderBackdrop(GuiGraphics g) {
-        renderBackground(g);
+        renderTransparentBackground(g);
         if (bgStyle == BG_MINECRAFT || bgStyle == BG_NONE) {
             return;
         }
@@ -1661,7 +1661,7 @@ public final class ProfileScreen extends Screen {
         PoseStack ps = g.pose();
         ps.pushPose();
         ps.translate(cx, feetY, 50.0);
-        ps.mulPoseMatrix(new Matrix4f().scaling((float) 52, (float) 52, (float) -52));
+        ps.mulPose(new Matrix4f().scaling((float) 52, (float) 52, (float) -52));
         ps.mulPose(Axis.ZP.rotationDegrees(180f));
         ps.mulPose(Axis.XP.rotationDegrees(modelPitch));
         ps.mulPose(Axis.YP.rotationDegrees(-modelYaw));
@@ -1673,7 +1673,7 @@ public final class ProfileScreen extends Screen {
 
         RenderSystem.enableDepthTest();
         VertexConsumer vc = buffers.getBuffer(RenderType.entityCutoutNoCull(skin));
-        model.renderToBuffer(ps, vc, 0xF000F0, OverlayTexture.NO_OVERLAY, 1f, 1f, 1f, 1f);
+        model.renderToBuffer(ps, vc, 0xF000F0, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
         buffers.endBatch();
         Lighting.setupFor3DItems();
         ps.popPose();
@@ -1751,7 +1751,7 @@ public final class ProfileScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double delta) {
         if (!editing) {
             if (mouseX >= sbLeft && mouseX <= sbLeft + SIDEBAR_W && mouseY >= sbTop && mouseY <= sbBottom) {
                 sbScrollY = Math.max(0, Math.min(sbMaxScroll, sbScrollY - (int) (delta * 16)));
@@ -1762,7 +1762,7 @@ public final class ProfileScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseScrolled(mouseX, mouseY, delta);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, delta);
     }
 
     private void doSave() {
@@ -1896,11 +1896,11 @@ public final class ProfileScreen extends Screen {
         if (own && mc != null) {
             net.minecraft.client.player.AbstractClientPlayer local = mc.player;
             if (local != null && uuid.equals(local.getUUID())) {
-                ResourceLocation loc = local.getSkinTextureLocation();
+                ResourceLocation loc = local.getSkin().texture();
                 return loc;
             }
         }
-        return DefaultPlayerSkin.getDefaultSkin(uuid);
+        return DefaultPlayerSkin.get(uuid).texture();
     }
 
     private void drawAvatar(GuiGraphics g, UUID id, int x, int y, int size) {
@@ -1912,10 +1912,10 @@ public final class ProfileScreen extends Screen {
         } else if (own && uuid.equals(id) && this.minecraft != null) {
             net.minecraft.client.player.AbstractClientPlayer local = this.minecraft.player;
             tex = local != null && uuid.equals(local.getUUID())
-                    ? local.getSkinTextureLocation()
-                    : DefaultPlayerSkin.getDefaultSkin(id);
+                    ? local.getSkin().texture()
+                    : DefaultPlayerSkin.get(id).texture();
         } else {
-            tex = DefaultPlayerSkin.getDefaultSkin(id);
+            tex = DefaultPlayerSkin.get(id).texture();
         }
         PlayerFaceRenderer.draw(g, tex, x, y, size);
     }

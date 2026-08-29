@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
-public final class HostScreen extends Screen {
+public final class HostScreen extends LanPlusScreen {
 
     private static final int CARD_W = 320;
     private static final int ROW_H = 24;
@@ -160,8 +160,7 @@ public final class HostScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        drawBackdrop(g);
         layout();
         layoutButtons();
 
@@ -359,13 +358,13 @@ public final class HostScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double delta) {
         if (!inWorld && in(mouseX, mouseY, cardX + PAD, listTop, cardW - 2 * PAD, listBottom - listTop)) {
             int max = Math.max(0, worlds.size() * ROW_H + 4 - (listBottom - listTop));
             listScroll = Math.max(0, Math.min(max, listScroll - (int) (delta * ROW_H)));
             return true;
         }
-        return super.mouseScrolled(mouseX, mouseY, delta);
+        return super.mouseScrolled(mouseX, mouseY, scrollX, delta);
     }
 
     @Override
@@ -530,7 +529,7 @@ public final class HostScreen extends Screen {
             this.minecraft.setScreen(new InviteOverlay(this, world, accessMode, allowNonPremium));
         } else {
             HostController.requestHost(accessMode, Set.of(), allowNonPremium);
-            this.minecraft.createWorldOpenFlows().loadLevel(this, world.getLevelId());
+            this.minecraft.createWorldOpenFlows().openWorld(world.getLevelId(), () -> this.minecraft.setScreen(this));
         }
     }
 }

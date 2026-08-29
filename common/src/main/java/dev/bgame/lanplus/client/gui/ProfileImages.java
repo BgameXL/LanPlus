@@ -56,7 +56,7 @@ final class ProfileImages {
             String name = image.hash() == null || image.hash().isEmpty()
                     ? Integer.toHexString(image.url().hashCode())
                     : image.hash().toLowerCase(Locale.ROOT);
-            ResourceLocation loc = new ResourceLocation(LanplusCommon.MODID, "profile_images/" + name);
+            ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "profile_images/" + name);
             Minecraft.getInstance().getTextureManager().register(loc, dyn);
             TEXTURES.put(image.url(), new Tex(loc, ni.getWidth(), ni.getHeight()));
         } catch (IOException | RuntimeException e) {

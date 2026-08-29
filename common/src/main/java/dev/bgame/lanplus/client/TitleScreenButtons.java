@@ -19,11 +19,11 @@ import java.util.UUID;
 
 public final class TitleScreenButtons {
 
-    static final ResourceLocation HOST_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/host.png");
-    private static final ResourceLocation FRIENDS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/friends.png");
-    private static final ResourceLocation PROFILE_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/profile.png");
-    private static final ResourceLocation SETTINGS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/settings.png");
-    private static final ResourceLocation ANNOUNCEMENTS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/announcements.png");
+    static final ResourceLocation HOST_ICON = ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "textures/gui/host.png");
+    private static final ResourceLocation FRIENDS_ICON = ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "textures/gui/friends.png");
+    private static final ResourceLocation PROFILE_ICON = ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "textures/gui/profile.png");
+    private static final ResourceLocation SETTINGS_ICON = ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "textures/gui/settings.png");
+    private static final ResourceLocation ANNOUNCEMENTS_ICON = ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "textures/gui/announcements.png");
 
     private TitleScreenButtons() {
     }

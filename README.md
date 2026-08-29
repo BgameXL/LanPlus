@@ -2,8 +2,21 @@
 
 LAN+ is a Minecraft mod for playing with friends without the usual hassle. Add friends, invite them into your world, and let them join over the internet with no port forwarding.
 
+<p align="left">
+  <a href="https://www.curseforge.com/minecraft/mc-mods/lan">
+    <img alt="CurseForge" height="50" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/available/curseforge_vector.svg"></a>
+  <a href="https://github.com/BgameXL/LanPlus">
+    <img alt="GitHub" height="50" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/available/github_vector.svg"></a>
+  <a href="https://discord.gg/kAKk3wRAVh">
+    <img alt="Discord" height="50" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/social/discord-singular_vector.svg"></a>
+  <a href="https://ko-fi.com/bgame">
+    <img alt="Ko-fi" height="50" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/donate/kofi-singular_vector.svg"></a>
+</p>
+
+<p align="center"> <img src="assets/divider.png" alt="" width="1000"> </p>
+
 ### Free
-> Lan+ is hosted on a VPS that i pay $24 a month for, and Lan+ will remain free because of my love for this project. If you'd like, you can donate to this mod it's your decision after all, but i appreciate it.
+> Lan+ is hosted on a VPS that i pay for, and Lan+ will remain free because of my love for this project. If you'd like, you can donate to this mod it's your decision after all, but i appreciate it.
 
 ## What it does
 
@@ -21,6 +34,8 @@ LAN+ is a Minecraft mod for playing with friends without the usual hassle. Add f
 - If the backend is down or unreachable, the mod just falls back to local-only. Your game keeps working either way.
 - Everything's configurable in `config/lanplus-client.toml`, including the backend URL. You can turn off the online features or Discord entirely.
 - People without LAN+ can still join your world while you're hosting, they just won't have profiles.
+
+<p align="center"> <img src="assets/divider.png" alt="" width="800"> </p>
 
 ## FAQ
 
@@ -54,6 +69,8 @@ Still actively working on it. On the list:
 - **Public world directory:** browse open ("everyone") worlds and hop in without an invite.
 - **Discord badges:** show your linked Discord on your profile (intended for the LAN+ server).
 - **Website:** a place to share your profile, join worlds, and see what cosmetics are available.
+
+<p align="center"> <img src="assets/divider.png" alt="" width="600"> </p>
 
 ## For modpack authors
 

@@ -152,7 +152,7 @@ public final class ClientPresenceDetector {
             return false;
         }
         IntegratedServer server = mc.getSingleplayerServer();
-        return server != null && server.getWorldData().getAllowCommands();
+        return server != null && server.getWorldData().isAllowCommands();
     }
 
     private static void publishSkinIfChanged(Minecraft mc, PresenceManager presence) {

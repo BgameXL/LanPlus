@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-public final class ImagePicker extends Screen {
+public final class ImagePicker extends LanPlusScreen {
 
     private static final int MARGIN = 20;
     private static final int MAX_W = 460;
@@ -72,8 +72,7 @@ public final class ImagePicker extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        drawBackdrop(g);
         int panelTop = 36;
         int panelBottom = this.height - 40;
         LanPlusUI.panel(g, boxX, panelTop, boxX + contentW, panelBottom);
@@ -172,7 +171,7 @@ public final class ImagePicker extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double delta) {
         int rows = (cells.size() + columns - 1) / columns;
         int total = rows * rowH;
         int viewport = gridBottom - gridTop;

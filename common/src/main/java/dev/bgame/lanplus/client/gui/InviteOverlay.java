@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-public final class InviteOverlay extends Screen {
+public final class InviteOverlay extends LanPlusScreen {
 
     private static final int PANEL_W = 240;
     private static final int PANEL_H = 200;
@@ -63,8 +63,7 @@ public final class InviteOverlay extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        drawBackdrop(g);
         LanPlusUI.panel(g, panelX, panelY, panelX + PANEL_W, panelY + PANEL_H);
         LanPlusUI.header(g, this.font, this.title, panelX + 8, panelY + 8, PANEL_W - 32);
 
@@ -139,7 +138,7 @@ public final class InviteOverlay extends Screen {
         }
         HostController.requestHost(mode, picked, allowNonPremium);
         notifyInvited();
-        this.minecraft.createWorldOpenFlows().loadLevel(parent, world.getLevelId());
+        this.minecraft.createWorldOpenFlows().openWorld(world.getLevelId(), () -> this.minecraft.setScreen(parent));
     }
 
     private void notifyInvited() {

@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-public final class FriendsScreen extends Screen {
+public final class FriendsScreen extends LanPlusScreen {
 
     private enum Tab {FRIENDS, JOIN, ADD, DETAILS}
 
@@ -225,8 +225,7 @@ public final class FriendsScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        drawBackdrop(g);
         layout();
 
         int wx = LanPlusUI.wordmark(g, this.font, leftX, headerTop);
@@ -403,7 +402,7 @@ public final class FriendsScreen extends Screen {
     private void drawAvatar(GuiGraphics g, UUID uuid, int x, int y, int size) {
         SkinTextures textures = LanPlusClient.skinTextures();
         SkinTextures.Resolved resolved = textures == null ? null : textures.get(uuid);
-        ResourceLocation tex = resolved != null ? resolved.texture() : DefaultPlayerSkin.getDefaultSkin(uuid);
+        ResourceLocation tex = resolved != null ? resolved.texture() : DefaultPlayerSkin.get(uuid).texture();
         PlayerFaceRenderer.draw(g, tex, x, y, size);
     }
 

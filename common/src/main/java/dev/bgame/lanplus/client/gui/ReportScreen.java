@@ -10,7 +10,7 @@ import net.minecraft.util.FormattedCharSequence;
 
 import java.util.UUID;
 
-public final class ReportScreen extends Screen {
+public final class ReportScreen extends LanPlusScreen {
 
     private static final String[] REASONS =
             {"hate_speech", "harassment", "spam", "inappropriate", "other"};
@@ -76,8 +76,7 @@ public final class ReportScreen extends Screen {
             ps.height = this.height;
             ps.renderBackdrop(g);
         } else {
-            renderBackground(g);
-            LanPlusUI.backdrop(g, this.width, this.height);
+            drawBackdrop(g);
         }
         layout();
 

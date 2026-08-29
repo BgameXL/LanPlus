@@ -47,7 +47,7 @@ public final class SkinTextures implements SkinTextureSink {
                 return null;
             }
             DynamicTexture tex = new DynamicTexture(image);
-            ResourceLocation loc = new ResourceLocation(LanplusCommon.MODID, "skins/" + seq.getAndIncrement());
+            ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "skins/" + seq.getAndIncrement());
             mc.getTextureManager().register(loc, tex);
             return loc;
         } catch (Exception e) {
