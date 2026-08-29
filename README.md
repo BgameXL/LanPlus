@@ -44,7 +44,7 @@
 ## FAQ
 
 **Does it work on other loaders?** 
-Right now it's Forge and Fabric 1.20.1. Other loaders are planned.
+Yes, it does work in other loaders.
 
 **Do my friends need LAN+ to join?**
 Nope. Anyone can connect with the address, like a normal server.
@@ -68,7 +68,7 @@ Your profile only holds what you choose to share. LAN+ signs in through your exi
 
 Still actively working on it. On the list:
 
-- **Unlockable cosmetics and emotes:** spend your XP on in-world cosmetics (head, hand, and back slots) and emotes.
+- **Unlockable cosmetics and emotes:** spend your XP on in-world cosmetics (accessories and emotes).
 - **More minecraft versions**
 - **Public world directory:** browse open ("everyone") worlds and hop in without an invite.
 - **Discord badges:** show your linked Discord on your profile (intended for the LAN+ server).
