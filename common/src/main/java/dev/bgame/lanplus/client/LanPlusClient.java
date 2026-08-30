@@ -14,6 +14,7 @@ import dev.bgame.lanplus.client.gui.FriendsScreen;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.core.ProfileCache;
+import dev.bgame.lanplus.cosmetics.CosmeticSlot;
 import dev.bgame.lanplus.discord.DiscordPresence;
 import dev.bgame.lanplus.discord.DiscordRichPresence;
 import dev.bgame.lanplus.friends.DefaultFriendsService;
@@ -37,6 +38,8 @@ import net.minecraft.client.server.IntegratedServer;
 import dev.bgame.lanplus.platform.PlatformHolder;
 import org.slf4j.Logger;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +59,7 @@ public final class LanPlusClient {
     private static RelayTunnel relayTunnel;
     private static SkinService skins;
     private static SkinTextures skinTextures;
+    private static CosmeticModels cosmetics;
     private static DiscordPresence discord;
     private static AnnouncementsService announcements;
     private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
@@ -77,6 +81,8 @@ public final class LanPlusClient {
 
         skinTextures = new SkinTextures();
         skins = new DefaultSkinService(skinTextures, network, assetCache);
+        cosmetics = new CosmeticModels();
+        loadDevCosmetics();
         friends.addListener(LanPlusClient::resolveFriendSkins);
         friends.addListener(new SocialToastListener());
 
@@ -135,6 +141,32 @@ public final class LanPlusClient {
 
     public static SkinTextures skinTextures() {
         return skinTextures;
+    }
+
+    public static CosmeticModels cosmetics() {
+        return cosmetics;
+    }
+
+    private static void loadDevCosmetics() {
+        try {
+            Path dir = PlatformHolder.get().getConfigDir().resolve("lanplus-cosmetics");
+            Path geo = dir.resolve("test.geo.json");
+            if (!Files.isRegularFile(geo)) {
+                return;
+            }
+            Path anim = dir.resolve("test.animation.json");
+            Path png = dir.resolve("test.png");
+            cosmetics.register("test",
+                    Files.readAllBytes(geo),
+                    Files.isRegularFile(anim) ? Files.readAllBytes(anim) : null,
+                    Files.isRegularFile(png) ? Files.readAllBytes(png) : null);
+            UUID self = selfUuid();
+            if (self != null) {
+                cosmetics.equip(self, CosmeticSlot.HEAD, "test");
+            }
+        } catch (Exception e) {
+            LOGGER.warn("cosmetic failed", e);
+        }
     }
 
     public static DiscordPresence discord() {
