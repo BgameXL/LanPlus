@@ -46,6 +46,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 public final class LanPlusClient {
 
@@ -150,19 +151,25 @@ public final class LanPlusClient {
     private static void loadDevCosmetics() {
         try {
             Path dir = PlatformHolder.get().getConfigDir().resolve("lanplus-cosmetics");
-            Path geo = dir.resolve("test.geo.json");
-            if (!Files.isRegularFile(geo)) {
+            if (!Files.isDirectory(dir)) {
                 return;
             }
-            Path anim = dir.resolve("test.animation.json");
-            Path png = dir.resolve("test.png");
-            cosmetics.register("test",
-                    Files.readAllBytes(geo),
-                    Files.isRegularFile(anim) ? Files.readAllBytes(anim) : null,
-                    Files.isRegularFile(png) ? Files.readAllBytes(png) : null);
+            List<Path> geoFiles;
+            try (Stream<Path> files = Files.list(dir)) {
+                geoFiles = files.filter(p -> p.getFileName().toString().endsWith(".geo.json")).toList();
+            }
             UUID self = selfUuid();
-            if (self != null) {
-                cosmetics.equip(self, CosmeticSlot.HEAD, "test");
+            for (Path geo : geoFiles) {
+                String id = geo.getFileName().toString().replace(".geo.json", "");
+                Path anim = dir.resolve(id + ".animation.json");
+                Path png = dir.resolve(id + ".png");
+                cosmetics.register(id,
+                        Files.readAllBytes(geo),
+                        Files.isRegularFile(anim) ? Files.readAllBytes(anim) : null,
+                        Files.isRegularFile(png) ? Files.readAllBytes(png) : null);
+                if (self != null) {
+                    cosmetics.equip(self, CosmeticSlot.HEAD, id);
+                }
             }
         } catch (Exception e) {
             LOGGER.warn("cosmetic failed", e);
