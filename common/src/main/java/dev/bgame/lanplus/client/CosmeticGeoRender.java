@@ -17,12 +17,12 @@ package dev.bgame.lanplus.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.cache.object.BakedGeoModel;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.cache.object.GeoBone;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.cache.object.GeoCube;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.cache.object.GeoQuad;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.cache.object.GeoVertex;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.util.RenderUtil;
+import dev.bgame.lanplus.cosmetics.geckolib.cache.object.BakedGeoModel;
+import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoBone;
+import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoCube;
+import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoQuad;
+import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoVertex;
+import dev.bgame.lanplus.cosmetics.geckolib.util.RenderUtil;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;

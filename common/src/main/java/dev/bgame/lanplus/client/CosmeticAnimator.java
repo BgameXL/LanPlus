@@ -2,16 +2,16 @@ package dev.bgame.lanplus.client;
 
 import dev.bgame.lanplus.LanplusCommon;
 import dev.bgame.lanplus.cosmetics.CosmeticModel;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.animatable.GeoAnimatable;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.animatable.instance.AnimatableInstanceCache;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.animation.AnimatableManager;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.animation.Animation;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.animation.AnimationController;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.animation.AnimationState;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.animation.RawAnimation;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.model.GeoModel;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.util.GeckoLibUtil;
-import dev.bgame.lanplus.cosmetics.vendored.geckolib.util.RenderUtil;
+import dev.bgame.lanplus.cosmetics.geckolib.animatable.GeoAnimatable;
+import dev.bgame.lanplus.cosmetics.geckolib.animatable.instance.AnimatableInstanceCache;
+import dev.bgame.lanplus.cosmetics.geckolib.animation.AnimatableManager;
+import dev.bgame.lanplus.cosmetics.geckolib.animation.Animation;
+import dev.bgame.lanplus.cosmetics.geckolib.animation.AnimationController;
+import dev.bgame.lanplus.cosmetics.geckolib.animation.AnimationState;
+import dev.bgame.lanplus.cosmetics.geckolib.animation.RawAnimation;
+import dev.bgame.lanplus.cosmetics.geckolib.model.GeoModel;
+import dev.bgame.lanplus.cosmetics.geckolib.util.GeckoLibUtil;
+import dev.bgame.lanplus.cosmetics.geckolib.util.RenderUtil;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
