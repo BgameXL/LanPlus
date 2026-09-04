@@ -22,11 +22,16 @@ jar {
     from project(':common').sourceSets.main.output
 }
 
+repositories {
+    maven { url 'https://api.modrinth.com/maven' }
+}
+
 dependencies {
     implementation project(path: ':common', configuration: 'namedElements')
     runtimeOnly project(':common').sourceSets.main.output
     modImplementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+    modLocalRuntime "maven.modrinth:simple-voice-chat:${rootProject.voicechat_fabric_version}"
 }
 
 processResources {

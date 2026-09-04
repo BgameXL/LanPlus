@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
+import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.api.RelayTicket;
 import org.slf4j.Logger;
 
@@ -31,13 +32,12 @@ public final class TcpRelayTunnel implements RelayTunnel {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new Gson();
     private static final int CONNECT_TIMEOUT_MS = 5_000;
-
     private final boolean plaintext;
     private final ExecutorService pool = Executors.newCachedThreadPool(daemon("lanplus-relay"));
-
     private volatile Socket control;
     private volatile int localPort;
     private volatile boolean open;
+    private volatile VoiceTunnel voice;
 
     public TcpRelayTunnel(boolean plaintext) {
         this.plaintext = plaintext;
@@ -60,6 +60,11 @@ public final class TcpRelayTunnel implements RelayTunnel {
         open = false;
         Socket c = control;
         control = null;
+        VoiceTunnel v = voice;
+        voice = null;
+        if (v != null) {
+            v.close();
+        }
         closeQuietly(c);
     }
 
@@ -88,6 +93,7 @@ public final class TcpRelayTunnel implements RelayTunnel {
             this.open = true;
             result.complete(domain);
             LOGGER.info("LAN+ relay tunnel open: {}", domain);
+            maybeStartVoice(ticket, str(first, "voiceHost"), str(first, "voiceKey"));
 
             String line;
             while ((line = reader.readLine()) != null) {
@@ -101,7 +107,8 @@ public final class TcpRelayTunnel implements RelayTunnel {
                         pool.execute(() -> proxySession(ticket, id));
                     }
                     case "PING" -> writeLine(out, GSON.toJson(Map.of("type", "PONG")));
-                    default -> { }
+                    default -> {
+                    }
                 }
             }
         } catch (IOException e) {
@@ -135,6 +142,33 @@ public final class TcpRelayTunnel implements RelayTunnel {
             LOGGER.debug("LAN+ relay session {} failed: {}", id, e.toString());
             closeQuietly(data);
             closeQuietly(local);
+        }
+    }
+
+    private void maybeStartVoice(RelayTicket ticket, String voiceHost, String voiceKey) {
+        if (voiceHost != null && !voiceHost.isBlank()) {
+            if (!voiceHost.equals(Config.voiceHost)) {
+                Config.voiceHost = voiceHost;
+                Config.save();
+            }
+            SvcBridge.applyVoiceHost(voiceHost);
+        }
+        if (!Config.voiceEnabled || voiceKey == null || voiceKey.isBlank() || !SvcBridge.installed()) {
+            return;
+        }
+        pool.execute(() -> startVoice(ticket, voiceKey, localPort));
+    }
+
+    private void startVoice(RelayTicket ticket, String voiceKey, int svcPort) {
+        try {
+            Socket vs = connect(ticket.relayHost(), ticket.relayPort());
+            writeLine(vs.getOutputStream(), GSON.toJson(Map.of("type", "VOICE", "key", voiceKey)));
+            VoiceTunnel vt = new VoiceTunnel(vs, svcPort, pool);
+            this.voice = vt;
+            LOGGER.info("LAN+ voice tunnel open (svc {})", svcPort);
+            vt.run();
+        } catch (IOException e) {
+            LOGGER.debug("LAN+ voice tunnel failed: {}", e.toString());
         }
     }
 

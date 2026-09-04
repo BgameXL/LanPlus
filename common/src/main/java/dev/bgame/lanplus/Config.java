@@ -29,6 +29,8 @@ public final class Config {
     public static boolean discordEnabled = true;
     public static String discordAppId = "1516914761626030170";
     public static String theme = "amethyst";
+    public static boolean voiceEnabled = true;
+    public static String voiceHost = "";
 
     private Config() {
     }
@@ -50,6 +52,8 @@ public final class Config {
                 discordEnabled = getBool(json, "discordEnabled", discordEnabled);
                 discordAppId = getString(json, "discordAppId", discordAppId);
                 theme = getString(json, "theme", theme);
+                voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
+                voiceHost = getString(json, "voiceHost", voiceHost);
             } catch (Exception e) {
             }
         }
@@ -71,6 +75,8 @@ public final class Config {
         json.addProperty("discordEnabled", discordEnabled);
         json.addProperty("discordAppId", discordAppId);
         json.addProperty("theme", theme);
+        json.addProperty("voiceEnabled", voiceEnabled);
+        json.addProperty("voiceHost", voiceHost);
 
         try {
             Files.createDirectories(file.getParent());

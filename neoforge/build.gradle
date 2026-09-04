@@ -8,6 +8,7 @@ base {
 
 repositories {
     maven { url 'https://maven.neoforged.net/releases/' }
+    maven { url 'https://api.modrinth.com/maven' }
 }
 
 loom {
@@ -40,6 +41,7 @@ configurations {
 dependencies {
     common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
     neoForge "net.neoforged:neoforge:${rootProject.neoforge_version}"
+    modLocalRuntime "maven.modrinth:simple-voice-chat:${rootProject.voicechat_neoforge_version}"
 }
 
 processResources {
