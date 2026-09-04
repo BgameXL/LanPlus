@@ -1,10 +1,12 @@
 package dev.bgame.lanplus.client;
 
 import com.mojang.logging.LogUtils;
+import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.invites.HostAccessControl;
+import dev.bgame.lanplus.network.SvcBridge;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.util.HttpUtil;
@@ -12,6 +14,9 @@ import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
 import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -94,11 +99,28 @@ public final class HostController {
             if (!server.isPublished()) {
                 boolean ok = server.publishServer(
                         s.gameType() != null ? s.gameType() : server.getDefaultGameType(),
-                        s.allowCommands(), HttpUtil.getAvailablePort());
+                        s.allowCommands(), hostLanPort());
                 LOGGER.info("LAN+ opened world to LAN ({}), access={}, nonPremium={}, gameType={}, cheats={}, difficulty={}",
                         ok ? "ok" : "failed", s.mode(), s.allowNonPremium(), s.gameType(), s.allowCommands(), s.difficulty());
             }
         });
+    }
+
+    private static int hostLanPort() {
+        int port = 24454;
+        if (Config.voiceEnabled && SvcBridge.installed() && portAvailable(port)) {
+            return port;
+        }
+        return HttpUtil.getAvailablePort();
+    }
+
+    private static boolean portAvailable(int port) {
+        try (ServerSocket socket = new ServerSocket()) {
+            socket.bind(new InetSocketAddress(port));
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private static Set<UUID> allowlistFor(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium) {

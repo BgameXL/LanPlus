@@ -24,6 +24,7 @@ import dev.bgame.lanplus.network.HttpLanPlusNetwork;
 import dev.bgame.lanplus.network.LanPlusNetwork;
 import dev.bgame.lanplus.network.RelayHostingCoordinator;
 import dev.bgame.lanplus.network.RelayTunnel;
+import dev.bgame.lanplus.network.SvcBridge;
 import dev.bgame.lanplus.network.TcpRelayTunnel;
 import dev.bgame.lanplus.presence.DefaultPresenceManager;
 import dev.bgame.lanplus.presence.PresenceManager;
@@ -90,6 +91,10 @@ public final class LanPlusClient {
         new RelayHostingCoordinator(presence, relayTunnel, network,
                 () -> Config.relayEnabled, HostController::isOfflineHosting,
                 relayDev ? LanPlusClient::devRelayTicket : null);
+
+        if (Config.voiceEnabled) {
+            SvcBridge.applyVoiceHost(Config.voiceHost);
+        }
 
         invites = new DefaultInviteService(network, presence, LanPlusClient::localIdentity,
                 () -> Config.relayEnabled, HostController::isOfflineHosting);
