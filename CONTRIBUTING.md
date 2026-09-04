@@ -39,13 +39,11 @@ Requirements:
 - JDK 21
 - Git
 - IntelliJ IDEA is recommended but others IDEs are fine.
-- Java of course.
+- Knowledge of Java of course.
 
 ```bash
 ./gradlew build
 ```
-
-`org.gradle.daemon=false` is configured, so every invocation is a cold start.
 
 Run a dev client
 
@@ -57,14 +55,11 @@ Run a dev client
 For multiplayer testing, launch a second `runClient` configuration from the IDE
 after importing the Gradle project.
 
-There is no automated test suite. Changes are verified in-game, so please run a
-`runClient` and confirm your change works before opening a PR. Check
-`fabric/run/logs/latest.log` or `neoforge/run/logs/latest.log` for exceptions
-and errors.
+Changes are verified in-game, so please test it and confirm your change works before opening a PR.
 
 ## Code style
 
-- **No comments in LAN+ code.** If a decision needs explaining, do it in the PR description, not in the source.
+- **No comments in LAN+ code.** If a decision needs explaining, do it in the PR description.
 - Follow the existing structure and naming and please keep changes small and focused,
   reuse and extend before creating new classes or helpers, and do not refactor
   unrelated code.
@@ -75,7 +70,7 @@ and errors.
 
 1. Fork the repository and create a branch off `main`.
 2. Make your change following the code style above.
-3. Make sure `./gradlew build` passes (it also builds and remaps both loaders).
+3. Make sure `./gradlew build` passes.
 4. Test the change in-game with `runClient`.
 5. Open a pull request against `main`. Describe what it does and why, and reference any related issue.
 
