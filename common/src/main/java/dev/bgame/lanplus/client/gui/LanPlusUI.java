@@ -76,13 +76,93 @@ final class LanPlusUI {
     }
 
     static void panel(GuiGraphics g, int x0, int y0, int x1, int y1) {
-        g.fill(x0, y0, x1, y1, SURFACE);
-        bevelR(g, x0, y0, x1, y1);
-        g.fill(x0, y0, x1, y0 + 1, ACCENT_LINE);
+        outline1(g, x0, y0, x1, y1, EDGE_DARK);
+        g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, SURFACE);
+        outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, shade(SURFACE, 1.6f));
     }
 
     static void border(GuiGraphics g, int x0, int y0, int x1, int y1) {
         bevelR(g, x0, y0, x1, y1);
+    }
+
+    static void outline(GuiGraphics g, int x0, int y0, int x1, int y1, int color) {
+        outline1(g, x0, y0, x1, y1, color);
+    }
+
+    static void outline1(GuiGraphics g, int x0, int y0, int x1, int y1, int color) {
+        g.fill(x0, y0, x1, y0 + 1, color);
+        g.fill(x0, y1 - 1, x1, y1, color);
+        g.fill(x0, y0, x0 + 1, y1, color);
+        g.fill(x1 - 1, y0, x1, y1, color);
+    }
+
+    static void raised(GuiGraphics g, int x0, int y0, int x1, int y1) {
+        g.fill(x0, y0, x1, y0 + 2, EDGE_LIGHT);
+        g.fill(x0, y0, x0 + 2, y1, EDGE_LIGHT);
+        g.fill(x0, y1 - 2, x1, y1, EDGE_DARK);
+        g.fill(x1 - 2, y0, x1, y1, EDGE_DARK);
+    }
+
+    static int shade(int argb, float f) {
+        int a = argb >>> 24;
+        int r = clampByte(Math.round(((argb >> 16) & 0xFF) * f));
+        int g = clampByte(Math.round(((argb >> 8) & 0xFF) * f));
+        int b = clampByte(Math.round((argb & 0xFF) * f));
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    private static int clampByte(int v) {
+        return Math.clamp(v, 0, 255);
+    }
+
+    static void button3d(GuiGraphics g, int x0, int y0, int x1, int y1, int fill) {
+        outline1(g, x0, y0, x1, y1, EDGE_DARK);
+        g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill);
+        outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, shade(fill, 1.4f));
+    }
+
+    static void primaryButton(GuiGraphics g, int x0, int y0, int x1, int y1, boolean hover, boolean active) {
+        int fill = !active ? SURFACE_DISABLED : hover ? shade(ACCENT_STRONG, 0.4f) : SURFACE_RAISED;
+        outline1(g, x0, y0, x1, y1, EDGE_DARK);
+        g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill);
+        int accent = !active ? BORDER : hover ? ACCENT_HOVER : ACCENT;
+        outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, accent);
+        g.fill(x0 + 2, y0 + 1, x1 - 2, y0 + 2, accent);
+        g.fill(x0 + 2, y1 - 2, x1 - 2, y1 - 1, accent);
+        if (hover && active) {
+            int glow = 0x55000000 | (ACCENT & 0xFFFFFF);
+            g.fill(x0 - 1, y0 - 1, x1 + 1, y0, glow);
+            g.fill(x0 - 1, y1, x1 + 1, y1 + 1, glow);
+            g.fill(x0 - 1, y0, x0, y1, glow);
+            g.fill(x1, y0, x1 + 1, y1, glow);
+        }
+    }
+
+    private static void button(GuiGraphics g, int a, int b, int c, int d, int hi, int lo) {
+        g.fill(a, b, c, b + 1, hi);
+        g.fill(a, b, a + 1, d, hi);
+        g.fill(a, d - 1, c, d, lo);
+        g.fill(c - 1, b, c, d, lo);
+    }
+
+    static void slot(GuiGraphics g, int x0, int y0, int x1, int y1) {
+        outline1(g, x0, y0, x1, y1, EDGE_DARK);
+        int a = x0 + 1;
+        int b = y0 + 1;
+        int c = x1 - 1;
+        int d = y1 - 1;
+        g.fill(a, b, c, d, SLOT);
+        g.fill(a, b, c, b + 1, shade(SLOT, 0.4f));
+        g.fill(a, b, a + 1, d, shade(SLOT, 0.4f));
+        g.fill(a, d - 1, c, d, shade(SLOT, 2.2f));
+        g.fill(c - 1, b, c, d, shade(SLOT, 2.2f));
+    }
+
+    static void rivets(GuiGraphics g, int x0, int y0, int x1, int y1, int color) {
+        g.fill(x0 + 3, y0 + 3, x0 + 5, y0 + 5, color);
+        g.fill(x1 - 5, y0 + 3, x1 - 3, y0 + 5, color);
+        g.fill(x0 + 3, y1 - 5, x0 + 5, y1 - 3, color);
+        g.fill(x1 - 5, y1 - 5, x1 - 3, y1 - 3, color);
     }
 
     static void bevelR(GuiGraphics g, int x0, int y0, int x1, int y1) {
@@ -94,10 +174,7 @@ final class LanPlusUI {
     }
 
     private static void bevel(GuiGraphics g, int x0, int y0, int x1, int y1, int edgeDark, int edgeLight) {
-        g.fill(x0, y0, x1, y0 + 1, edgeDark);
-        g.fill(x0, y0, x0 + 1, y1, edgeDark);
-        g.fill(x0, y1 - 1, x1, y1, edgeLight);
-        g.fill(x1 - 1, y0, x1, y1, edgeLight);
+        button(g, x0, y0, x1, y1, edgeDark, edgeLight);
     }
 
     static void header(GuiGraphics g, Font font, Component label, int x, int y, int width) {
@@ -115,8 +192,7 @@ final class LanPlusUI {
     static void chip(GuiGraphics g, Font font, Component label, int x, int y, int w, int h,
                      boolean selected, boolean enabled, boolean hover) {
         int bg = !enabled ? SURFACE_DISABLED : selected ? ACCENT_STRONG : (hover ? SURFACE_HOVER : SURFACE_RAISED);
-        g.fill(x, y, x + w, y + h, bg);
-        LanPlusUI.bevelR(g, x, y, x + w, y + h);
+        button3d(g, x, y, x + w, y + h, bg);
         int color = !enabled ? FAINT : selected || hover ? TEXT : MUTED;
         int tx = x + (w - font.width(label)) / 2;
         g.drawString(font, label, tx, y + (h - 8) / 2, color, false);
