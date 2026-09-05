@@ -17,7 +17,7 @@
     <img alt="Ko-fi" height="50" src="https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/donate/kofi-singular_vector.svg"></a>
 </p>
 
-<p align="center"> <img src="https://raw.githubusercontent.com/BgameXL/LanPlus/main/assets/divider.png" alt="" width="1000"> </p>
+<p align="center"> <img src="https://raw.githubusercontent.com/BgameXL/LanPlus/main/assets/divider.png" alt="Decorative divider" width="1000"> </p>
 
 ## What it does
 
@@ -43,7 +43,7 @@
 > Lan+ is hosted on a VPS that i pay for, and Lan+ will remain free because of my love for this project. If you'd like,
 > you can donate to this mod it's your decision after all, but i appreciate it.
 
-<p align="center"> <img src="https://raw.githubusercontent.com/BgameXL/LanPlus/main/assets/divider.png" alt="" width="800"> </p>
+<p align="center"> <img src="https://raw.githubusercontent.com/BgameXL/LanPlus/main/assets/divider.png" alt="Decorative divider" width="800"> </p>
 
 ## FAQ
 
@@ -78,7 +78,7 @@ Still actively working on it. On the list:
 - **Public world directory:** browse open ("everyone") worlds and hop in without an invite (This means like a Global search).
 - **Website:** a place to share your profile, join worlds, and see what cosmetics are available.
 
-<p align="center"> <img src="https://raw.githubusercontent.com/BgameXL/LanPlus/main/assets/divider.png" alt="" width="600"> </p>
+<p align="center"> <img src="https://raw.githubusercontent.com/BgameXL/LanPlus/main/assets/divider.png" alt="Decorative divider" width="600"> </p>
 
 ## For modpack authors
 
