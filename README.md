@@ -26,7 +26,7 @@
 - **Play over the internet:** a built-in relay lets friends join your singleplayer world from anywhere. No port
   forwarding, no static IP.
 - **Host access control:** pick who can join (everyone, friends only, or invite-only).
-- **Profiles:** bio, pronouns, links, favorite modpack, playtime, and a background you can customize.
+- **Profiles:** bio, pronouns, links, favorite modpack, playtime, and a background you can customize (Still working on this).
 - **Skins:** set a custom skin by URL or upload. It shows up in the UI and in the world.
 - **Discord Rich Presence:** show what you're playing and let friends join straight from Discord.
 
@@ -36,7 +36,7 @@
 - If the backend is down or unreachable, the mod just falls back to local-only. Your game keeps working either way.
 - Everything's configurable in `config/lanplus-client.toml`, including the backend URL. You can turn off the online
   features or Discord entirely.
-- People without LAN+ can still join your world while you're hosting, they just won't have profiles.
+- People without LAN+ can still join your world while you're hosting, they just won't have access to profiles.
 
 ### Free
 
@@ -56,17 +56,17 @@ fills up profile tiers and doesn't touch gameplay at all. There's nothing to spe
 way (see below).
 
 **Do I need a premium (paid) Minecraft account?**
-The social features work with offline accounts too. Joining someone's "Open to LAN" world usually needs a premium
+The social features work with offline accounts too. Joining someone's Hosted world usually needs a premium
 account, unless the host turns on offline support.
 
 **Do I have to port-forward to host over the internet?**
-No. The relay gives you a public address without touching your router.
+No. The relay gives you a public address without touching your router (Your IP gets masked).
 
 **Is it free? Any cash shop?**
 Free, and no monetization. Cosmetics are unlockable, there's no store or currency.
 
 **Is my profile safe?**
-Your profile only holds what you choose to share. LAN+ signs in through your existing Minecraft session, so there's no
+Your profile don't hold private stuff. LAN+ signs in through your existing Minecraft session, so there's no
 extra account or password to worry about.
 
 ## Planned
@@ -75,8 +75,7 @@ Still actively working on it. On the list:
 
 - **Unlockable cosmetics and emotes:** spend your XP on in-world cosmetics (accessories and emotes).
 - **More minecraft versions**
-- **Public world directory:** browse open ("everyone") worlds and hop in without an invite.
-- **Discord badges:** show your linked Discord on your profile (intended for the LAN+ server).
+- **Public world directory:** browse open ("everyone") worlds and hop in without an invite (This means like a Global search).
 - **Website:** a place to share your profile, join worlds, and see what cosmetics are available.
 
 <p align="center"> <img src="https://raw.githubusercontent.com/BgameXL/LanPlus/main/assets/divider.png" alt="" width="600"> </p>
@@ -94,7 +93,7 @@ our [Discord](https://discord.gg/kAKk3wRAVh).
 ## A note from Dev
 
 LAN+ is built with help from an AI coding tool (Claude). I use it, but every feature is designed, reviewed, and tested
-in-game by me before it ships. Over 70% is made by a human, 30% was made with AI
+in-game by me before it ships. Over 70% is made by a human, 30% was made with AI.
 
 ## License
 
