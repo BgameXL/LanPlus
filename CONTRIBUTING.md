@@ -1,7 +1,7 @@
 # Contributing to LAN+
 
 Thanks for taking the time to help out. LAN+ is a Minecraft multiplayer
-quality-of-life mod, and contributions of all sizes are welcome: bug reports,
+quality-of-life mod, and contributions are welcome: bug reports,
 fixes, features, and docs.
 
 ## Ways to contribute
@@ -11,13 +11,13 @@ fixes, features, and docs.
   templates, or come say hi on [Discord](https://discord.gg/kAKk3wRAVh).
 - **Send a change:** open a pull request (see below).
 
-If you are planning a larger change, it is a good idea to open an issue (or talk this in discord) first so we can agree on the approach before you spend time.
+If you are planning a large change, it is a good idea to open an issue (or talk this in discord) first so we can agree before you make changes.
 
 ## Project
 
 LAN+ is a multi-loader [Architectury](https://docs.architectury.dev/) project targeting **Fabric** and **NeoForge** on **Minecraft 1.21.1**.
 
-- `common/` holds all shared logic and every mixin (`dev.bgame.lanplus`).
+- `common/` holds all shared logic, including mixins(`dev.bgame.lanplus`).
 - `fabric/` holds the Fabric entry points.
 - `neoforge/` holds the NeoForge entry points.
 
@@ -25,7 +25,7 @@ Features are organized into domains inside `common/`: `presence`, `friends`,
 `invites`, `skins`, `network`, `discord`, `profiles`, and `cosmetics`. `core`,
 `client`, and `api` are support packages. When adding something, fit it into an existing domain rather than inventing a new one.
 
-The online backend and relay do not live on `main`. They are maintained on the
+The online backend and relay do not live on `main`. They are keep on the
 `backend-relay` branch.
 
 `common/src/main/java/dev/bgame/lanplus/cosmetics/geckolib` is vendored
@@ -74,7 +74,7 @@ Changes are verified in-game, so please test it and confirm your change works be
 4. Test the change in-game with `runClient`.
 5. Open a pull request against `main`. Describe what it does and why, and reference any related issue.
 
-Using an AI coding tool is fine, But you are still responsible for understanding, reviewing, and testing everything you submit.
+Using an AI coding tool is fine, but you are still responsible for understanding, reviewing, and testing everything you submit.
 If you can't explain your changes in detail, please don't submit.
 
 ## License
