@@ -20,6 +20,8 @@ final class RoutingTable {
 
     private final Map<String, HostSession> domains = new ConcurrentHashMap<>();
     private final Map<String, Pending> pending = new ConcurrentHashMap<>();
+    private final Map<String, HostSession> voiceKeys = new ConcurrentHashMap<>();
+    private final Map<String, HostSession> voiceByIp = new ConcurrentHashMap<>();
 
     boolean register(String domain, HostSession session) {
         return domains.putIfAbsent(domain, session) == null;
@@ -45,6 +47,27 @@ final class RoutingTable {
 
     Pending claimPending(String sid) {
         return sid == null ? null : pending.remove(sid);
+    }
+
+    void registerVoiceKey(String key, HostSession session) {
+        voiceKeys.put(key, session);
+    }
+
+    HostSession claimVoiceKey(String key) {
+        return key == null ? null : voiceKeys.remove(key);
+    }
+
+    void noteVoiceIp(String ip, HostSession session) {
+        voiceByIp.put(ip, session);
+    }
+
+    HostSession voiceForIp(String ip) {
+        return voiceByIp.get(ip);
+    }
+
+    void clearVoice(HostSession session) {
+        voiceKeys.values().removeIf(v -> v == session);
+        voiceByIp.values().removeIf(v -> v == session);
     }
 
     void pingAll() {

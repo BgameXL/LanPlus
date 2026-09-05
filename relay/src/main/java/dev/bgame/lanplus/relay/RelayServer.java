@@ -3,6 +3,7 @@ package dev.bgame.lanplus.relay;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLServerSocket;
 import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.LocalTime;
@@ -31,7 +32,20 @@ public final class RelayServer {
         TicketValidator validator = new TicketValidator(cfg);
         GuestTokenValidator guestTokens = new GuestTokenValidator(cfg);
         RateLimiter limiter = new RateLimiter(cfg.mcRatePerMin);
-        ControlListener control = new ControlListener(table, validator, pool);
+
+        VoiceRelay voice = null;
+        if (cfg.voiceEnabled) {
+            DatagramSocket voiceSocket = new DatagramSocket(null);
+            voiceSocket.setReuseAddress(true);
+            voiceSocket.bind(cfg.voiceBind);
+            voice = new VoiceRelay(table, voiceSocket);
+            VoiceRelay started = voice;
+            Thread vt = new Thread(started::receiveLoop, "voice-recv");
+            vt.setDaemon(true);
+            vt.start();
+        }
+
+        ControlListener control = new ControlListener(table, validator, pool, cfg, voice);
         MinecraftListener minecraft = new MinecraftListener(table, limiter, guestTokens);
 
         ServerSocket relaySocket = openRelaySocket(cfg);
@@ -51,6 +65,7 @@ public final class RelayServer {
 
         log("LAN+ relay up — control " + cfg.relayBind + (cfg.tls ? " (TLS)" : " (PLAINTEXT)")
                 + ", minecraft " + cfg.mcBind
+                + (cfg.voiceEnabled ? ", voice " + cfg.voiceBind + " -> " + cfg.advertisedVoiceHost() : ", voice off")
                 + (cfg.noAuth ? ", NO_AUTH dev mode, base domain " + cfg.baseDomain
                 : ", backend " + cfg.backendUrl));
         Thread.currentThread().join();

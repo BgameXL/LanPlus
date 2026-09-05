@@ -15,10 +15,14 @@ final class RelayConfig {
     final String backendUrl;
     final String baseDomain;
     final int mcRatePerMin;
+    final boolean voiceEnabled;
+    final InetSocketAddress voiceBind;
+    final String voiceHostOverride;
 
     private RelayConfig(InetSocketAddress relayBind, InetSocketAddress mcBind, boolean tls,
                         String certPath, String keyPath, boolean noAuth, String backendUrl,
-                        String baseDomain, int mcRatePerMin) {
+                        String baseDomain, int mcRatePerMin, boolean voiceEnabled,
+                        InetSocketAddress voiceBind, String voiceHostOverride) {
         this.relayBind = relayBind;
         this.mcBind = mcBind;
         this.tls = tls;
@@ -28,6 +32,9 @@ final class RelayConfig {
         this.backendUrl = backendUrl;
         this.baseDomain = baseDomain;
         this.mcRatePerMin = mcRatePerMin;
+        this.voiceEnabled = voiceEnabled;
+        this.voiceBind = voiceBind;
+        this.voiceHostOverride = voiceHostOverride;
     }
 
     static RelayConfig fromEnv() {
@@ -54,7 +61,15 @@ final class RelayConfig {
                 addr(env("LANPLUS_RELAY_MC_BIND", ":25565")),
                 tls, cert, key, noAuth, backend,
                 env("LANPLUS_RELAY_BASE_DOMAIN", "lanplus.local"),
-                intEnv("LANPLUS_RELAY_MC_RATE_PER_MIN", 30));
+                intEnv("LANPLUS_RELAY_MC_RATE_PER_MIN", 30),
+                bool("LANPLUS_RELAY_VOICE", true),
+                addr(env("LANPLUS_RELAY_VOICE_BIND", ":24454")),
+                env("LANPLUS_RELAY_VOICE_HOST", ""));
+    }
+
+    String advertisedVoiceHost() {
+        String host = voiceHostOverride.isBlank() ? baseDomain : voiceHostOverride;
+        return host + ":" + voiceBind.getPort();
     }
 
     private static InetSocketAddress addr(String s) {

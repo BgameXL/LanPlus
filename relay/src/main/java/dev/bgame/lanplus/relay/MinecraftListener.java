@@ -5,11 +5,6 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
-/**
- * Handles public Minecraft player connections: reads the handshake,
- * routes by hostname, and hands the socket to the matching host as a parked session. The relay
- * does not pump here — the host dials back a data connection that does the pumping.
- */
 final class MinecraftListener {
 
     private final RoutingTable table;
@@ -39,6 +34,7 @@ final class MinecraftListener {
             if (host == null) {
                 return;
             }
+            table.noteVoiceIp(ip, host);
             String sid = table.addPending(player, hs.raw);
             if (!host.send(Json.obj("type", "SESSION", "id", sid))) {
                 table.claimPending(sid);

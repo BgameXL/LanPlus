@@ -1,5 +1,6 @@
 package dev.bgame.lanplus.relay;
 
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -13,11 +14,16 @@ final class ControlListener {
     private final RoutingTable table;
     private final TicketValidator validator;
     private final ExecutorService pool;
+    private final RelayConfig cfg;
+    private final VoiceRelay voiceRelay;
 
-    ControlListener(RoutingTable table, TicketValidator validator, ExecutorService pool) {
+    ControlListener(RoutingTable table, TicketValidator validator, ExecutorService pool,
+                    RelayConfig cfg, VoiceRelay voiceRelay) {
         this.table = table;
         this.validator = validator;
         this.pool = pool;
+        this.cfg = cfg;
+        this.voiceRelay = voiceRelay;
     }
 
     void handle(Socket socket) {
@@ -30,6 +36,8 @@ final class ControlListener {
                 hello(socket, in, msg);
             } else if ("DATA".equals(type)) {
                 data(socket, msg);
+            } else if ("VOICE".equals(type)) {
+                voice(socket, in, msg);
             } else {
                 Pump.closeQuietly(socket);
             }
@@ -47,13 +55,19 @@ final class ControlListener {
             return;
         }
         String domain = result.domain();
-        HostSession session = new HostSession(socket, domain, result.requireToken());
+        HostSession session = new HostSession(socket, domain, result.requireToken(), voiceRelay);
         if (!table.register(domain, session)) {
             reject(out, "domain busy");
             Pump.closeQuietly(socket);
             return;
         }
-        session.send(Json.obj("type", "ASSIGNED", "domain", domain));
+        if (cfg.voiceEnabled) {
+            table.registerVoiceKey(session.voiceKey(), session);
+            session.send(Json.obj("type", "ASSIGNED", "domain", domain,
+                    "voiceHost", cfg.advertisedVoiceHost(), "voiceKey", session.voiceKey()));
+        } else {
+            session.send(Json.obj("type", "ASSIGNED", "domain", domain));
+        }
         RelayServer.log("host assigned " + domain + (result.requireToken() ? " (gated)" : "")
                 + " (" + socket.getRemoteSocketAddress() + ")");
         try {
@@ -61,6 +75,8 @@ final class ControlListener {
             }
         } finally {
             table.unregister(domain, session);
+            table.clearVoice(session);
+            session.closeVoiceChannel();
             Pump.closeQuietly(socket);
             RelayServer.log("host gone, freed " + domain);
         }
@@ -78,12 +94,21 @@ final class ControlListener {
         Pump.bidirectional(pending.player, socket, pool);
     }
 
+    private void voice(Socket socket, InputStream in, Map<String, String> msg) {
+        HostSession session = table.claimVoiceKey(msg.get("key"));
+        if (session == null) {
+            Pump.closeQuietly(socket);
+            return;
+        }
+        session.attachVoiceChannel(socket, new DataInputStream(in), pool);
+        RelayServer.log("voice channel up for " + session.domain());
+    }
+
     private static void reject(OutputStream out, String reason) {
         try {
             out.write((Json.obj("type", "REJECTED", "reason", reason) + "\n").getBytes(StandardCharsets.UTF_8));
             out.flush();
         } catch (IOException ignored) {
-            // host already gone
         }
     }
 }
