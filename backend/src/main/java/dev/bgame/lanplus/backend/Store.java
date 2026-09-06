@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -102,8 +104,12 @@ final class Store {
             .connectTimeout(Duration.ofSeconds(5))
             .build();
 
+    private static final int READER_POOL = 8;
+
     private final Object lock = new Object();
     private final Connection connection;
+    private final BlockingQueue<Connection> readers;
+    private final ThreadLocal<Connection> readConn = new ThreadLocal<>();
     private final AssetCatalog backgrounds;
     private final AssetCatalog banners;
     private final AssetCatalog announcementImages;
@@ -130,12 +136,68 @@ final class Store {
         this.discordWebhook = discordWebhook;
         String path = (dataFile == null || dataFile.isBlank()) ? ":memory:" : dataFile;
         this.connection = openDb(path);
+        this.readers = openReaders(path);
+    }
+
+    private static String jdbcUrl(String path) {
+        if (":memory:".equals(path)) {
+            return "jdbc:sqlite:file:lanplus_shared_mem?mode=memory&cache=shared";
+        }
+        return "jdbc:sqlite:" + path;
+    }
+
+    private static BlockingQueue<Connection> openReaders(String path) {
+        BlockingQueue<Connection> pool = new ArrayBlockingQueue<>(READER_POOL);
+        try {
+            for (int i = 0; i < READER_POOL; i++) {
+                Connection c = DriverManager.getConnection(jdbcUrl(path));
+                try (Statement st = c.createStatement()) {
+                    st.execute("PRAGMA busy_timeout=5000");
+                    st.execute("PRAGMA foreign_keys=ON");
+                    st.execute("PRAGMA cache_size=-1024");
+                    st.execute("PRAGMA query_only=true");
+                }
+                pool.add(c);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("LAN+ backend: failed to open reader pool", e);
+        }
+        return pool;
+    }
+
+    private Connection conn() {
+        Connection c = readConn.get();
+        return c != null ? c : connection;
+    }
+
+    private interface Reader extends AutoCloseable {
+        @Override
+        void close();
+    }
+
+    private Reader read() {
+        if (readConn.get() != null) {
+            return () -> {
+            };
+        }
+        Connection c;
+        try {
+            c = readers.take();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("LAN+ backend: interrupted waiting for reader", e);
+        }
+        readConn.set(c);
+        return () -> {
+            readConn.remove();
+            readers.add(c);
+        };
     }
 
     private static Connection openDb(String path) {
         try {
             Class.forName("org.sqlite.JDBC");
-            Connection c = DriverManager.getConnection("jdbc:sqlite:" + path);
+            Connection c = DriverManager.getConnection(jdbcUrl(path));
             try (Statement st = c.createStatement()) {
                 st.execute("PRAGMA journal_mode=WAL");
                 st.execute("PRAGMA synchronous=NORMAL");
@@ -276,6 +338,13 @@ final class Store {
             } catch (SQLException ignored) {
             }
         }
+        Connection c;
+        while ((c = readers.poll()) != null) {
+            try {
+                c.close();
+            } catch (SQLException ignored) {
+            }
+        }
     }
 
     // users
@@ -286,7 +355,7 @@ final class Store {
                 if (u == null) {
                     String friendCode = uniqueFriendCode();
                     String domain = uniqueDomain();
-                    try (PreparedStatement ps = connection.prepareStatement(
+                    try (PreparedStatement ps = conn().prepareStatement(
                             "INSERT INTO users (uuid, username, friend_code, domain) VALUES (?,?,?,?)")) {
                         ps.setString(1, uuid.toString());
                         ps.setString(2, username);
@@ -298,7 +367,7 @@ final class Store {
                     return new User(uuid, username, friendCode, domain);
                 }
                 if (username != null && !username.isBlank() && !username.equals(u.username)) {
-                    try (PreparedStatement ps = connection.prepareStatement(
+                    try (PreparedStatement ps = conn().prepareStatement(
                             "UPDATE users SET username=? WHERE uuid=?")) {
                         ps.setString(1, username);
                         ps.setString(2, uuid.toString());
@@ -323,8 +392,8 @@ final class Store {
         if (query == null || query.isBlank()) {
             return null;
         }
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT uuid, username FROM users WHERE (friend_code = ? COLLATE NOCASE "
                             + "OR username = ? COLLATE NOCASE) AND banned = 0 LIMIT 1")) {
                 ps.setString(1, query);
@@ -348,8 +417,8 @@ final class Store {
         if (q == null || q.isBlank()) {
             return out;
         }
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT uuid, username FROM users WHERE (username LIKE ? COLLATE NOCASE "
                             + "OR friend_code LIKE ? COLLATE NOCASE) AND banned = 0")) {
                 String like = "%" + q + "%";
@@ -473,7 +542,7 @@ final class Store {
 
     private void saveSkinRef(UUID uuid, String skinJson, long now) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT INTO user_skin (uuid, skin_json, updated_at) VALUES (?,?,?) "
                             + "ON CONFLICT(uuid) DO UPDATE SET skin_json=excluded.skin_json, "
                             + "updated_at=excluded.updated_at")) {
@@ -488,7 +557,7 @@ final class Store {
     }
 
     private Object persistedSkinLocked(UUID uuid) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT skin_json FROM user_skin WHERE uuid=?")) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
@@ -497,10 +566,10 @@ final class Store {
         }
     }
 
-    // hosted skins: the one deliberate content exception — a user-uploaded, validated, capped PNG.
+    // hosted skins
     void putHostedSkin(UUID uuid, byte[] png, String hash, String model) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT INTO skin_data (uuid, png, hash, model, updated_at) VALUES (?,?,?,?,?) "
                             + "ON CONFLICT(uuid) DO UPDATE SET png=excluded.png, hash=excluded.hash, "
                             + "model=excluded.model, updated_at=excluded.updated_at")) {
@@ -518,7 +587,7 @@ final class Store {
 
     void deleteHostedSkin(UUID uuid) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "DELETE FROM skin_data WHERE uuid=?")) {
                 ps.setString(1, uuid.toString());
                 ps.executeUpdate();
@@ -529,8 +598,8 @@ final class Store {
     }
 
     byte[] hostedSkinPng(UUID uuid) {
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT png FROM skin_data WHERE uuid=?")) {
                 ps.setString(1, uuid.toString());
                 try (ResultSet rs = ps.executeQuery()) {
@@ -544,7 +613,7 @@ final class Store {
 
     private void markOnline(UUID uuid) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT INTO presence_state (uuid, online) VALUES (?,1) "
                             + "ON CONFLICT(uuid) DO UPDATE SET online=1")) {
                 ps.setString(1, uuid.toString());
@@ -557,7 +626,7 @@ final class Store {
 
     private void markOffline(UUID uuid, long at) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT INTO presence_state (uuid, online, last_disconnect_at) VALUES (?,0,?) "
                             + "ON CONFLICT(uuid) DO UPDATE SET online=0, last_disconnect_at=excluded.last_disconnect_at")) {
                 ps.setString(1, uuid.toString());
@@ -571,14 +640,14 @@ final class Store {
 
     // profile privacy
     boolean isInvisible(UUID uuid) {
-        synchronized (lock) {
+        try (Reader r = read()) {
             return invisibleLocked(uuid);
         }
     }
 
     void setInvisible(UUID uuid, boolean invisible) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT INTO profile_privacy (uuid, invisible_mode) VALUES (?,?) "
                             + "ON CONFLICT(uuid) DO UPDATE SET invisible_mode=excluded.invisible_mode")) {
                 ps.setString(1, uuid.toString());
@@ -591,7 +660,7 @@ final class Store {
     }
 
     private boolean invisibleLocked(UUID uuid) {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT invisible_mode FROM profile_privacy WHERE uuid=?")) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
@@ -603,7 +672,7 @@ final class Store {
     }
 
     private Long lastDisconnectLocked(UUID uuid) {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT last_disconnect_at FROM presence_state WHERE uuid=?")) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
@@ -637,7 +706,7 @@ final class Store {
                     acceptRequestLocked(uuid, friendUuid);
                     return AddResult.ACCEPTED;
                 }
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "INSERT OR IGNORE INTO friend_requests (from_uuid, to_uuid) VALUES (?,?)")) {
                     ps.setString(1, uuid.toString());
                     ps.setString(2, friendUuid.toString());
@@ -673,7 +742,7 @@ final class Store {
     void removeFriend(UUID uuid, UUID friendUuid) {
         String[] pair = normalize(uuid, friendUuid);
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "DELETE FROM friends WHERE a=? AND b=?")) {
                 ps.setString(1, pair[0]);
                 ps.setString(2, pair[1]);
@@ -686,8 +755,8 @@ final class Store {
 
     List<Object> friendRequests(UUID uuid) {
         List<Object> out = new ArrayList<>();
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT r.from_uuid, u.username FROM friend_requests r "
                             + "JOIN users u ON u.uuid = r.from_uuid WHERE r.to_uuid = ?")) {
                 ps.setString(1, uuid.toString());
@@ -708,8 +777,8 @@ final class Store {
     Set<UUID> friendsOf(UUID uuid) {
         Set<UUID> out = new LinkedHashSet<>();
         String s = uuid.toString();
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT b FROM friends WHERE a=? UNION SELECT a FROM friends WHERE b=?")) {
                 ps.setString(1, s);
                 ps.setString(2, s);
@@ -732,9 +801,9 @@ final class Store {
         Map<UUID, Object> persistedSkins = new HashMap<>();
         Set<UUID> invisible = new HashSet<>();
         String s = uuid.toString();
-        synchronized (lock) {
+        try (Reader r = read()) {
             try {
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "SELECT u.uuid, u.username FROM friends f "
                                 + "JOIN users u ON u.uuid = (CASE WHEN f.a=? THEN f.b ELSE f.a END) "
                                 + "WHERE f.a=? OR f.b=?")) {
@@ -750,7 +819,7 @@ final class Store {
                 for (UUID fid : names.keySet()) {
                     tiers.put(fid, tierFor(totalXpLocked(fid)));
                 }
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "SELECT target, muted, blocked FROM relationships WHERE uuid=?")) {
                     ps.setString(1, s);
                     try (ResultSet rs = ps.executeQuery()) {
@@ -759,7 +828,7 @@ final class Store {
                         }
                     }
                 }
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "SELECT uuid FROM profile_privacy WHERE invisible_mode != 0")) {
                     try (ResultSet rs = ps.executeQuery()) {
                         while (rs.next()) {
@@ -776,7 +845,7 @@ final class Store {
                 }
                 if (!needPersisted.isEmpty()) {
                     String placeholders = String.join(",", java.util.Collections.nCopies(needPersisted.size(), "?"));
-                    try (PreparedStatement ps = connection.prepareStatement(
+                    try (PreparedStatement ps = conn().prepareStatement(
                             "SELECT uuid, skin_json FROM user_skin WHERE uuid IN (" + placeholders + ")")) {
                         for (int i = 0; i < needPersisted.size(); i++) {
                             ps.setString(i + 1, needPersisted.get(i).toString());
@@ -847,7 +916,7 @@ final class Store {
     }
 
     private void clearRequestLocked(UUID a, UUID b) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "DELETE FROM friend_requests WHERE (from_uuid=? AND to_uuid=?) "
                         + "OR (from_uuid=? AND to_uuid=?)")) {
             ps.setString(1, a.toString());
@@ -860,7 +929,7 @@ final class Store {
 
     private void linkFriendsLocked(UUID a, UUID b) throws SQLException {
         String[] pair = normalize(a, b);
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "INSERT OR IGNORE INTO friends (a, b) VALUES (?,?)")) {
             ps.setString(1, pair[0]);
             ps.setString(2, pair[1]);
@@ -870,7 +939,7 @@ final class Store {
 
     private boolean areFriends(UUID a, UUID b) throws SQLException {
         String[] pair = normalize(a, b);
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT 1 FROM friends WHERE a=? AND b=?")) {
             ps.setString(1, pair[0]);
             ps.setString(2, pair[1]);
@@ -881,7 +950,7 @@ final class Store {
     }
 
     private boolean requestExists(UUID from, UUID to) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT 1 FROM friend_requests WHERE from_uuid=? AND to_uuid=?")) {
             ps.setString(1, from.toString());
             ps.setString(2, to.toString());
@@ -900,8 +969,8 @@ final class Store {
     }
 
     boolean isMutedOrBlocked(UUID uuid, UUID target) {
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT 1 FROM relationships WHERE uuid=? AND target=? AND (muted=1 OR blocked=1)")) {
                 ps.setString(1, uuid.toString());
                 ps.setString(2, target.toString());
@@ -915,7 +984,7 @@ final class Store {
     }
 
     boolean isBlocked(UUID uuid, UUID target) {
-        synchronized (lock) {
+        try (Reader r = read()) {
             try {
                 return isBlockedLocked(uuid, target);
             } catch (SQLException e) {
@@ -925,7 +994,7 @@ final class Store {
     }
 
     private boolean isBlockedLocked(UUID uuid, UUID target) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT 1 FROM relationships WHERE uuid=? AND target=? AND blocked=1")) {
             ps.setString(1, uuid.toString());
             ps.setString(2, target.toString());
@@ -941,20 +1010,20 @@ final class Store {
         }
         synchronized (lock) {
             try {
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "INSERT OR IGNORE INTO relationships (uuid, target, muted, blocked) VALUES (?,?,0,0)")) {
                     ps.setString(1, uuid.toString());
                     ps.setString(2, target.toString());
                     ps.executeUpdate();
                 }
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "UPDATE relationships SET " + col + "=? WHERE uuid=? AND target=?")) {
                     ps.setInt(1, value ? 1 : 0);
                     ps.setString(2, uuid.toString());
                     ps.setString(3, target.toString());
                     ps.executeUpdate();
                 }
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "DELETE FROM relationships WHERE uuid=? AND target=? AND muted=0 AND blocked=0")) {
                     ps.setString(1, uuid.toString());
                     ps.setString(2, target.toString());
@@ -1029,7 +1098,7 @@ final class Store {
             try {
                 long now = System.currentTimeMillis();
                 int changed;
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "INSERT OR IGNORE INTO advancements (uuid, advancement_id, earned_at) VALUES (?,?,?)")) {
                     ps.setString(1, uuid.toString());
                     ps.setString(2, advancementId);
@@ -1041,7 +1110,7 @@ final class Store {
                 }
                 long windowStart = now - (now % XP_WINDOW_MS);
                 int count;
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "SELECT count FROM advancement_xp_window WHERE uuid=? AND window_start=?")) {
                     ps.setString(1, uuid.toString());
                     ps.setLong(2, windowStart);
@@ -1052,7 +1121,7 @@ final class Store {
                 if (count >= XP_WINDOW_MAX) {
                     return false;
                 }
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "INSERT INTO advancement_xp_window (uuid, window_start, count) VALUES (?,?,1) "
                                 + "ON CONFLICT(uuid, window_start) DO UPDATE SET count=count+1")) {
                     ps.setString(1, uuid.toString());
@@ -1060,7 +1129,7 @@ final class Store {
                     ps.executeUpdate();
                 }
                 addXpTotalLocked(uuid, "advancement", XP_PER_ADVANCEMENT, now);
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "INSERT INTO xp_events (uuid, source, amount, detail, created_at) VALUES (?,?,?,?,?)")) {
                     ps.setString(1, uuid.toString());
                     ps.setString(2, "advancement");
@@ -1088,7 +1157,7 @@ final class Store {
             return;
         }
         addXpTotalLocked(uuid, source, delta, now);
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "INSERT INTO xp_events (uuid, source, amount, detail, created_at) VALUES (?,?,?,?,?)")) {
             ps.setString(1, uuid.toString());
             ps.setString(2, source);
@@ -1100,7 +1169,7 @@ final class Store {
     }
 
     private long totalXpLocked(UUID uuid) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT COALESCE(SUM(total), 0) FROM xp_totals WHERE uuid=?")) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
@@ -1110,7 +1179,7 @@ final class Store {
     }
 
     private long getXpTotalLocked(UUID uuid, String source) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT total FROM xp_totals WHERE uuid=? AND source=?")) {
             ps.setString(1, uuid.toString());
             ps.setString(2, source);
@@ -1121,7 +1190,7 @@ final class Store {
     }
 
     private void addXpTotalLocked(UUID uuid, String source, long amount, long now) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "INSERT INTO xp_totals (uuid, source, total, updated_at) VALUES (?,?,?,?) "
                         + "ON CONFLICT(uuid, source) DO UPDATE SET total=total+excluded.total, updated_at=excluded.updated_at")) {
             ps.setString(1, uuid.toString());
@@ -1144,7 +1213,7 @@ final class Store {
     }
 
     private int advancementCountLocked(UUID uuid) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT COUNT(*) FROM advancements WHERE uuid=?")) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
@@ -1158,7 +1227,7 @@ final class Store {
         m.put("advancement", 0);
         m.put("playtime", 0);
         m.put("social", 0);
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT source, total FROM xp_totals WHERE uuid=?")) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
@@ -1171,7 +1240,7 @@ final class Store {
     }
 
     Map<String, Object> profile(UUID uuid, UUID viewer) {
-        synchronized (lock) {
+        try (Reader r = read()) {
             try {
                 User u = findUser(uuid);
                 if (u == null || isBanned(uuid)) {
@@ -1187,7 +1256,7 @@ final class Store {
                 m.put("pronouns", scalar("SELECT pronouns FROM profile_identity WHERE uuid=?", uuid));
                 m.put("bio", scalar("SELECT text FROM profile_bio WHERE uuid=?", uuid));
                 Map<String, Object> links = new LinkedHashMap<>();
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "SELECT discord, instagram, twitter, youtube, twitch, tiktok, paypal, kofi "
                                 + "FROM profile_links WHERE uuid=?")) {
                     ps.setString(1, uuid.toString());
@@ -1202,7 +1271,7 @@ final class Store {
                 m.put("links", links);
 
                 Map<String, Object> prompts = new LinkedHashMap<>();
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "SELECT prompt_id, answer FROM profile_prompts WHERE uuid=?")) {
                     ps.setString(1, uuid.toString());
                     try (ResultSet rs = ps.executeQuery()) {
@@ -1232,7 +1301,7 @@ final class Store {
                 int bgOpacity = DEFAULT_BG_OPACITY;
                 String bgImageId = null;
                 String bannerId = null;
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "SELECT favorite_modpack_id, favorite_modpack_visible, currently_playing_visible, "
                                 + "recently_played_visible, bg_style, bg_color, bg_opacity, "
                                 + "bg_image_id, banner_id "
@@ -1329,8 +1398,8 @@ final class Store {
         if (modpackId == null || modpackId.isBlank()) {
             return null;
         }
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT 1 FROM modpack_registry WHERE modpack_id=?")) {
                 ps.setString(1, modpackId);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -1346,7 +1415,7 @@ final class Store {
         if (modpackId == null || modpackId.isBlank()) {
             return null;
         }
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT name, download_url FROM modpack_registry WHERE modpack_id=?")) {
             ps.setString(1, modpackId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -1369,7 +1438,7 @@ final class Store {
         synchronized (lock) {
             try {
                 long now = System.currentTimeMillis();
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "INSERT INTO playtime (uuid, modpack_id, seconds, updated_at) "
                                 + "SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM modpack_registry WHERE modpack_id=?) "
                                 + "ON CONFLICT(uuid, modpack_id) DO UPDATE SET "
@@ -1396,7 +1465,7 @@ final class Store {
         }
         String value = modpackId.length() > 100 ? modpackId.substring(0, 100) : modpackId;
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "UPDATE users SET last_modpack=? WHERE uuid=?")) {
                 ps.setString(1, value);
                 ps.setString(2, uuid.toString());
@@ -1414,7 +1483,7 @@ final class Store {
         synchronized (lock) {
             try {
                 long now = System.currentTimeMillis();
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "INSERT INTO social_time (uuid, seconds, updated_at) VALUES (?,?,?) "
                                 + "ON CONFLICT(uuid) DO UPDATE SET "
                                 + "seconds=seconds+excluded.seconds, updated_at=excluded.updated_at")) {
@@ -1433,7 +1502,7 @@ final class Store {
     }
 
     private String lastModpackLocked(UUID uuid) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT last_modpack FROM users WHERE uuid=?")) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
@@ -1443,7 +1512,7 @@ final class Store {
     }
 
     private long scalarLongLocked(String sql, UUID uuid) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn().prepareStatement(sql)) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : 0;
@@ -1466,7 +1535,7 @@ final class Store {
         synchronized (lock) {
             try {
                 long lastAt = 0;
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "SELECT last_at FROM social_pair WHERE a=? AND b=?")) {
                     ps.setString(1, pair[0]);
                     ps.setString(2, pair[1]);
@@ -1477,7 +1546,7 @@ final class Store {
                     }
                 }
                 boolean newSession = now - lastAt > SOCIAL_SESSION_GAP_MS;
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "INSERT INTO social_pair (a, b, sessions, last_at) VALUES (?,?,1,?) "
                                 + "ON CONFLICT(a, b) DO UPDATE SET "
                                 + "sessions = sessions + ?, last_at = excluded.last_at")) {
@@ -1506,7 +1575,7 @@ final class Store {
 
     private void recordActivityLocked(UUID actor, String type, String subject, long now)
             throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "INSERT INTO activity (actor_uuid, type, subject, created_at) VALUES (?,?,?,?)")) {
             ps.setString(1, actor.toString());
             ps.setString(2, type);
@@ -1514,7 +1583,7 @@ final class Store {
             ps.setLong(4, now);
             ps.executeUpdate();
         }
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "DELETE FROM activity WHERE created_at < ?")) {
             ps.setLong(1, now - ACTIVITY_RETENTION_MS);
             ps.executeUpdate();
@@ -1527,7 +1596,7 @@ final class Store {
             return List.of();
         }
         long cutoff = System.currentTimeMillis() - ACTIVITY_RETENTION_MS;
-        synchronized (lock) {
+        try (Reader r = read()) {
             try {
                 StringBuilder in = new StringBuilder();
                 for (int i = 0; i < friends.size(); i++) {
@@ -1538,7 +1607,7 @@ final class Store {
                         + "WHERE a.created_at >= ? AND a.actor_uuid IN (" + in + ") "
                         + "ORDER BY a.created_at DESC LIMIT 100";
                 List<Object> out = new ArrayList<>();
-                try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                try (PreparedStatement ps = conn().prepareStatement(sql)) {
                     ps.setLong(1, cutoff);
                     int idx = 2;
                     for (UUID f : friends) {
@@ -1564,8 +1633,8 @@ final class Store {
     }
 
     List<Object> announcementsUnseen(UUID viewer) {
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT id, type, title, body, created_at, image_id FROM announcements "
                             + "WHERE active = 1 AND id NOT IN "
                             + "(SELECT announcement_id FROM announcement_seen WHERE user_uuid = ?) "
@@ -1579,8 +1648,8 @@ final class Store {
     }
 
     List<Object> announcementsAll() {
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT id, type, title, body, created_at, image_id FROM announcements "
                             + "WHERE active = 1 ORDER BY created_at DESC")) {
                 return announcementRows(ps);
@@ -1592,7 +1661,7 @@ final class Store {
 
     void deactivateAnnouncement(int id) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "UPDATE announcements SET active = 0 WHERE id = ?")) {
                 ps.setInt(1, id);
                 ps.executeUpdate();
@@ -1623,7 +1692,7 @@ final class Store {
             return;
         }
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT OR IGNORE INTO announcement_seen (user_uuid, announcement_id) VALUES (?,?)")) {
                 for (Integer id : ids) {
                     if (id == null) {
@@ -1642,7 +1711,7 @@ final class Store {
     Map<String, Object> publishAnnouncement(String type, String title, String body, String imageId) {
         long now = System.currentTimeMillis();
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT INTO announcements (type, title, body, created_at, active, image_id) VALUES (?,?,?,?,1,?)",
                     Statement.RETURN_GENERATED_KEYS)) {
                 ps.setString(1, type);
@@ -1666,7 +1735,7 @@ final class Store {
     }
 
     private void markAllAnnouncementsSeenLocked(String uuid) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "INSERT OR IGNORE INTO announcement_seen (user_uuid, announcement_id) "
                         + "SELECT ?, id FROM announcements WHERE active = 1")) {
             ps.setString(1, uuid);
@@ -1676,7 +1745,7 @@ final class Store {
 
     private Map<String, Object> playedTogetherLocked(UUID a, UUID b) throws SQLException {
         String[] pair = normalize(a, b);
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT sessions, last_at FROM social_pair WHERE a=? AND b=?")) {
             ps.setString(1, pair[0]);
             ps.setString(2, pair[1]);
@@ -1703,7 +1772,7 @@ final class Store {
     }
 
     private Map<String, Object> recentlyPlayedLocked(UUID uuid) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT r.modpack_id, r.name, r.download_url FROM playtime p "
                         + "JOIN modpack_registry r ON r.modpack_id = p.modpack_id "
                         + "WHERE p.uuid=? ORDER BY p.updated_at DESC LIMIT 1")) {
@@ -1722,9 +1791,9 @@ final class Store {
     }
 
     List<Map<String, Object>> listModpacks() {
-        synchronized (lock) {
+        try (Reader r = read()) {
             List<Map<String, Object>> out = new ArrayList<>();
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT modpack_id, name, download_url FROM modpack_registry ORDER BY name");
                  ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -1742,8 +1811,8 @@ final class Store {
     }
 
     boolean currentlyPlayingVisible(UUID uuid) {
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT currently_playing_visible FROM profile_settings WHERE uuid=?")) {
                 ps.setString(1, uuid.toString());
                 try (ResultSet rs = ps.executeQuery()) {
@@ -1760,7 +1829,7 @@ final class Store {
         synchronized (lock) {
             try {
                 ensureSettingsRowLocked(uuid);
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "UPDATE profile_settings SET favorite_modpack_id=?, updated_at=? WHERE uuid=?")) {
                     ps.setString(1, value);
                     ps.setLong(2, System.currentTimeMillis());
@@ -1780,7 +1849,7 @@ final class Store {
         synchronized (lock) {
             try {
                 ensureSettingsRowLocked(uuid);
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "UPDATE profile_settings SET " + column + "=?, updated_at=? WHERE uuid=?")) {
                     ps.setInt(1, visible ? 1 : 0);
                     ps.setLong(2, System.currentTimeMillis());
@@ -1800,7 +1869,7 @@ final class Store {
         synchronized (lock) {
             try {
                 ensureSettingsRowLocked(uuid);
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "UPDATE profile_settings SET bg_style=?, bg_color=?, bg_opacity=?, updated_at=? "
                                 + "WHERE uuid=?")) {
                     ps.setString(1, s);
@@ -1829,7 +1898,7 @@ final class Store {
         synchronized (lock) {
             try {
                 ensureSettingsRowLocked(uuid);
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "UPDATE profile_settings SET " + column + "=?, updated_at=? WHERE uuid=?")) {
                     ps.setString(1, v);
                     ps.setLong(2, System.currentTimeMillis());
@@ -1844,7 +1913,7 @@ final class Store {
 
     String backgroundImageId(UUID uuid) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT bg_image_id FROM profile_settings WHERE uuid=?")) {
                 ps.setString(1, uuid.toString());
                 try (ResultSet rs = ps.executeQuery()) {
@@ -1857,7 +1926,7 @@ final class Store {
     }
 
     private void ensureSettingsRowLocked(UUID uuid) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "INSERT OR IGNORE INTO profile_settings (uuid, updated_at) VALUES (?,?)")) {
             ps.setString(1, uuid.toString());
             ps.setLong(2, System.currentTimeMillis());
@@ -1867,7 +1936,7 @@ final class Store {
 
     void setBio(UUID uuid, String text) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT INTO profile_bio (uuid, text, updated_at) VALUES (?,?,?) "
                             + "ON CONFLICT(uuid) DO UPDATE SET text=excluded.text, updated_at=excluded.updated_at")) {
                 ps.setString(1, uuid.toString());
@@ -1882,7 +1951,7 @@ final class Store {
 
     void setPronouns(UUID uuid, String pronouns) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT INTO profile_identity (uuid, pronouns) VALUES (?,?) "
                             + "ON CONFLICT(uuid) DO UPDATE SET pronouns=excluded.pronouns")) {
                 ps.setString(1, uuid.toString());
@@ -1900,12 +1969,12 @@ final class Store {
         }
         synchronized (lock) {
             try {
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "INSERT OR IGNORE INTO profile_links (uuid) VALUES (?)")) {
                     ps.setString(1, uuid.toString());
                     ps.executeUpdate();
                 }
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "UPDATE profile_links SET " + platform + "=? WHERE uuid=?")) {
                     ps.setString(1, (value == null || value.isBlank()) ? null : value);
                     ps.setString(2, uuid.toString());
@@ -1920,12 +1989,12 @@ final class Store {
     // Replace the player's whole set of prompt answers (not a patch). Blank/null answers are dropped.
     void setPrompts(UUID uuid, Map<String, String> answers) {
         synchronized (lock) {
-            try (PreparedStatement del = connection.prepareStatement(
+            try (PreparedStatement del = conn().prepareStatement(
                     "DELETE FROM profile_prompts WHERE uuid=?")) {
                 del.setString(1, uuid.toString());
                 del.executeUpdate();
                 long now = System.currentTimeMillis();
-                try (PreparedStatement ins = connection.prepareStatement(
+                try (PreparedStatement ins = conn().prepareStatement(
                         "INSERT INTO profile_prompts (uuid, prompt_id, answer, updated_at) VALUES (?,?,?,?)")) {
                     for (Map.Entry<String, String> e : answers.entrySet()) {
                         String answer = e.getValue();
@@ -1946,7 +2015,7 @@ final class Store {
     }
 
     private String scalar(String sql, UUID uuid) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn().prepareStatement(sql)) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getString(1) : null;
@@ -1956,8 +2025,8 @@ final class Store {
 
     // moderation
     boolean isBanned(UUID uuid) {
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement("SELECT banned FROM users WHERE uuid=?")) {
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement("SELECT banned FROM users WHERE uuid=?")) {
                 ps.setString(1, uuid.toString());
                 try (ResultSet rs = ps.executeQuery()) {
                     return rs.next() && rs.getInt(1) != 0;
@@ -1971,7 +2040,7 @@ final class Store {
     void setBanned(UUID uuid, boolean banned, String reason) {
         ensureUser(uuid, null);
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "UPDATE users SET banned=?, ban_reason=? WHERE uuid=?")) {
                 ps.setInt(1, banned ? 1 : 0);
                 ps.setString(2, banned ? reason : null);
@@ -1988,7 +2057,7 @@ final class Store {
 
     void revokeSessions(UUID uuid) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement("DELETE FROM sessions WHERE uuid=?")) {
+            try (PreparedStatement ps = conn().prepareStatement("DELETE FROM sessions WHERE uuid=?")) {
                 ps.setString(1, uuid.toString());
                 ps.executeUpdate();
             } catch (SQLException e) {
@@ -2009,7 +2078,7 @@ final class Store {
         String targetBio = null;
         synchronized (lock) {
             try {
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "SELECT 1 FROM reports WHERE reporter_uuid=? AND target_uuid=? AND status='open' LIMIT 1")) {
                     ps.setString(1, reporter.toString());
                     ps.setString(2, target.toString());
@@ -2019,7 +2088,7 @@ final class Store {
                         }
                     }
                 }
-                try (PreparedStatement ps = connection.prepareStatement(
+                try (PreparedStatement ps = conn().prepareStatement(
                         "INSERT INTO reports (reporter_uuid, target_uuid, reason, status, created_at) "
                                 + "VALUES (?,?,?, 'open', ?)")) {
                     ps.setString(1, reporter.toString());
@@ -2074,7 +2143,7 @@ final class Store {
     List<Object> openReports() {
         List<Object> out = new ArrayList<>();
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT r.id, r.reporter_uuid, r.target_uuid, r.reason, r.created_at, u.username, b.text "
                             + "FROM reports r "
                             + "LEFT JOIN users u ON u.uuid = r.target_uuid "
@@ -2100,7 +2169,7 @@ final class Store {
 
     boolean resolveReport(long id) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "UPDATE reports SET status='resolved' WHERE id=? AND status='open'")) {
                 ps.setLong(1, id);
                 return ps.executeUpdate() > 0;
@@ -2220,8 +2289,8 @@ final class Store {
             return null;
         }
         String hash = sha256Hex(token);
-        synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
                     "SELECT uuid, verified, expires_at FROM sessions WHERE token_hash=?")) {
                 ps.setString(1, hash);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -2240,7 +2309,7 @@ final class Store {
         String token = randomHex(32);
         long now = System.currentTimeMillis();
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement(
+            try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT INTO sessions (token_hash, uuid, verified, created_at, expires_at) VALUES (?,?,?,?,?)")) {
                 ps.setString(1, sha256Hex(token));
                 ps.setString(2, uuid.toString());
@@ -2327,7 +2396,7 @@ final class Store {
 
     private void sweepSessions(long now) {
         synchronized (lock) {
-            try (PreparedStatement ps = connection.prepareStatement("DELETE FROM sessions WHERE expires_at < ?")) {
+            try (PreparedStatement ps = conn().prepareStatement("DELETE FROM sessions WHERE expires_at < ?")) {
                 ps.setLong(1, now);
                 ps.executeUpdate();
             } catch (SQLException e) {
@@ -2340,7 +2409,7 @@ final class Store {
     private static final String CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTVWXYZ"; // no 0/1 or I/L/O/U
 
     private User findUser(UUID uuid) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT username, friend_code, domain FROM users WHERE uuid=?")) {
             ps.setString(1, uuid.toString());
             try (ResultSet rs = ps.executeQuery()) {
@@ -2366,7 +2435,7 @@ final class Store {
     }
 
     private boolean friendCodeTaken(String code) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT 1 FROM users WHERE friend_code=?")) {
             ps.setString(1, code);
             try (ResultSet rs = ps.executeQuery()) {
@@ -2394,7 +2463,7 @@ final class Store {
     }
 
     private boolean domainTaken(String domain) throws SQLException {
-        try (PreparedStatement ps = connection.prepareStatement(
+        try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT 1 FROM users WHERE domain=?")) {
             ps.setString(1, domain);
             try (ResultSet rs = ps.executeQuery()) {
