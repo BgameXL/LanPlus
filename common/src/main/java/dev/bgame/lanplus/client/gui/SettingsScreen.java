@@ -99,9 +99,8 @@ public final class SettingsScreen extends LanPlusScreen {
         layout();
         rows.clear();
 
-        g.fill(px, py, px + pw, py + ph, LanPlusUI.SURFACE);
-        LanPlusUI.bevelR(g, px, py, px + pw, py + ph);
-        g.fill(px, py, px + pw, py + 2, LanPlusUI.LIME);
+        LanPlusUI.panel(g, px, py, px + pw, py + ph);
+        LanPlusUI.rivets(g, px, py, px + pw, py + ph, LanPlusUI.FAINT);
 
         int wx = LanPlusUI.wordmark(g, this.font, px + 70, py + 12);
         g.drawString(this.font, Component.translatable("gui.lanplus.settings.word"), wx + 6, py + 12, LanPlusUI.MUTED, false);
@@ -170,7 +169,7 @@ public final class SettingsScreen extends LanPlusScreen {
         int w = 28;
         int h = 14;
         g.fill(x, y, x + w, y + h, on ? LanPlusUI.LIME : LanPlusUI.SLOT);
-        LanPlusUI.bevelI(g, x, y, x + w, y + h);
+        LanPlusUI.outline1(g, x, y, x + w, y + h, LanPlusUI.EDGE_DARK);
         int kx = on ? x + w - 2 - 10 : x + 2;
         g.fill(kx, y + 2, kx + 10, y + h - 2, on ? LanPlusUI.SURFACE : LanPlusUI.MUTED);
     }

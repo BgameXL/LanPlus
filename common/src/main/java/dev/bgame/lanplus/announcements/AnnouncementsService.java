@@ -3,12 +3,15 @@ package dev.bgame.lanplus.announcements;
 import dev.bgame.lanplus.api.Announcement;
 
 import java.util.List;
+import java.util.Set;
 
 public interface AnnouncementsService {
 
     List<Announcement> announcements();
 
     int unseenCount();
+
+    Set<Integer> unseenIds();
 
     void refresh();
 

@@ -100,10 +100,7 @@ public final class LanPlusNotifications {
         if (hiddenOnCurrentScreen()) {
             return false;
         }
-        if (button == 0 && handleClick(mouseX, mouseY)) {
-            return true;
-        }
-        return false;
+        return button == 0 && handleClick(mouseX, mouseY);
     }
 
     private static boolean hiddenOnCurrentScreen() {
@@ -225,19 +222,16 @@ public final class LanPlusNotifications {
 
     private static void borderAlpha(GuiGraphics g, int x0, int y0, int x1, int y1, float a) {
         int c = col(0xFFFFFF, a * 0.25f);
-        g.fill(x0, y0, x1, y0 + 1, c);
-        g.fill(x0, y1 - 1, x1, y1, c);
-        g.fill(x0, y0, x0 + 1, y1, c);
-        g.fill(x1 - 1, y0, x1, y1, c);
+        LanPlusUI.outline1(g, x0, y0, x1, y1, c);
     }
 
     private static int col(int rgb, float alpha) {
-        int a = Math.max(0, Math.min(255, (int) (alpha * 255)));
+        int a = Math.clamp((int) (alpha * 255), 0, 255);
         return (a << 24) | (rgb & 0xFFFFFF);
     }
 
     private static float clamp01(float v) {
-        return Math.max(0f, Math.min(1f, v));
+        return Math.clamp(v, 0f, 1f);
     }
 
     private static final class Notif {

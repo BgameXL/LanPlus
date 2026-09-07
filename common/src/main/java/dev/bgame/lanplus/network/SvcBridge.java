@@ -40,7 +40,7 @@ public final class SvcBridge {
                 lines.add("voice_host=" + hostPort);
             }
             Files.write(file, lines, StandardCharsets.UTF_8);
-        } catch (IOException e) {
+        } catch (IOException ignored) {
         }
     }
 

@@ -157,18 +157,7 @@ public final class DefaultProfilesService implements ProfilesService {
                 if (resp.statusCode() != 200) {
                     return null;
                 }
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buf = new byte[8192];
-                int total = 0;
-                int n;
-                while ((n = in.read(buf)) != -1) {
-                    total += n;
-                    if (total > MAX_IMAGE_BYTES) {
-                        return null;
-                    }
-                    out.write(buf, 0, n);
-                }
-                return out.toByteArray();
+                return getBytes(in, MAX_IMAGE_BYTES);
             }
         } catch (IOException | RuntimeException e) {
             return null;
@@ -176,6 +165,21 @@ public final class DefaultProfilesService implements ProfilesService {
             Thread.currentThread().interrupt();
             return null;
         }
+    }
+
+    public static byte[] getBytes(InputStream in, int maxImageBytes) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int total = 0;
+        int n;
+        while ((n = in.read(buf)) != -1) {
+            total += n;
+            if (total > maxImageBytes) {
+                return null;
+            }
+            out.write(buf, 0, n);
+        }
+        return out.toByteArray();
     }
 
     @Override

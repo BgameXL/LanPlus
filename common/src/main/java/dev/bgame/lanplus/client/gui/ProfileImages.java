@@ -59,7 +59,7 @@ final class ProfileImages {
             ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "profile_images/" + name);
             Minecraft.getInstance().getTextureManager().register(loc, dyn);
             TEXTURES.put(image.url(), new Tex(loc, ni.getWidth(), ni.getHeight()));
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException ignored) {
         }
     }
 

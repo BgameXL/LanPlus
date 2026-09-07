@@ -156,7 +156,7 @@ public final class ClientPresenceDetector {
     }
 
     private static void publishSkinIfChanged(Minecraft mc, PresenceManager presence) {
-        SkinRef ref = detectSkin(mc);
+        SkinRef ref = detectSkin();
         if (Objects.equals(ref, lastSkin)) {
             return;
         }
@@ -176,7 +176,7 @@ public final class ClientPresenceDetector {
         presence.updateSkin(ref);
     }
 
-    private static SkinRef detectSkin(Minecraft mc) {
+    private static SkinRef detectSkin() {
         if (Config.skinCustomActive && !Config.skinUrl.isBlank()) {
             return new SkinRef(SkinType.CUSTOM, Config.skinUrl, null, Config.skinSlim ? "slim" : null);
         }

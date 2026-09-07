@@ -84,23 +84,23 @@ public final class SkinTextures implements SkinTextureSink {
         }
         setNoAlpha(image, 0, 0, 32, 16);
         if (legacy) {
-            doNotchTransparencyHack(image, 32, 0, 64, 32);
+            doNotchTransparencyHack(image);
         }
         setNoAlpha(image, 0, 16, 64, 32);
         setNoAlpha(image, 16, 48, 48, 64);
         return image;
     }
 
-    private static void doNotchTransparencyHack(NativeImage image, int x0, int y0, int x1, int y1) {
-        for (int x = x0; x < x1; x++) {
-            for (int y = y0; y < y1; y++) {
+    private static void doNotchTransparencyHack(NativeImage image) {
+        for (int x = 32; x < 64; x++) {
+            for (int y = 0; y < 32; y++) {
                 if ((image.getPixelRGBA(x, y) >> 24 & 255) < 128) {
                     return;
                 }
             }
         }
-        for (int x = x0; x < x1; x++) {
-            for (int y = y0; y < y1; y++) {
+        for (int x = 32; x < 64; x++) {
+            for (int y = 0; y < 32; y++) {
                 image.setPixelRGBA(x, y, image.getPixelRGBA(x, y) & 0xFFFFFF);
             }
         }

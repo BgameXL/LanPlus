@@ -17,12 +17,10 @@ public final class BackgroundPicker extends LanPlusScreen {
     private static final int PAD = 12;
     private static final int SWATCH = 34;
     private static final int SWATCH_GAP = 8;
-
     private final Screen parent;
     private final int[] palette;
     private final int current;
     private final IntConsumer onPick;
-
     private int boxX;
     private int contentW;
     private int panelTop;
@@ -85,7 +83,7 @@ public final class BackgroundPicker extends LanPlusScreen {
             g.fill(cx - 2, cy - 2, cx - 1, cy + SWATCH + 2, LanPlusUI.ACCENT);
             g.fill(cx + SWATCH + 1, cy - 2, cx + SWATCH + 2, cy + SWATCH + 2, LanPlusUI.ACCENT);
         } else {
-            LanPlusUI.border(g, cx, cy, cx + SWATCH, cy + SWATCH);
+            LanPlusUI.outline1(g, cx, cy, cx + SWATCH, cy + SWATCH, LanPlusUI.EDGE_DARK);
         }
         if (hover && !selected) {
             g.fill(cx, cy, cx + SWATCH, cy + SWATCH, 0x22FFFFFF);

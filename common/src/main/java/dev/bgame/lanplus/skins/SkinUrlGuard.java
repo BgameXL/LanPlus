@@ -11,6 +11,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
+import static dev.bgame.lanplus.profiles.DefaultProfilesService.getBytes;
+
 final class SkinUrlGuard {
 
     static final int MAX_BYTES = 256 * 1024;
@@ -81,17 +83,6 @@ final class SkinUrlGuard {
     }
 
     private static byte[] readCapped(InputStream in) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buf = new byte[8192];
-        int total = 0;
-        int n;
-        while ((n = in.read(buf)) != -1) {
-            total += n;
-            if (total > MAX_BYTES) {
-                return null;
-            }
-            out.write(buf, 0, n);
-        }
-        return out.toByteArray();
+        return getBytes(in, MAX_BYTES);
     }
 }

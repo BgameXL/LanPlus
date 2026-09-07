@@ -11,8 +11,10 @@ public abstract class LanPlusScreen extends Screen {
     }
 
     protected void drawBackdrop(GuiGraphics g) {
-        renderTransparentBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        if (this.minecraft != null && this.minecraft.level != null) {
+            return;
+        }
+        LanPlusUI.background(g, this.width, this.height);
     }
 
     @Override

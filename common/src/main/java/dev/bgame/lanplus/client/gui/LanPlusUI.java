@@ -30,7 +30,6 @@ final class LanPlusUI {
     static int FAINT;
     static int BORDER;
     static int DIVIDER;
-    static int BACKDROP;
 
     private static Theme current;
 
@@ -68,21 +67,17 @@ final class LanPlusUI {
         FAINT = t.faint();
         BORDER = t.border();
         DIVIDER = t.divider();
-        BACKDROP = t.backdrop();
     }
 
-    static void backdrop(GuiGraphics g, int width, int height) {
-        g.fill(0, 0, width, height, BACKDROP);
+    static void background(GuiGraphics g, int width, int height) {
+        int base = 0xFF000000 | (SURFACE & 0xFFFFFF);
+        g.fillGradient(0, 0, width, height, base, shade(base, 0.32f));
     }
 
     static void panel(GuiGraphics g, int x0, int y0, int x1, int y1) {
         outline1(g, x0, y0, x1, y1, EDGE_DARK);
         g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, SURFACE);
         outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, shade(SURFACE, 1.6f));
-    }
-
-    static void border(GuiGraphics g, int x0, int y0, int x1, int y1) {
-        bevelR(g, x0, y0, x1, y1);
     }
 
     static void outline(GuiGraphics g, int x0, int y0, int x1, int y1, int color) {
@@ -94,13 +89,6 @@ final class LanPlusUI {
         g.fill(x0, y1 - 1, x1, y1, color);
         g.fill(x0, y0, x0 + 1, y1, color);
         g.fill(x1 - 1, y0, x1, y1, color);
-    }
-
-    static void raised(GuiGraphics g, int x0, int y0, int x1, int y1) {
-        g.fill(x0, y0, x1, y0 + 2, EDGE_LIGHT);
-        g.fill(x0, y0, x0 + 2, y1, EDGE_LIGHT);
-        g.fill(x0, y1 - 2, x1, y1, EDGE_DARK);
-        g.fill(x1 - 2, y0, x1, y1, EDGE_DARK);
     }
 
     static int shade(int argb, float f) {
@@ -138,13 +126,6 @@ final class LanPlusUI {
         }
     }
 
-    private static void button(GuiGraphics g, int a, int b, int c, int d, int hi, int lo) {
-        g.fill(a, b, c, b + 1, hi);
-        g.fill(a, b, a + 1, d, hi);
-        g.fill(a, d - 1, c, d, lo);
-        g.fill(c - 1, b, c, d, lo);
-    }
-
     static void slot(GuiGraphics g, int x0, int y0, int x1, int y1) {
         outline1(g, x0, y0, x1, y1, EDGE_DARK);
         int a = x0 + 1;
@@ -165,21 +146,11 @@ final class LanPlusUI {
         g.fill(x1 - 5, y1 - 5, x1 - 3, y1 - 3, color);
     }
 
-    static void bevelR(GuiGraphics g, int x0, int y0, int x1, int y1) {
-        bevel(g, x0, y0, x1, y1, EDGE_LIGHT, EDGE_DARK);
-    }
-
-    static void bevelI(GuiGraphics g, int x0, int y0, int x1, int y1) {
-        bevel(g, x0, y0, x1, y1, EDGE_DARK, EDGE_LIGHT);
-    }
-
-    private static void bevel(GuiGraphics g, int x0, int y0, int x1, int y1, int edgeDark, int edgeLight) {
-        button(g, x0, y0, x1, y1, edgeDark, edgeLight);
-    }
-
-    static void header(GuiGraphics g, Font font, Component label, int x, int y, int width) {
-        g.drawString(font, label, x, y, TEXT, false);
-        g.fill(x, y + 11, x + width, y + 12, ACCENT_LINE);
+    static void sectionHeader(GuiGraphics g, Font font, Component label, int x, int y, int right) {
+        g.drawString(font, "+", x, y, LIME, false);
+        int labelX = x + font.width("+") + 4;
+        g.drawString(font, label, labelX, y, TEXT, false);
+        g.fill(x, y + 11, right, y + 12, BORDER);
     }
 
     static int wordmark(GuiGraphics g, Font font, int x, int y) {

@@ -17,6 +17,10 @@ final class MarkdownText {
     private MarkdownText() {
     }
 
+    static Component line(String s, int codeColor, int linkColor) {
+        return s == null ? Component.empty() : inline(s, codeColor, linkColor);
+    }
+
     static List<Block> parse(String body, int headingColor, int codeColor, int linkColor) {
         List<Block> out = new ArrayList<>();
         if (body == null) {

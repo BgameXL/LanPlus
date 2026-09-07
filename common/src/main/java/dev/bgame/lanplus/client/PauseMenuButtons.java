@@ -1,5 +1,6 @@
 package dev.bgame.lanplus.client;
 
+import dev.bgame.lanplus.LanplusCommon;
 import dev.bgame.lanplus.client.gui.HostScreen;
 import dev.bgame.lanplus.client.gui.LanPlusIconButton;
 import dev.bgame.lanplus.mixin.client.ScreenAccessor;
@@ -8,9 +9,13 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.resources.ResourceLocation;
 
 public final class
 PauseMenuButtons {
+
+    private static final ResourceLocation HOST_ICON =
+            ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "textures/gui/host.png");
 
     private PauseMenuButtons() {
     }
@@ -41,7 +46,7 @@ PauseMenuButtons {
         int x = share.getX() + share.getWidth() + 4;
         int y = share.getY();
         ((ScreenAccessor) screen).lanplus$invokeAddRenderableWidget(
-                new LanPlusIconButton(x, y, TitleScreenButtons.HOST_ICON, "gui.lanplus.host.tooltip",
+                new LanPlusIconButton(x, y, HOST_ICON, "gui.lanplus.host.tooltip",
                         b -> mc.setScreen(new HostScreen(screen, true))));
     }
 

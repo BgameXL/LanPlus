@@ -14,7 +14,7 @@ import dev.bgame.lanplus.client.gui.FriendsScreen;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.core.ProfileCache;
-import dev.bgame.lanplus.cosmetics.CosmeticSlot;
+import dev.bgame.lanplus.cosmetics.CosmeticMeta;
 import dev.bgame.lanplus.discord.DiscordPresence;
 import dev.bgame.lanplus.discord.DiscordRichPresence;
 import dev.bgame.lanplus.friends.DefaultFriendsService;
@@ -168,12 +168,16 @@ public final class LanPlusClient {
                 String id = geo.getFileName().toString().replace(".geo.json", "");
                 Path anim = dir.resolve(id + ".animation.json");
                 Path png = dir.resolve(id + ".png");
+                Path metaFile = dir.resolve(id + ".cosmetic.json");
                 cosmetics.register(id,
                         Files.readAllBytes(geo),
                         Files.isRegularFile(anim) ? Files.readAllBytes(anim) : null,
                         Files.isRegularFile(png) ? Files.readAllBytes(png) : null);
+                CosmeticMeta meta = CosmeticMeta.parse(id,
+                        Files.isRegularFile(metaFile) ? Files.readString(metaFile) : null);
+                cosmetics.putMeta(meta);
                 if (self != null) {
-                    cosmetics.equip(self, CosmeticSlot.HEAD, id);
+                    cosmetics.equip(self, meta.slot(), id);
                 }
             }
         } catch (Exception e) {

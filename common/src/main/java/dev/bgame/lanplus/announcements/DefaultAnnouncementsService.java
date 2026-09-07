@@ -7,7 +7,9 @@ import dev.bgame.lanplus.network.LanPlusNetwork;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Supplier;
@@ -22,6 +24,7 @@ public final class DefaultAnnouncementsService
     private final List<AnnouncementsListener> listeners = new CopyOnWriteArrayList<>();
     private volatile List<Announcement> cache = List.of();
     private volatile int unseen;
+    private volatile Set<Integer> unseenSet = Set.of();
 
     public DefaultAnnouncementsService(LanPlusNetwork network, Supplier<PlayerIdentity> identity) {
         this.network = network;
@@ -39,6 +42,11 @@ public final class DefaultAnnouncementsService
     }
 
     @Override
+    public Set<Integer> unseenIds() {
+        return unseenSet;
+    }
+
+    @Override
     public void refresh() {
         if (localUuid() == null) {
             return;
@@ -48,7 +56,12 @@ public final class DefaultAnnouncementsService
             notifyChanged();
         });
         network.getUnseenAnnouncements().thenAccept(list -> {
-            unseen = list.size();
+            Set<Integer> ids = new HashSet<>();
+            for (Announcement a : list) {
+                ids.add(a.id());
+            }
+            unseenSet = Set.copyOf(ids);
+            unseen = unseenSet.size();
             notifyChanged();
         });
     }
@@ -59,7 +72,10 @@ public final class DefaultAnnouncementsService
             return;
         }
         network.markAnnouncementsSeen(ids);
-        unseen = 0;
+        Set<Integer> next = new HashSet<>(unseenSet);
+        next.removeAll(ids);
+        unseenSet = Set.copyOf(next);
+        unseen = unseenSet.size();
         notifyChanged();
     }
 
@@ -91,7 +107,10 @@ public final class DefaultAnnouncementsService
             }
         }
         cache = List.copyOf(next);
-        unseen++;
+        Set<Integer> nextUnseen = new HashSet<>(unseenSet);
+        nextUnseen.add(announcement.id());
+        unseenSet = Set.copyOf(nextUnseen);
+        unseen = unseenSet.size();
         notifyChanged();
         for (AnnouncementsListener listener : listeners) {
             try {
@@ -114,7 +133,12 @@ public final class DefaultAnnouncementsService
             return;
         }
         cache = List.copyOf(next);
-        unseen = Math.min(unseen, cache.size());
+        if (unseenSet.contains(id)) {
+            Set<Integer> nextUnseen = new HashSet<>(unseenSet);
+            nextUnseen.remove(id);
+            unseenSet = Set.copyOf(nextUnseen);
+        }
+        unseen = unseenSet.size();
         notifyChanged();
     }
 

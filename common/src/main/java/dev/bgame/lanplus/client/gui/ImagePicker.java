@@ -137,7 +137,7 @@ public final class ImagePicker extends LanPlusScreen {
             g.fill(cx, cy, cx + 2, cy + cellH, a);
             g.fill(cx + cellW - 2, cy, cx + cellW, cy + cellH, a);
         } else if (hover) {
-            LanPlusUI.border(g, cx - 1, cy - 1, cx + cellW + 1, cy + cellH + 1);
+            LanPlusUI.outline1(g, cx - 1, cy - 1, cx + cellW + 1, cy + cellH + 1, LanPlusUI.EDGE_DARK);
             g.fill(cx, cy, cx + cellW, cy + 2, LanPlusUI.ACCENT_TINT);
         }
         String label = none ? "" : img.id();

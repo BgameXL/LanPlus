@@ -92,7 +92,7 @@ public final class CosmeticScreen extends LanPlusScreen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderTransparentBackground(g);
+        drawBackdrop(g);
         layout();
         rows.clear();
         tip = null;

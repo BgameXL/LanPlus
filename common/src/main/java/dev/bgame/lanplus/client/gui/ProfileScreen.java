@@ -18,11 +18,6 @@ import dev.bgame.lanplus.client.gui.ProfilePrompt.Prompt;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.network.LanPlusNetwork;
 import dev.bgame.lanplus.profiles.ProfilesService;
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -31,18 +26,11 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.model.PlayerModel;
-import net.minecraft.client.model.geom.ModelLayers;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
-import net.minecraft.world.entity.LivingEntity;
-import org.joml.Matrix4f;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -143,8 +131,6 @@ public final class ProfileScreen extends LanPlusScreen {
     private float modelPitch;
     private boolean draggingModel;
     private int cmBoxX, cmBoxY, cmBoxW, cmBoxH;
-    private PlayerModel<LivingEntity> wideModel;
-    private PlayerModel<LivingEntity> slimModel;
     private EditBox bioBox;
     private Button pronounButton;
     private Button invisibleButton;
@@ -933,12 +919,9 @@ public final class ProfileScreen extends LanPlusScreen {
         int x = colLX;
         int top = aLinksRowsY + linkPickerOpen * 24 + 21;
         int h = opts.size() * itemH;
-        int bg = 0xFF000000 | (PANEL_BG & 0xFFFFFF);
         g.pose().pushPose();
         g.pose().translate(0, 0, 300);
-        g.fill(x, top, x + w, top + h, bg);
-        LanPlusUI.border(g, x, top, x + w, top + h);
-        g.fill(x, top, x + w, top + 1, ACCENT_LINE);
+        LanPlusUI.panel(g, x, top, x + w, top + h);
         for (int i = 0; i < opts.size(); i++) {
             int p = opts.get(i);
             int iy = top + i * itemH;
@@ -991,7 +974,7 @@ public final class ProfileScreen extends LanPlusScreen {
     }
 
     private static int alpha(int opacity0to100) {
-        return (Math.max(0, Math.min(255, opacity0to100 * 255 / 100))) << 24;
+        return (Math.clamp(opacity0to100 * 255L / 100, 0, 255)) << 24;
     }
 
     private void renderEditDecor(GuiGraphics g, int mouseX, int mouseY) {
@@ -1002,8 +985,8 @@ public final class ProfileScreen extends LanPlusScreen {
         int cbot = editBodyBottom + 6;
         renderEditTabs(g, mouseX, mouseY);
         g.fill(cl, ctop, cr, cbot, PANEL_BG);
-        LanPlusUI.bevelR(g, cl, ctop, cr, cbot);
-        g.fill(cl, ctop, cr, ctop + 1, LanPlusUI.ACCENT_LINE);
+        LanPlusUI.outline1(g, cl, ctop, cr, cbot, LanPlusUI.EDGE_DARK);
+        LanPlusUI.outline1(g, cl + 1, ctop + 1, cr - 1, cbot - 1, LanPlusUI.shade(LanPlusUI.SURFACE, 1.6f));
 
         switch (editTab) {
             case 0 -> {
@@ -1263,7 +1246,7 @@ public final class ProfileScreen extends LanPlusScreen {
     }
 
     private int bannerHeight() {
-        return Math.max(44, Math.min(64, layoutWidth() / 8));
+        return Math.clamp(layoutWidth() / 8, 44, 64);
     }
 
     private int contentTop() {
@@ -1284,7 +1267,7 @@ public final class ProfileScreen extends LanPlusScreen {
             ProfileImages.blitCover(g, tex, left, top, right - left, bottom - top);
         }
         g.fillGradient(left, bottom - 26, right, bottom, 0x00000000, 0xA0000000);
-        LanPlusUI.bevelI(g, left, top, right, bottom);
+        LanPlusUI.outline1(g, left, top, right, bottom, BORDER);
     }
 
     private void renderBannerIdentity(GuiGraphics g) {
@@ -1297,8 +1280,7 @@ public final class ProfileScreen extends LanPlusScreen {
         int av = 36;
         int ax = left + 10;
         int ay = bottom - av + 10;
-        g.fill(ax - 2, ay - 2, ax + av + 2, ay + av + 2, SLOT);
-        LanPlusUI.bevelI(g, ax - 2, ay - 2, ax + av + 2, ay + av + 2);
+        LanPlusUI.slot(g, ax - 2, ay - 2, ax + av + 2, ay + av + 2);
         drawAvatar(g, uuid, ax, ay, av);
         int hx = ax + av + 8;
         String name = profile.username() == null ? "?" : profile.username();
@@ -1336,7 +1318,7 @@ public final class ProfileScreen extends LanPlusScreen {
             int barW = r - l;
             int prev = tier <= 0 ? 0 : (int) TIER_THRESHOLDS[Math.min(tier, TIER_THRESHOLDS.length) - 1];
             int next = tier >= TIER_THRESHOLDS.length ? xp : (int) TIER_THRESHOLDS[tier];
-            float frac = next <= prev ? 1f : Math.max(0f, Math.min(1f, (xp - prev) / (float) (next - prev)));
+            float frac = next <= prev ? 1f : Math.clamp((xp - prev) / (float) (next - prev), 0f, 1f);
             g.fill(l, y, l + barW, y + 4, SLOT);
             g.fill(l, y, l + (int) (barW * frac), y + 4, ACCENT);
             y += 7;
@@ -1421,8 +1403,7 @@ public final class ProfileScreen extends LanPlusScreen {
     }
 
     private void drawModpackIcon(GuiGraphics g, int x, int y, int size, ModpackRef ref) {
-        g.fill(x, y, x + size, y + size, SLOT);
-        LanPlusUI.bevelI(g, x, y, x + size, y + size);
+        LanPlusUI.slot(g, x, y, x + size, y + size);
         int strip = Math.max(2, size / 9);
         g.fill(x, y, x + size, y + strip, ACCENT);
         String name = ref.name() == null ? "" : ref.name().trim();
@@ -1515,8 +1496,8 @@ public final class ProfileScreen extends LanPlusScreen {
         int bottom = this.height - 34;
         int divX = left + SIDEBAR_W;
         g.fill(divX, top + 1, divX + 1, bottom, LanPlusUI.DIVIDER);
-        LanPlusUI.bevelR(g, left, top, right, bottom);
-        g.fill(left, top, right, top + 1, LanPlusUI.ACCENT_LINE);
+        LanPlusUI.outline1(g, left, top, right, bottom, LanPlusUI.EDGE_DARK);
+        LanPlusUI.outline1(g, left + 1, top + 1, right - 1, bottom - 1, LanPlusUI.shade(LanPlusUI.SURFACE, 1.6f));
     }
 
     private void renderPanel(GuiGraphics g, int mouseX, int mouseY) {
@@ -1575,10 +1556,7 @@ public final class ProfileScreen extends LanPlusScreen {
     }
 
     private int sectionHeader(GuiGraphics g, int x, int y, int right, Component label) {
-        int lw = this.font.width(label);
-        g.drawString(this.font, label, x, y, HEADER_COLOR);
-        g.fill(x, y + 11, x + lw, y + 12, ACCENT_LINE);
-        g.fill(x + lw, y + 11, right, y + 12, DIVIDER);
+        LanPlusUI.sectionHeader(g, this.font, label, x, y, right);
         return y + 17;
     }
 
@@ -1593,10 +1571,9 @@ public final class ProfileScreen extends LanPlusScreen {
         cmBoxH = renderH;
 
         g.fill(x, y, x + renderW, y + renderH, SLOT);
-        LanPlusUI.bevelI(g, x, y, x + renderW, y + renderH);
-        g.fill(x, y, x + renderW, y + 2, ACCENT);
+        LanPlusUI.outline1(g, x, y, x + renderW, y + renderH, BORDER);
         g.flush();
-        g.enableScissor(x + 1, y + 2, x + renderW - 1, y + renderH - 1);
+        g.enableScissor(x + 1, y + 1, x + renderW - 1, y + renderH - 1);
         drawPlayerModel(g, x + renderW / 2, y + renderH - 26);
         g.disableScissor();
         g.drawString(this.font, Component.translatable("gui.lanplus.profile.cosmetics.rotate"),
@@ -1608,9 +1585,7 @@ public final class ProfileScreen extends LanPlusScreen {
         Component soon = Component.translatable("gui.lanplus.profile.cosmetics.soon");
         for (int i = 0; i < COSMETIC_SLOTS.length; i++) {
             int sy = y + i * (slotH + slotGap);
-            g.fill(sx, sy, sx + sw, sy + slotH, SURFACE_RAISED);
-            drawBorder(g, sx, sy, sx + sw, sy + slotH, BORDER);
-            g.fill(sx, sy, sx + 2, sy + slotH, ACCENT);
+            LanPlusUI.button3d(g, sx, sy, sx + sw, sy + slotH, SURFACE_RAISED);
             g.drawString(this.font, Component.translatable("gui.lanplus.profile.cosmetics." + COSMETIC_SLOTS[i]),
                     sx + 7, sy + 5, 0xFFD3D6DC);
             Component sub = soon;
@@ -1630,60 +1605,16 @@ public final class ProfileScreen extends LanPlusScreen {
         return y + Math.max(renderH, slotsH);
     }
 
-    private PlayerModel<LivingEntity> playerModel(boolean slim) {
-        var models = Minecraft.getInstance().getEntityModels();
-        if (slim) {
-            if (slimModel == null) {
-                slimModel = new PlayerModel<>(models.bakeLayer(ModelLayers.PLAYER_SLIM), true);
-            }
-            return slimModel;
-        }
-        if (wideModel == null) {
-            wideModel = new PlayerModel<>(models.bakeLayer(ModelLayers.PLAYER), false);
-        }
-        return wideModel;
-    }
-
     private void drawPlayerModel(GuiGraphics g, int cx, int feetY) {
         SkinTextures st = LanPlusClient.skinTextures();
         SkinTextures.Resolved res = st == null ? null : st.get(uuid);
         ResourceLocation skin = res != null ? res.texture() : resolveFallbackSkin();
         boolean slim = res != null && res.slim();
-        PlayerModel<LivingEntity> model = playerModel(slim);
-        model.setAllVisible(true);
-        model.young = false;
-        model.crouching = false;
-        model.attackTime = 0f;
-        model.riding = false;
-
-        g.flush();
-
-        PoseStack ps = g.pose();
-        ps.pushPose();
-        ps.translate(cx, feetY, 50.0);
-        ps.mulPose(new Matrix4f().scaling((float) 52, (float) 52, (float) -52));
-        ps.mulPose(Axis.ZP.rotationDegrees(180f));
-        ps.mulPose(Axis.XP.rotationDegrees(modelPitch));
-        ps.mulPose(Axis.YP.rotationDegrees(-modelYaw));
-        Lighting.setupForEntityInInventory();
-        ps.scale(-1f, -1f, 1f);
-        ps.scale(0.9375f, 0.9375f, 0.9375f);
-        ps.translate(0f, -1.501f, 0f);
-        MultiBufferSource.BufferSource buffers = g.bufferSource();
-
-        RenderSystem.enableDepthTest();
-        VertexConsumer vc = buffers.getBuffer(RenderType.entityCutoutNoCull(skin));
-        model.renderToBuffer(ps, vc, 0xF000F0, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
-        buffers.endBatch();
-        Lighting.setupFor3DItems();
-        ps.popPose();
+        PlayerPreview.render(g, cx, feetY, 52f, modelYaw, modelPitch, skin, slim, uuid);
     }
 
     private void drawBorder(GuiGraphics g, int x1, int y1, int x2, int y2, int color) {
-        g.fill(x1, y1, x2, y1 + 1, color);
-        g.fill(x1, y2 - 1, x2, y2, color);
-        g.fill(x1, y1, x1 + 1, y2, color);
-        g.fill(x2 - 1, y1, x2, y2, color);
+        LanPlusUI.outline1(g, x1, y1, x2, y2, color);
     }
 
     @Override
@@ -1731,7 +1662,7 @@ public final class ProfileScreen extends LanPlusScreen {
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (draggingModel && button == 0) {
             modelYaw -= (float) dragX;
-            modelPitch = Math.max(-35f, Math.min(35f, modelPitch - (float) dragY));
+            modelPitch = Math.clamp(modelPitch - (float) dragY, -35f, 35f);
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
@@ -1866,7 +1797,7 @@ public final class ProfileScreen extends LanPlusScreen {
             default -> BG_DARK;
         };
         bgColor = bg.color() & 0xFFFFFF;
-        bgOpacity = Math.max(0, Math.min(100, bg.opacity()));
+        bgOpacity = Math.clamp(bg.opacity(), 0, 100);
         bgImage = bg.image();
         bgImageId = bg.image() == null ? null : bg.image().id();
     }

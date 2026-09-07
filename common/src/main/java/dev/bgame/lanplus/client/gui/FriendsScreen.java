@@ -138,7 +138,7 @@ public final class FriendsScreen extends LanPlusScreen {
         contentRight = leftX + contentW;
         rightX = leftX + LEFT_W + GAP;
         rightW = contentRight - rightX;
-        int paneH = Math.min(PANE_H, Math.max(120, this.height - 2 * MARGIN - HEADER_H - FOOTER_H));
+        int paneH = Math.clamp(this.height - 2 * MARGIN - HEADER_H - FOOTER_H, 120, PANE_H);
         int blockH = HEADER_H + paneH + FOOTER_H;
         headerTop = Math.max(MARGIN, (this.height - blockH) / 2);
         tabsTop = headerTop + 14;
@@ -469,7 +469,7 @@ public final class FriendsScreen extends LanPlusScreen {
 
     private void renderDetail(GuiGraphics g, int x, int w) {
         if (tab == Tab.ADD) {
-            LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.add.title"), x + 6, paneTop + 6, w - 12);
+            LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.add.title"), x + 6, paneTop + 6, x + w - 6);
             g.drawString(this.font, Component.translatable("gui.lanplus.add.note"), x + 6, paneTop + 48, LanPlusUI.FAINT, false);
             UserProfile self = localProfile();
             Component code = self != null && self.friendCode() != null
@@ -521,7 +521,7 @@ public final class FriendsScreen extends LanPlusScreen {
         }
         int headerY = paneBottom - 70;
         g.fill(x + 8, headerY - 8, x + w - 8, headerY - 7, LanPlusUI.DIVIDER);
-        LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.join.title"), x + 6, headerY, w - 12);
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.join.title"), x + 6, headerY, x + w - 6);
         g.drawString(this.font, Component.translatable("gui.lanplus.join.note"), x + 6, headerY + 16, LanPlusUI.FAINT, false);
     }
 
@@ -552,7 +552,7 @@ public final class FriendsScreen extends LanPlusScreen {
     }
 
     private void renderDetails(GuiGraphics g, int x, int w) {
-        LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.details.title"), x + 6, paneTop + 6, w - 12);
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.details.title"), x + 6, paneTop + 6, x + w - 6);
         HostInfo info = hostInfo();
         if (info == null) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.details.nothosting"),
@@ -573,9 +573,9 @@ public final class FriendsScreen extends LanPlusScreen {
         HostInfo self = hostInfo();
         Friend hosting = hubFriendHosting();
         if (self != null) {
-            LanPlusUI.header(g, this.font,
+            LanPlusUI.sectionHeader(g, this.font,
                     Component.translatable("gui.lanplus.hub.youhosting", safe(self.world())),
-                    x + 8, paneTop + 8, w - 16);
+                    x + 8, paneTop + 8, x + w - 8);
             g.drawString(this.font, Component.translatable("gui.lanplus.hub.youhosting.hint"),
                     x + 8, paneTop + 26, LanPlusUI.FAINT, false);
             g.drawString(this.font, Component.translatable("gui.lanplus.details.code"),
@@ -598,7 +598,7 @@ public final class FriendsScreen extends LanPlusScreen {
     }
 
     private void renderFeed(GuiGraphics g, int x, int w, int y) {
-        LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.hub.recent"), x + 8, y, w - 16);
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.hub.recent"), x + 8, y, x + w - 8);
         y += 16;
         List<ActivityEntry> feed = activity();
         if (feed.isEmpty()) {
@@ -901,8 +901,7 @@ public final class FriendsScreen extends LanPlusScreen {
         int h = menuHeight();
         g.pose().pushPose();
         g.pose().translate(0, 0, 400);
-        g.fill(x, y, x + w, y + h, LanPlusUI.SURFACE_RAISED);
-        LanPlusUI.border(g, x, y, x + w, y + h);
+        LanPlusUI.button3d(g, x, y, x + w, y + h, LanPlusUI.SURFACE_RAISED);
         int ey = y + 2;
         for (ContextEntry e : contextEntries) {
             boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= ey && mouseY < ey + MENU_ROW_H;

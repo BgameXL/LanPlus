@@ -5,8 +5,8 @@ import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.LanPlusKeybinds;
 import dev.bgame.lanplus.client.PauseMenuButtons;
-import dev.bgame.lanplus.client.TitleScreenButtons;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
+import dev.bgame.lanplus.client.gui.TitleScreenPanel;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -34,16 +34,18 @@ public class LanplusFabricClient implements ClientModInitializer {
         });
 
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
-            TitleScreenButtons.tryAddButtons(screen);
             PauseMenuButtons.tryAddHostButton(screen);
         });
 
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             ScreenEvents.afterRender(screen).register((screenInstance, graphics, mouseX, mouseY, tickDelta) -> {
+                TitleScreenPanel.onScreenRender(graphics, mouseX, mouseY);
                 LanPlusNotifications.onScreenRender(graphics, mouseX, mouseY);
             });
             ScreenMouseEvents.allowMouseClick(screen).register((screenInstance, mouseX, mouseY, button) -> {
-                return !LanPlusNotifications.onMouseClick(mouseX, mouseY, button);
+                boolean consumed = TitleScreenPanel.onMouseClick(mouseX, mouseY, button)
+                        || LanPlusNotifications.onMouseClick(mouseX, mouseY, button);
+                return !consumed;
             });
         });
 

@@ -8,5 +8,5 @@ record Theme(String id, Component name,
              int accent, int accentStrong, int accentHover, int accentTint, int accentLine, int link,
              int online, int amber, int red,
              int text, int muted, int faint,
-             int border, int divider, int backdrop) {
+             int border, int divider) {
 }

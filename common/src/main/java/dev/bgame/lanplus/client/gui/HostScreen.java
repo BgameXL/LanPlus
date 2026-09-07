@@ -27,13 +27,15 @@ import java.util.function.Function;
 
 public final class HostScreen extends LanPlusScreen {
 
-    private static final int CARD_W = 320;
+    private static final int CARD_W = 336;
     private static final int ROW_H = 24;
     private static final int PAD = 10;
     private static final int ICON = ROW_H - 4;
     private static final int ITEM_H = 18;
     private static final int DROPDOWN_H = 20;
     private static final int ROW_GAP = 26;
+    private static final int HEADER_H = 24;
+    private static final int SECTION_H = 16;
     private static final int LABEL_PAD = 12;
     private static final int CTRL_W = 110;
     private static final GameType[] GAME_TYPES = GameType.values();
@@ -53,7 +55,8 @@ public final class HostScreen extends LanPlusScreen {
     private boolean gameTypeOpen;
     private boolean difficultyOpen;
     private int cardX, cardY, cardW, cardH;
-    private int listTop, listBottom;
+    private int worldHeaderY, listTop, listBottom;
+    private int settingsHeaderY;
     private int gameRowY, cmdRowY, diffRowY;
     private int accessLabelY, accessRowY, premiumRowY;
     private int ctrlX, ctrlW;
@@ -73,17 +76,21 @@ public final class HostScreen extends LanPlusScreen {
 
     private void layout() {
         cardW = Math.min(this.width - 40, CARD_W);
-        int y = PAD + 24;
+        int y = PAD + HEADER_H;
 
         if (!inWorld) {
-            int fitRows = (this.height - 260) / ROW_H;
+            worldHeaderY = y;
+            y += SECTION_H;
+            int fitRows = (this.height - 286) / ROW_H;
             int listRows = Math.max(2, Math.min(visibleRowsWanted(), fitRows));
             int listH = listRows * ROW_H + 4;
             listTop = y;
             listBottom = listTop + listH;
-            y = listBottom + 8;
+            y = listBottom + 10;
         }
 
+        settingsHeaderY = y;
+        y += SECTION_H;
         gameRowY = y;
         y += ROW_GAP;
         cmdRowY = y;
@@ -106,6 +113,8 @@ public final class HostScreen extends LanPlusScreen {
 
         listTop += cardY;
         listBottom += cardY;
+        worldHeaderY += cardY;
+        settingsHeaderY += cardY;
         gameRowY += cardY;
         cmdRowY += cardY;
         diffRowY += cardY;
@@ -165,32 +174,51 @@ public final class HostScreen extends LanPlusScreen {
         layoutButtons();
 
         LanPlusUI.panel(g, cardX, cardY, cardX + cardW, cardY + cardH);
-        LanPlusUI.header(g, this.font, this.title, cardX + PAD, cardY + PAD, cardW - 2 * PAD);
+        LanPlusUI.rivets(g, cardX, cardY, cardX + cardW, cardY + cardH, LanPlusUI.FAINT);
+        renderHeader(g);
 
         boolean anyOpen = gameTypeOpen || difficultyOpen;
         int bmx = anyOpen ? -1 : mouseX;
         int bmy = anyOpen ? -1 : mouseY;
 
         if (!inWorld) {
-            g.fill(cardX + PAD, listTop, cardX + cardW - PAD, listBottom, LanPlusUI.SURFACE_RAISED);
-            LanPlusUI.border(g, cardX + PAD, listTop, cardX + cardW - PAD, listBottom);
+            renderSectionHeader(g, Component.translatable("selectWorld.title"), worldHeaderY);
+            LanPlusUI.slot(g, cardX + PAD, listTop, cardX + cardW - PAD, listBottom);
             if (loading) {
                 g.drawCenteredString(this.font, Component.translatable("gui.lanplus.host.loading"),
-                        cardX + cardW / 2, listTop + 47, LanPlusUI.FAINT);
+                        cardX + cardW / 2, emptyListTextY(), LanPlusUI.FAINT);
             } else if (worlds.isEmpty()) {
                 g.drawCenteredString(this.font, Component.translatable("gui.lanplus.host.noworlds"),
-                        cardX + cardW / 2, listTop + 47, LanPlusUI.FAINT);
+                        cardX + cardW / 2, emptyListTextY(), LanPlusUI.FAINT);
             } else {
                 renderWorldList(g, bmx, bmy);
             }
         }
 
+        renderSectionHeader(g, this.title, settingsHeaderY);
         renderWorldSettings(g, bmx, bmy);
         renderAccess(g, bmx, bmy);
 
         super.render(g, bmx, bmy, partialTick);
 
         renderOpenDropdowns(g, mouseX, mouseY);
+    }
+
+    private int emptyListTextY() {
+        return listTop + (listBottom - listTop - this.font.lineHeight) / 2;
+    }
+
+    private void renderHeader(GuiGraphics g) {
+        int x = cardX + PAD;
+        int y = cardY + PAD;
+        int wordmarkRight = LanPlusUI.wordmark(g, this.font, x, y);
+        g.drawString(this.font, Component.translatable("gui.lanplus.host.word"),
+                wordmarkRight + 6, y, LanPlusUI.MUTED, false);
+        g.fill(x, y + 13, cardX + cardW - PAD, y + 14, LanPlusUI.BORDER);
+    }
+
+    private void renderSectionHeader(GuiGraphics g, Component label, int y) {
+        LanPlusUI.sectionHeader(g, this.font, label, cardX + PAD, y, cardX + cardW - PAD);
     }
 
     private void renderOpenDropdowns(GuiGraphics g, int mouseX, int mouseY) {
@@ -205,30 +233,38 @@ public final class HostScreen extends LanPlusScreen {
     }
 
     private void renderWorldSettings(GuiGraphics g, int mouseX, int mouseY) {
+        renderSettingRow(g, gameRowY);
         g.drawString(this.font, Component.translatable("gui.lanplus.host.gamemode"),
-                cardX + PAD, gameRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
+                cardX + PAD + 6, gameRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
         renderDropdownButton(g, ctrlX, gameRowY, gameTypeLabel(gameType), gameTypeOpen, mouseX, mouseY);
 
+        renderSettingRow(g, cmdRowY);
         g.drawString(this.font, Component.translatable("gui.lanplus.host.commands"),
-                cardX + PAD, cmdRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
+                cardX + PAD + 6, cmdRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
         Component commands = Component.translatable(
                 allowCheats ? "gui.lanplus.host.commands.on" : "gui.lanplus.host.commands.off");
         LanPlusUI.chip(g, this.font, commands, ctrlX, cmdRowY, ctrlW, DROPDOWN_H,
                 allowCheats, true, in(mouseX, mouseY, ctrlX, cmdRowY, ctrlW, DROPDOWN_H));
 
+        renderSettingRow(g, diffRowY);
         g.drawString(this.font, Component.translatable("gui.lanplus.host.difficulty"),
-                cardX + PAD, diffRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
+                cardX + PAD + 6, diffRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
         renderDropdownButton(g, ctrlX, diffRowY, difficultyLabel(difficulty), difficultyOpen, mouseX, mouseY);
+    }
+
+    private void renderSettingRow(GuiGraphics g, int y) {
+        int x = cardX + PAD;
+        int right = cardX + cardW - PAD;
+        LanPlusUI.button3d(g, x, y, right, y + DROPDOWN_H, LanPlusUI.SURFACE_RAISED);
     }
 
     private void renderDropdownButton(GuiGraphics g, int x, int y, Component label,
                                       boolean open, int mouseX, int mouseY) {
         boolean hover = in(mouseX, mouseY, x, y, ctrlW, DROPDOWN_H);
         int bg = open ? LanPlusUI.ACCENT : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
-        g.fill(x, y, x + ctrlW, y + DROPDOWN_H, bg);
-        LanPlusUI.border(g, x, y, x + ctrlW, y + DROPDOWN_H);
+        LanPlusUI.button3d(g, x, y, x + ctrlW, y + DROPDOWN_H, bg);
         g.drawString(this.font, label, x + 6, y + (DROPDOWN_H - 8) / 2, LanPlusUI.TEXT, false);
-        Component caret = Component.literal(open ? "\u25B2" : "\u25BC");
+        Component caret = Component.literal(open ? "▲" : "▼");
         g.drawString(this.font, caret, x + ctrlW - 14, y + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
     }
 
@@ -238,8 +274,7 @@ public final class HostScreen extends LanPlusScreen {
         int menuH = count * ITEM_H + 4;
         g.pose().pushPose();
         g.pose().translate(0, 0, 300);
-        g.fill(x, menuTop, x + w, menuTop + menuH, LanPlusUI.SURFACE_RAISED);
-        LanPlusUI.border(g, x, menuTop, x + w, menuTop + menuH);
+        LanPlusUI.panel(g, x, menuTop, x + w, menuTop + menuH);
         for (int i = 0; i < count; i++) {
             int iy = menuTop + 2 + i * ITEM_H;
             boolean hover = in(mouseX, mouseY, x, iy, w, ITEM_H);
@@ -248,15 +283,17 @@ public final class HostScreen extends LanPlusScreen {
                 bg = LanPlusUI.ACCENT_TINT;
             }
             g.fill(x + 1, iy, x + w - 1, iy + ITEM_H, bg);
-            g.drawString(this.font, labelFn.apply(i), x + 6, iy + (ITEM_H - 8) / 2,
+            if (i == selectedIdx) {
+                g.fill(x + 2, iy + 2, x + 4, iy + ITEM_H - 2, LanPlusUI.LIME);
+            }
+            g.drawString(this.font, labelFn.apply(i), x + 7, iy + (ITEM_H - 8) / 2,
                     i == selectedIdx ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
         }
         g.pose().popPose();
     }
 
     private void renderAccess(GuiGraphics g, int mouseX, int mouseY) {
-        g.drawString(this.font, Component.translatable("gui.lanplus.host.access"),
-                cardX + PAD, accessLabelY, LanPlusUI.MUTED, false);
+        renderSectionHeader(g, Component.translatable("gui.lanplus.host.access"), accessLabelY);
         int chipW = (cardW - 2 * PAD - 2 * 6) / 3;
         renderModeChip(g, mouseX, mouseY, HostAccessMode.EVERYONE, "gui.lanplus.host.access.everyone",
                 cardX + PAD, chipW);
@@ -329,12 +366,16 @@ public final class HostScreen extends LanPlusScreen {
                 boolean hover = in(mouseX, mouseY, x0, Math.max(y, listTop), x1 - x0,
                         Math.min(y + ROW_H, listBottom) - Math.max(y, listTop));
                 if (sel || hover) {
-                    g.fill(x0 + 1, Math.max(y, listTop), x1 - 1, Math.min(y + ROW_H, listBottom),
-                            sel ? LanPlusUI.ACCENT_TINT : LanPlusUI.DIVIDER);
+                    int rowTop = Math.max(y, listTop + 1);
+                    int rowBottom = Math.min(y + ROW_H, listBottom - 1);
+                    g.fill(x0 + 2, rowTop, x1 - 2, rowBottom,
+                            sel ? LanPlusUI.ACCENT_TINT : LanPlusUI.SURFACE_HOVER);
                 }
                 if (sel) {
-                    g.fill(x0 + 1, Math.max(y, listTop), x0 + 3, Math.min(y + ROW_H, listBottom),
-                            LanPlusUI.ACCENT);
+                    int rowTop = Math.max(y, listTop + 1);
+                    int rowBottom = Math.min(y + ROW_H, listBottom - 1);
+                    LanPlusUI.outline1(g, x0 + 2, rowTop, x1 - 2, rowBottom, LanPlusUI.ACCENT);
+                    g.fill(x0 + 3, rowTop + 1, x0 + 5, rowBottom - 1, LanPlusUI.LIME);
                 }
                 LevelSummary s = worlds.get(i);
                 FaviconTexture icon = icons.get(s.getLevelId());

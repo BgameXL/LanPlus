@@ -65,7 +65,7 @@ public final class InviteOverlay extends LanPlusScreen {
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         drawBackdrop(g);
         LanPlusUI.panel(g, panelX, panelY, panelX + PANEL_W, panelY + PANEL_H);
-        LanPlusUI.header(g, this.font, this.title, panelX + 8, panelY + 8, PANEL_W - 32);
+        LanPlusUI.sectionHeader(g, this.font, this.title, panelX + 8, panelY + 8, panelX + PANEL_W - 24);
 
         List<Friend> friends = friends();
         int listTop = panelY + 28;
@@ -87,7 +87,7 @@ public final class InviteOverlay extends LanPlusScreen {
                 int bx = panelX + 10;
                 int by = y + 5;
                 g.fill(bx, by, bx + 9, by + 9, on ? LanPlusUI.ACCENT : LanPlusUI.SURFACE_RAISED);
-                LanPlusUI.border(g, bx, by, bx + 9, by + 9);
+                LanPlusUI.outline1(g, bx, by, bx + 9, by + 9, LanPlusUI.EDGE_DARK);
                 g.drawString(this.font, f.username(), panelX + 26, y + 5,
                         on ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
                 y += ROW_H;
