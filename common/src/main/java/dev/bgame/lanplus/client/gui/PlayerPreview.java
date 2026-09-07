@@ -60,7 +60,7 @@ final class PlayerPreview {
 
         PoseStack ps = g.pose();
         ps.pushPose();
-        ps.translate(cx, feetY, 50.0);
+        ps.translate(cx, feetY, 200.0);
         ps.mulPose(new Matrix4f().scaling(scale, scale, -scale));
         ps.mulPose(Axis.ZP.rotationDegrees(180f));
         ps.mulPose(Axis.XP.rotationDegrees(pitch));
@@ -107,9 +107,9 @@ final class PlayerPreview {
     private static void anchor(PlayerModel<LivingEntity> model, CosmeticSlot slot, PoseStack ps) {
         ModelPart part = switch (slot) {
             case HEAD, FACE -> model.head;
-            case HELD -> model.rightArm;
-            case LEFT_HAND -> model.leftArm;
-            case BACK, BODY, WAIST -> model.body;
+            case MAIN_HAND -> model.rightArm;
+            case OFF_HAND -> model.leftArm;
+            case BODY, BACK, WAIST, LEGS -> model.body;
         };
         part.translateAndRotate(ps);
         ps.scale(-1f, -1f, 1f);

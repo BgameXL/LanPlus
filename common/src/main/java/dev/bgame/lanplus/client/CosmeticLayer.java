@@ -51,9 +51,9 @@ public final class CosmeticLayer extends RenderLayer<AbstractClientPlayer, Playe
         PlayerModel<AbstractClientPlayer> model = getParentModel();
         ModelPart part = switch (slot) {
             case HEAD, FACE -> model.head;
-            case HELD -> model.rightArm;
-            case LEFT_HAND -> model.leftArm;
-            case BACK, BODY, WAIST -> model.body;
+            case MAIN_HAND -> model.rightArm;
+            case OFF_HAND -> model.leftArm;
+            case BODY, BACK, WAIST, LEGS -> model.body;
         };
         part.translateAndRotate(poseStack);
         poseStack.scale(-1f, -1f, 1f);

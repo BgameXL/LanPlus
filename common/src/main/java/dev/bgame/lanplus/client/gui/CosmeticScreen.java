@@ -24,10 +24,14 @@ public final class CosmeticScreen extends LanPlusScreen {
 
     private static final int PAD = 12;
     private static final int SLOT = 28;
-    private static final int SLOT_GAP = 8;
+    private static final int SLOT_GAP = 6;
     private static final int LIST_W = 168;
     private static final int LIST_ROW = 26;
     private static final int LIST_GAP = 3;
+    private static final int UNEQUIP_H = 20;
+    private static final int CTRL_W = 52;
+    private static final int CTRL_H = 18;
+    private static final int CTRL_GAP = 6;
     private static final CosmeticSlot[] SLOTS = CosmeticSlot.values();
 
     private final Screen parent;
@@ -35,6 +39,7 @@ public final class CosmeticScreen extends LanPlusScreen {
     private CosmeticSlot selected = CosmeticSlot.HEAD;
     private float modelYaw;
     private float modelPitch;
+    private float zoom = 1f;
     private boolean dragging;
     private int catScroll;
     private List<Component> tip;
@@ -70,7 +75,7 @@ public final class CosmeticScreen extends LanPlusScreen {
 
     private void layout() {
         cardW = Math.min(this.width - 60, 540);
-        cardH = Math.min(this.height - 60, 340);
+        cardH = Math.min(this.height - 60, 360);
         cardX = (this.width - cardW) / 2;
         cardY = Math.max(20, (this.height - cardH) / 2);
         contentTop = cardY + 30;
@@ -114,21 +119,40 @@ public final class CosmeticScreen extends LanPlusScreen {
 
     private void renderPreview(GuiGraphics g, int mouseX, int mouseY) {
         int cx = previewCx;
-        int feetY = bandBottom - 16;
+        int controlsY = bandBottom - CTRL_H;
+        int clipL = leftColX + SLOT + 6;
+        int clipR = listX - 6;
+        int clipTop = cardY + 24;
+        int clipBottom = controlsY - 2;
         SkinTextures st = LanPlusClient.skinTextures();
         SkinTextures.Resolved res = st == null || uuid == null ? null : st.get(uuid);
         ResourceLocation skin = res != null ? res.texture()
                 : DefaultPlayerSkin.get(uuid == null ? UUID.randomUUID() : uuid).texture();
         boolean slim = res != null && res.slim();
 
-        int clipL = leftColX + SLOT + 6;
-        int clipR = listX - 6;
-        float scale = Math.min(100f, (bandBottom - bandTop) * 0.42f);
-        g.enableScissor(clipL, bandTop, clipR, bandBottom);
+        float base = Math.min(85f, (clipBottom - clipTop) * 0.30f);
+        float scale = base * zoom;
+        int bodyCenterY = (clipBottom - 12) - Math.round(base * 0.92f);
+        int feetY = bodyCenterY + Math.round(scale * 0.92f);
+        g.enableScissor(clipL, clipTop, clipR, clipBottom);
         g.fill(cx - 30, feetY - 1, cx + 30, feetY, 0x44000000);
         g.fill(cx - 22, feetY - 2, cx + 22, feetY - 1, 0x33000000);
         PlayerPreview.render(g, cx, feetY, scale, modelYaw, modelPitch, skin, slim, uuid);
         g.disableScissor();
+
+        int total = CTRL_W * 2 + CTRL_GAP;
+        int bx = cx - total / 2;
+        drawControl(g, mouseX, mouseY, bx, controlsY, Component.translatable("gui.lanplus.cosmetics.rotate"), this::rotate);
+        drawControl(g, mouseX, mouseY, bx + CTRL_W + CTRL_GAP, controlsY,
+                Component.translatable("gui.lanplus.cosmetics.reset"), this::resetView);
+    }
+
+    private void drawControl(GuiGraphics g, int mouseX, int mouseY, int x, int y, Component label, Runnable action) {
+        boolean hover = inside(mouseX, mouseY, x, y, CTRL_W, CTRL_H);
+        LanPlusUI.button3d(g, x, y, x + CTRL_W, y + CTRL_H, hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
+        int tx = x + (CTRL_W - this.font.width(label)) / 2;
+        g.drawString(this.font, label, tx, y + (CTRL_H - 8) / 2, hover ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
+        rows.add(new Row(x, y, CTRL_W, CTRL_H, action));
     }
 
     private void renderSlots(GuiGraphics g, int mouseX, int mouseY) {
@@ -169,31 +193,47 @@ public final class CosmeticScreen extends LanPlusScreen {
         Component header = Component.translatable("gui.lanplus.cosmetics.slot", slotName(selected));
         g.drawString(this.font, header, listX, bandTop, LanPlusUI.TEXT, false);
         g.fill(listX, bandTop + 11, listX + listW, bandTop + 12, LanPlusUI.BORDER);
-        int listTop = bandTop + 16;
+
+        String current = LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().equipped(uuid, selected);
+        int unequipY = bandTop + 16;
+        drawUnequip(g, mouseX, mouseY, listX, unequipY, listW, current != null);
+
+        int listTop = unequipY + UNEQUIP_H + 6;
         int listBottom = bandBottom;
 
         List<String> ids = LanPlusClient.cosmetics() == null ? List.of() : LanPlusClient.cosmetics().idsForSlot(selected);
-        String current = LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().equipped(uuid, selected);
-        int count = ids.size() + 1;
-        int totalH = count * (LIST_ROW + LIST_GAP) - LIST_GAP;
+        if (ids.isEmpty()) {
+            g.drawCenteredString(this.font, Component.translatable("gui.lanplus.cosmetics.empty"),
+                    listX + listW / 2, listTop + 8, LanPlusUI.FAINT);
+            return;
+        }
+
+        int totalH = ids.size() * (LIST_ROW + LIST_GAP) - LIST_GAP;
         int viewH = listBottom - listTop;
         catScroll = Math.max(0, Math.min(Math.max(0, totalH - viewH), catScroll));
 
         g.enableScissor(listX, listTop, listX + listW, listBottom);
         int y = listTop - catScroll;
-        for (int i = 0; i < count; i++) {
+        for (String id : ids) {
             if (y + LIST_ROW >= listTop && y <= listBottom) {
                 boolean clickable = y >= listTop && y + LIST_ROW <= listBottom;
-                if (i == 0) {
-                    drawListRow(g, mouseX, mouseY, listX, y, listW, null, current == null, clickable, this::unequipSelected);
-                } else {
-                    String id = ids.get(i - 1);
-                    drawListRow(g, mouseX, mouseY, listX, y, listW, id, id.equals(current), clickable, () -> equipSelected(id));
-                }
+                drawListRow(g, mouseX, mouseY, listX, y, listW, id, id.equals(current), clickable, () -> equipSelected(id));
             }
             y += LIST_ROW + LIST_GAP;
         }
         g.disableScissor();
+    }
+
+    private void drawUnequip(GuiGraphics g, int mouseX, int mouseY, int x, int y, int w, boolean enabled) {
+        boolean hover = enabled && inside(mouseX, mouseY, x, y, w, UNEQUIP_H);
+        int fill = !enabled ? LanPlusUI.SURFACE_DISABLED : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
+        LanPlusUI.button3d(g, x, y, x + w, y + UNEQUIP_H, fill);
+        Component label = Component.translatable("gui.lanplus.cosmetics.unequip");
+        int color = !enabled ? LanPlusUI.FAINT : hover ? LanPlusUI.TEXT : LanPlusUI.MUTED;
+        g.drawString(this.font, label, x + (w - this.font.width(label)) / 2, y + (UNEQUIP_H - 8) / 2, color, false);
+        if (enabled) {
+            rows.add(new Row(x, y, w, UNEQUIP_H, this::unequipSelected));
+        }
     }
 
     private void drawListRow(GuiGraphics g, int mouseX, int mouseY, int x, int y, int w, String id, boolean on,
@@ -202,14 +242,14 @@ public final class CosmeticScreen extends LanPlusScreen {
         int fill = on ? LanPlusUI.ACCENT_TINT : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
         LanPlusUI.button3d(g, x, y, x + w, y + LIST_ROW, fill);
 
-        CosmeticMeta m = id == null || LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().meta(id);
+        CosmeticMeta m = LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().meta(id);
         g.fill(x + 2, y + 2, x + 4, y + LIST_ROW - 2, on ? LanPlusUI.LIME : rarityColor(m == null ? "common" : m.rarity()));
 
         int thumb = LIST_ROW - 6;
         int tx0 = x + 7;
         int ty0 = y + 3;
         int textX = tx0;
-        CosmeticModel model = id == null || LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().model(id);
+        CosmeticModel model = LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().model(id);
         if (model != null) {
             g.enableScissor(tx0, ty0, tx0 + thumb, ty0 + thumb);
             CosmeticGeoRender.renderThumb(g, model, LanPlusClient.cosmetics().bounds(id), tx0 + thumb / 2, ty0 + thumb / 2, thumb, spin());
@@ -217,14 +257,13 @@ public final class CosmeticScreen extends LanPlusScreen {
             textX = tx0 + thumb + 6;
         }
 
-        String name = id == null ? Component.translatable("gui.lanplus.cosmetics.none").getString()
-                : m != null ? m.name() : id;
+        String name = m != null ? m.name() : id;
         g.drawString(this.font, ellipsize(name, x + w - textX - 6), textX, y + (LIST_ROW - 8) / 2,
                 on || hover ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
 
         if (clickable) {
             rows.add(new Row(x, y, w, LIST_ROW, action));
-            if (hover && id != null) {
+            if (hover) {
                 buildTip(id, m, mouseX, mouseY);
             }
         }
@@ -293,6 +332,16 @@ public final class CosmeticScreen extends LanPlusScreen {
         return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
+    private void rotate() {
+        modelYaw += 90f;
+    }
+
+    private void resetView() {
+        modelYaw = 0f;
+        modelPitch = 0f;
+        zoom = 1f;
+    }
+
     private void equipSelected(String id) {
         if (LanPlusClient.cosmetics() != null && uuid != null) {
             LanPlusClient.cosmetics().equip(uuid, selected, id);
@@ -343,6 +392,12 @@ public final class CosmeticScreen extends LanPlusScreen {
     public boolean mouseScrolled(double mouseX, double mouseY, double dx, double dy) {
         if (mouseX >= listX && mouseX <= listX + listW) {
             catScroll = Math.max(0, catScroll - (int) (dy * 20));
+            return true;
+        }
+        int clipL = leftColX + SLOT + 6;
+        int clipR = listX - 6;
+        if (mouseX >= clipL && mouseX <= clipR && mouseY >= bandTop && mouseY <= bandBottom) {
+            zoom = Math.clamp(zoom + (float) dy * 0.15f, 0.5f, 3f);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, dx, dy);

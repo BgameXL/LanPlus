@@ -32,7 +32,7 @@ public final class Announcements extends LanPlusScreen {
     private static final int MAX_W = 580;
     private static final int MAX_H = 380;
     private static final int PAD = 10;
-    private static final int FOOTER_H = 30;
+    private static final int FOOTER_H = 36;
     private static final int SIDEBAR_W = 92;
     private static final int SB_ROW_H = 20;
     private static final int ENTRY_GAP = 10;
@@ -71,7 +71,7 @@ public final class Announcements extends LanPlusScreen {
     protected void init() {
         layout();
         addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
-                .bounds(cardX + cardW - 90 - PAD, cardY + cardH - 22, 90, 20).build());
+                .bounds(cardX + cardW - 90 - PAD, cardY + cardH - 26, 90, 20).build());
         AnnouncementsService svc = LanPlusClient.announcements();
         if (svc != null && newIds.isEmpty()) {
             newIds = new HashSet<>(svc.unseenIds());
@@ -81,7 +81,7 @@ public final class Announcements extends LanPlusScreen {
 
     private void layout() {
         cardW = Math.min(this.width - 2 * MARGIN, MAX_W);
-        cardH = Math.min(this.height - 60, MAX_H);
+        cardH = Math.min(this.height - 70, MAX_H);
         cardX = (this.width - cardW) / 2;
         cardY = Math.max(20, (this.height - cardH) / 2 - 10);
         sidebarX = cardX + PAD;
@@ -129,9 +129,9 @@ public final class Announcements extends LanPlusScreen {
 
         LanPlusUI.panel(g, cardX, cardY, cardX + cardW, cardY + cardH);
         int wx = LanPlusUI.wordmark(g, this.font, cardX + PAD, cardY + PAD);
-        g.drawString(this.font, this.title, wx + 6, cardY + PAD, LanPlusUI.MUTED, false);
+        g.drawString(this.font, this.title, wx + 8, cardY + PAD, LanPlusUI.MUTED, false);
         g.fill(cardX + PAD, cardY + 26, cardX + cardW - PAD, cardY + 27, LanPlusUI.DIVIDER);
-        g.fill(listX - 7, sidebarTop, listX - 6, listBottom, LanPlusUI.DIVIDER);
+        g.fill(listX - 8, sidebarTop, listX - 6, listBottom, LanPlusUI.DIVIDER);
         g.fill(cardX + PAD, cardY + cardH - FOOTER_H + 4, cardX + cardW - PAD, cardY + cardH - FOOTER_H + 5,
                 LanPlusUI.DIVIDER);
 
