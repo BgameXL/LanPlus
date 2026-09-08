@@ -57,6 +57,8 @@ final class PlayerPreview {
         model.body.visible = true;
         model.rightArm.visible = true;
         model.leftArm.visible = true;
+        model.rightSleeve.visible = false;
+        model.leftSleeve.visible = false;
         //
 
         model.young = false;
