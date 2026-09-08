@@ -8,9 +8,6 @@ import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.PlayedTogether;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.ProfileBackground;
-import dev.bgame.lanplus.api.SkinRef;
-import dev.bgame.lanplus.api.SkinType;
-import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
@@ -32,12 +29,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -102,8 +95,10 @@ public final class ProfileScreen extends LanPlusScreen {
     private static final int BG_MINECRAFT = 2;
     private static final int BG_IMAGE = 3;
     private static final int BG_NONE = 4;
-    private static final int[] BG_PALETTE =
-            {0x7B8CFF, 0x1A1C22, 0x262A33, 0x3BA55D, 0xE74C3C, 0x9B59B6, 0xF1A33C, 0x101216};
+    private static final int[] BG_PALETTE = {
+            0x101216, 0x1A1C22, 0x262A33, 0x3A3F4E, 0x5B6472, 0x8B909A,
+            0x7B8CFF, 0x5B8CFF, 0x3BA55D, 0x2FBFA0, 0xE74C3C, 0xF25C7A,
+            0x9B59B6, 0xB36AF0, 0xF1A33C, 0xF0C24A};
     private int bgStyle = BG_DARK;
     private int bgColor = 0x101216;
     private int bgOpacity = 92;
@@ -129,17 +124,13 @@ public final class ProfileScreen extends LanPlusScreen {
     private final List<Hit> hits = new ArrayList<>();
     private float modelYaw;
     private float modelPitch;
+    private float modelZoom = 1f;
     private boolean draggingModel;
     private int cmBoxX, cmBoxY, cmBoxW, cmBoxH;
     private EditBox bioBox;
     private Button pronounButton;
     private Button invisibleButton;
-    private Button bgColorButton;
     private Button bannerButton;
-    private Button skinSlimButton;
-    private Button skinRemoveButton;
-    private Button skinSourceButton;
-    private boolean skinSlimToggle;
     private int pronounIndex;
     private boolean invisibleToggle;
 
@@ -159,6 +150,10 @@ public final class ProfileScreen extends LanPlusScreen {
     private final List<int[]> linkPickerCells = new ArrayList<>();
     private static final int EDIT_SECTION_GAP = 18;
     private static final int EDIT_W = 440;
+    private static final int EDIT_W_WIDE = 660;
+    private static final int APP_FORM_W = 250;
+    private static final int APP_ROW_H = 44;
+    private static final int APP_ROW_GAP = 8;
     private static final int EDIT_TAB_Y = 30;
     private static final int EDIT_FRAME_TOP = 46;
     private static final String[] EDIT_TABS = {"about", "identity", "appearance"};
@@ -168,7 +163,8 @@ public final class ProfileScreen extends LanPlusScreen {
     private int editBodyBottom;
     private int aAboutHdrY, aBioY, aBioToolbarY, aBioPreviewY, aLinksHdrY, aLinksRowsY, aAddLinkY,
             aQHdrY, aQRowsY, aIdentityHdrY, aIdentityY, aMpHdrY, aMpValuesY, aMpRowY,
-            aBgHdrY, aBgRowY, aBannerHdrY, aBannerRowY, aSkinHdrY, aSkinRowY;
+            aBgRowY, aBannerRowY, aSkinRowY;
+    private int pvX, pvY, pvW, pvH;
 
     private static final java.util.regex.Pattern AMP_CODE =
             java.util.regex.Pattern.compile("&([0-9a-fk-orA-FK-OR])");
@@ -240,9 +236,7 @@ public final class ProfileScreen extends LanPlusScreen {
                         + 16 + MAX_SLOTS * 24;
             }
             case 1 -> 16 + 20;
-            default -> 16 + 20 + EDIT_SECTION_GAP
-                    + 16 + 20 + EDIT_SECTION_GAP
-                    + 16 + 12 + (hasCustomSkin() ? 46 : 0);
+            default -> 3 * APP_ROW_H + 2 * APP_ROW_GAP;
         };
     }
 
@@ -263,15 +257,26 @@ public final class ProfileScreen extends LanPlusScreen {
     }
 
     private void layoutEditAnchors() {
-        eW = Math.min(this.width - 2 * MARGIN, EDIT_W);
+        boolean wide = editTab == 2;
+        eW = Math.min(this.width - 2 * MARGIN, wide ? EDIT_W_WIDE : EDIT_W);
         eL = (this.width - eW) / 2;
         eR = eL + eW;
-        colW = eW - 24;
         colLX = eL + 12;
+        colW = wide ? APP_FORM_W : eW - 24;
         colRX = colLX;
         editTop = EDIT_FRAME_TOP + 8;
-        int bodyH = Math.min(maxTabContentHeight() + 16, this.height - EDIT_FRAME_TOP - 44);
+        int target = maxTabContentHeight() + 16;
+        if (wide) {
+            target = Math.max(target, 380);
+        }
+        int bodyH = Math.min(target, this.height - EDIT_FRAME_TOP - 44);
         editBodyBottom = EDIT_FRAME_TOP + bodyH;
+        if (wide) {
+            pvX = colLX + colW + 16;
+            pvY = editTop;
+            pvW = eR - 12 - pvX;
+            pvH = editBodyBottom - editTop;
+        }
         stackTabAnchors(editTab);
     }
 
@@ -305,16 +310,10 @@ public final class ProfileScreen extends LanPlusScreen {
                 aIdentityY = y;
             }
             default -> {
-                aBgHdrY = y;
-                y += 16;
                 aBgRowY = y;
-                y += 20 + EDIT_SECTION_GAP;
-                aBannerHdrY = y;
-                y += 16;
+                y += APP_ROW_H + APP_ROW_GAP;
                 aBannerRowY = y;
-                y += 20 + EDIT_SECTION_GAP;
-                aSkinHdrY = y;
-                y += 16;
+                y += APP_ROW_H + APP_ROW_GAP;
                 aSkinRowY = y;
             }
         }
@@ -404,190 +403,60 @@ public final class ProfileScreen extends LanPlusScreen {
     }
 
     private void buildSkinWidgets() {
-        if (!hasCustomSkin()) {
-            return;
-        }
-        int half = (colW - 6) / 2;
-        int row = aSkinRowY + 14;
-        skinSourceButton = LanplusButton.create(skinSourceLabel(), b -> toggleSkinSource())
-                .bounds(colRX, row, half, 20).build();
-        addRenderableWidget(skinSourceButton);
-
-        skinSlimButton = LanplusButton.create(skinSlimLabel(), b -> toggleSkinSlim())
-                .bounds(colRX + half + 6, row, colW - half - 6, 20).build();
-        addRenderableWidget(skinSlimButton);
-
-        skinRemoveButton = LanplusButton.create(Component.translatable("gui.lanplus.profile.skin.remove"),
-                        b -> removeHostedSkin())
-                .bounds(colRX, row + 24, half, 20).build();
-        addRenderableWidget(skinRemoveButton);
+        int bx = colLX + colW - 72;
+        addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.change"),
+                        b -> this.minecraft.setScreen(new SkinScreen(this)))
+                .bounds(bx, aSkinRowY + 12, 66, 20).primary().build());
     }
 
-    private Component skinSourceLabel() {
-        boolean custom = Config.skinCustomActive && !Config.skinUrl.isBlank();
-        return Component.translatable(custom
-                ? "gui.lanplus.profile.skin.source.custom" : "gui.lanplus.profile.skin.source.mojang");
-    }
-
-    private void toggleSkinSource() {
-        Config.setSkinCustomActive(!Config.skinCustomActive);
-        skinSourceButton.setMessage(skinSourceLabel());
-        applyLocalSkin();
-    }
-
-    private Component skinSlimLabel() {
-        return Component.translatable(skinSlimToggle
+    private Component skinStateSubtitle() {
+        boolean showingCustom = Config.skinCustomActive && hasCustomSkin();
+        Component src = Component.translatable(showingCustom
+                ? "gui.lanplus.profile.skin.source.custom.short" : "gui.lanplus.profile.skin.source.mojang.short");
+        Component arms = Component.translatable(Config.skinSlim
                 ? "gui.lanplus.profile.skin.slim" : "gui.lanplus.profile.skin.classic");
-    }
-
-    private void toggleSkinSlim() {
-        skinSlimToggle = !skinSlimToggle;
-        skinSlimButton.setMessage(skinSlimLabel());
-        if (!Config.skinUrl.isBlank()) {
-            Config.setSkin(Config.skinUrl, skinSlimToggle);
-            applyLocalSkin();
-        }
-    }
-
-    private void removeHostedSkin() {
-        if (LanPlusClient.skins() == null) {
-            return;
-        }
-        setStatus(Component.translatable("gui.lanplus.profile.skin.removing"));
-        LanPlusClient.skins().deleteSkin().whenComplete((deleted, ex) -> {
-            if (ex != null || !Boolean.TRUE.equals(deleted)) {
-                this.minecraft.execute(() ->
-                        setStatus(Component.translatable("gui.lanplus.profile.err.offline")));
-                return;
-            }
-            Config.setSkin("", skinSlimToggle);
-            this.minecraft.execute(() -> {
-                applyLocalSkin();
-                setStatus(Component.translatable("gui.lanplus.profile.skin.removed"));
-                if (editing) {
-                    rebuildWidgets();
-                }
-            });
-        });
-    }
-
-    private void applyLocalSkin() {
-        UUID self = LanPlusClient.selfUuid();
-        if (self == null || LanPlusClient.skins() == null) {
-            return;
-        }
-        boolean custom = Config.skinCustomActive && !Config.skinUrl.isBlank();
-        if (!custom && LanPlusClient.skinTextures() != null) {
-            LanPlusClient.skinTextures().remove(self);
-        }
-        SkinRef ref = custom
-                ? new SkinRef(SkinType.CUSTOM, Config.skinUrl, null, Config.skinSlim ? "slim" : null)
-                : new SkinRef(SkinType.MOJANG, self.toString(), null, null);
-        LanPlusClient.skins().resolve(self, ref);
-    }
-
-    @Override
-    public void onFilesDrop(List<Path> paths) {
-        if (!editing || !own || paths == null || LanPlusClient.skins() == null) {
-            return;
-        }
-        Path png = paths.stream()
-                .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".png"))
-                .findFirst().orElse(null);
-        if (png == null) {
-            setStatus(Component.translatable("gui.lanplus.profile.skin.err.bad_png"));
-            return;
-        }
-        setStatus(Component.translatable("gui.lanplus.profile.skin.uploading"));
-        boolean slim = skinSlimToggle;
-        CompletableFuture
-                .supplyAsync(() -> {
-                    try {
-                        return Files.size(png) > 32 * 1024 ? null : Files.readAllBytes(png);
-                    } catch (IOException e) {
-                        throw new CompletionException(e);
-                    }
-                }, Util.ioPool())
-                .thenCompose(bytes -> bytes == null
-                        ? CompletableFuture.completedFuture(new SkinUploadResult(null, null, "too_large"))
-                        : LanPlusClient.skins().uploadSkin(bytes, slim))
-                .whenComplete((result, ex) -> {
-                    boolean uploaded = ex == null && result != null && result.success();
-                    if (uploaded) {
-                        Config.setSkin(result.url(), slim);
-                    }
-                    this.minecraft.execute(() -> {
-                        if (ex != null) {
-                            setStatus(Component.translatable("gui.lanplus.profile.skin.err.read"));
-                            return;
-                        }
-                        if (!uploaded) {
-                            setStatus(Component.translatable(errorKey(result == null ? null : result.error())));
-                            return;
-                        }
-                        applyLocalSkin();
-                        setStatus(Component.translatable("gui.lanplus.profile.skin.uploaded"));
-                        if (editing) {
-                            rebuildWidgets();
-                        }
-                    });
-                });
+        return Component.translatable("gui.lanplus.profile.skin.state", src, arms);
     }
 
     private void buildBackgroundWidgets() {
-        Button bgStyleButton = LanplusButton.create(Component.translatable("gui.lanplus.profile.bg.color"), b -> picker())
-                .bounds(colLX, aBgRowY, 72, 20).build();
-        addRenderableWidget(bgStyleButton);
-
-        bgColorButton = LanplusButton.create(bgImageLabel(), b -> openBackgroundPicker())
-                .bounds(colLX + 78, aBgRowY, 170, 20).primary().build();
-        addRenderableWidget(bgColorButton);
+        int bx = colLX + colW - 72;
+        addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.change"), b -> openBg())
+                .bounds(bx, aBgRowY + 12, 66, 20).primary().build());
     }
 
-    private void picker() {
-        this.minecraft.setScreen(new BackgroundPicker(this, bgColor, BG_PALETTE, c -> {
-            bgStyle = BG_SOLID;
-            bgColor = c;
-        }));
+    private void openBg() {
+        this.minecraft.setScreen(new BackgroundPicker(this, bgStyle, bgColor, BG_PALETTE, bgImageId, bgCatalog,
+                new BackgroundPicker.Sink() {
+                    @Override
+                    public void solid(int c) {
+                        bgStyle = BG_SOLID;
+                        bgColor = c;
+                    }
+
+                    @Override
+                    public void image(CatalogImage img) {
+                        bgStyle = BG_IMAGE;
+                        selectBgImage(img);
+                    }
+
+                    @Override
+                    public void none() {
+                        bgStyle = BG_NONE;
+                    }
+                }));
     }
 
     private void buildBannerWidgets() {
-        bannerButton = LanplusButton.create(bannerLabel(), b -> openBannerPicker())
-                .bounds(colRX, aBannerRowY, 170, 20).primary().build();
+        int bx = colLX + colW - 72;
+        bannerButton = LanplusButton.create(Component.translatable("gui.lanplus.profile.change"), b -> openBannerPicker())
+                .bounds(bx, aBannerRowY + 12, 66, 20).primary().build();
         bannerButton.active = !bannerCatalog.isEmpty() || banner != null;
         addRenderableWidget(bannerButton);
-    }
-
-    private void openBackgroundPicker() {
-        this.minecraft.setScreen(new ImagePicker(this,
-                Component.translatable("gui.lanplus.profile.bg.pick.title"),
-                bgCatalog, bgStyle == BG_NONE ? null : bgImageId, true, 3, 16f / 9f, img -> {
-            if (img == null) {
-                bgStyle = BG_NONE;
-            } else {
-                bgStyle = BG_IMAGE;
-                selectBgImage(img);
-            }
-        }));
     }
 
     private void selectBgImage(CatalogImage image) {
         bgImage = image;
         bgImageId = image == null ? null : image.id();
-    }
-
-    private Component bgImageLabel() {
-        Component value = bgStyle == BG_NONE || bgImageId == null
-                ? Component.translatable("gui.lanplus.profile.bg.none")
-                : Component.literal(bgImageId);
-        return Component.translatable("gui.lanplus.profile.bg.image.pick", value);
-    }
-
-    private Component bannerLabel() {
-        Component value = banner == null
-                ? Component.translatable("gui.lanplus.profile.banner.none")
-                : Component.literal(banner.id());
-        return Component.translatable("gui.lanplus.profile.banner", value);
     }
 
     private void openBannerPicker() {
@@ -809,7 +678,6 @@ public final class ProfileScreen extends LanPlusScreen {
     private void primeEdit() {
         pronounIndex = 0;
         invisibleToggle = profile.invisible();
-        skinSlimToggle = Config.skinSlim;
         linkPickerOpen = -1;
         linkRows.clear();
         for (int p = 0; p < PLATFORMS.length; p++) {
@@ -997,14 +865,151 @@ public final class ProfileScreen extends LanPlusScreen {
                 editHeader(g, Component.translatable("gui.lanplus.profile.questions"), colLX, colW, aQHdrY);
             }
             case 1 -> editHeader(g, Component.translatable("gui.lanplus.profile.identity"), colLX, colW, aIdentityHdrY);
-            default -> {
-                editHeader(g, Component.translatable("gui.lanplus.profile.bg.header"), colLX, colW, aBgHdrY);
-                editHeader(g, Component.translatable("gui.lanplus.profile.banner.header"), colLX, colW, aBannerHdrY);
-                editHeader(g, Component.translatable("gui.lanplus.profile.skin.header"), colLX, colW, aSkinHdrY);
-                g.drawString(this.font, Component.translatable("gui.lanplus.profile.skin.hint"),
-                        colLX, aSkinRowY, FAINT, false);
+            default -> renderAppearanceEdit(g, mouseX, mouseY);
+        }
+    }
+
+    private void renderAppearanceEdit(GuiGraphics g, int mouseX, int mouseY) {
+        appearanceRow(g, aBgRowY, Component.translatable("gui.lanplus.profile.bg.header"), bgRowValue());
+        drawBgSwatch(g, colLX + 6, aBgRowY + 8);
+
+        appearanceRow(g, aBannerRowY, Component.translatable("gui.lanplus.profile.banner.header"), bannerRowValue());
+        drawBannerThumb(g, colLX + 6, aBannerRowY + 13);
+
+        appearanceRow(g, aSkinRowY, Component.translatable("gui.lanplus.profile.skin.header"), skinStateSubtitle());
+        drawFacePreview(g, colLX + 6, aSkinRowY + 8);
+
+        renderEditPreview(g, mouseX, mouseY);
+    }
+
+    private void appearanceRow(GuiGraphics g, int rowY, Component title, Component subtitle) {
+        LanPlusUI.slot(g, colLX, rowY, colLX + colW, rowY + APP_ROW_H);
+        g.drawString(this.font, title, colLX + 42, rowY + 8, TEXT, false);
+        if (subtitle != null) {
+            g.drawString(this.font, ellipsizeC(subtitle, colW - 42 - 78), colLX + 42, rowY + 22, MUTED, false);
+        }
+    }
+
+    private Component bgRowValue() {
+        return Component.translatable(switch (bgStyle) {
+            case BG_IMAGE -> "gui.lanplus.profile.bg.image";
+            case BG_NONE -> "gui.lanplus.profile.bg.none";
+            default -> "gui.lanplus.profile.bg.solid";
+        });
+    }
+
+    private Component bannerRowValue() {
+        return banner == null ? Component.translatable("gui.lanplus.profile.banner.none")
+                : Component.literal(banner.id());
+    }
+
+    private void drawBgSwatch(GuiGraphics g, int x, int y) {
+        LanPlusUI.outline1(g, x, y, x + 28, y + 28, LanPlusUI.EDGE_DARK);
+        if (bgStyle == BG_IMAGE) {
+            ProfileImages.Tex tex = ProfileImages.get(bgImage);
+            if (tex != null) {
+                ProfileImages.blitContain(g, tex, x + 1, y + 1, 26, 26);
+                return;
             }
         }
+        if (bgStyle == BG_NONE) {
+            g.drawString(this.font, "/", x + 11, y + 10, FAINT, false);
+            return;
+        }
+        g.fill(x + 1, y + 1, x + 27, y + 27, 0xFF000000 | (bgColor & 0xFFFFFF));
+    }
+
+    private void drawBannerThumb(GuiGraphics g, int x, int y) {
+        int w = 32;
+        int h = 18;
+        g.fill(x, y, x + w, y + h, SLOT);
+        LanPlusUI.outline1(g, x, y, x + w, y + h, LanPlusUI.EDGE_DARK);
+        if (banner != null) {
+            ProfileImages.Tex tex = ProfileImages.get(banner);
+            if (tex != null) {
+                ProfileImages.blitContain(g, tex, x + 1, y + 1, w - 2, h - 2);
+            }
+        }
+    }
+
+    private void drawFacePreview(GuiGraphics g, int x, int y) {
+        LanPlusUI.outline1(g, x, y, x + 28, y + 28, LanPlusUI.EDGE_DARK);
+        SkinTextures st = LanPlusClient.skinTextures();
+        SkinTextures.Resolved res = st == null ? null : st.get(uuid);
+        ResourceLocation skin = res != null ? res.texture() : resolveFallbackSkin();
+        PlayerFaceRenderer.draw(g, skin, x + 2, y + 2, 24);
+    }
+
+    private void renderEditPreview(GuiGraphics g, int mouseX, int mouseY) {
+        LanPlusUI.slot(g, pvX, pvY, pvX + pvW, pvY + pvH);
+        g.drawString(this.font, Component.translatable("gui.lanplus.profile.preview.header"), pvX + 8, pvY + 7, TEXT, false);
+        g.fill(pvX + 8, pvY + 18, pvX + pvW - 8, pvY + 19, DIVIDER);
+
+        int cx0 = pvX + 12;
+        int cy0 = pvY + 28;
+        int cw = pvW - 24;
+        int ch = pvH - 28 - 14;
+
+        g.enableScissor(cx0, cy0, cx0 + cw, cy0 + ch);
+        if (bgStyle == BG_IMAGE) {
+            ProfileImages.Tex tex = ProfileImages.get(bgImage);
+            if (tex != null) {
+                ProfileImages.blitCover(g, tex, cx0, cy0, cw, ch);
+                g.fill(cx0, cy0, cx0 + cw, cy0 + ch, alpha(bgOpacity));
+            } else {
+                g.fill(cx0, cy0, cx0 + cw, cy0 + ch, 0xFF0C0D10);
+            }
+        } else if (bgStyle == BG_SOLID) {
+            g.fill(cx0, cy0, cx0 + cw, cy0 + ch, 0xFF000000 | (bgColor & 0xFFFFFF));
+        } else {
+            g.fill(cx0, cy0, cx0 + cw, cy0 + ch, 0xFF0C0D10);
+        }
+
+        int bh = banner != null ? Math.min(cw / 4, 64) : 44;
+        if (banner != null) {
+            ProfileImages.Tex tex = ProfileImages.get(banner);
+            g.fill(cx0, cy0, cx0 + cw, cy0 + bh, SLOT);
+            if (tex != null) {
+                ProfileImages.blitCover(g, tex, cx0, cy0, cw, bh);
+            }
+            g.fillGradient(cx0, cy0 + bh - 22, cx0 + cw, cy0 + bh, 0x00000000, 0xB8000000);
+        } else {
+            g.fill(cx0, cy0, cx0 + cw, cy0 + bh, 0xCC0C0D10);
+        }
+
+        int cardTop = cy0 + bh;
+        g.fill(cx0, cardTop, cx0 + cw, cy0 + ch, 0x66000000);
+
+        int av = 36;
+        int ax = cx0 + 12;
+        int ay = cardTop - av + 10;
+        String name = profile.username() == null ? "?" : profile.username();
+        g.drawString(this.font, name, ax + av + 10, cardTop - 14, TEXT, false);
+        LanPlusUI.slot(g, ax - 2, ay - 2, ax + av + 2, ay + av + 2);
+        drawAvatar(g, uuid, ax, ay, av);
+
+        int sy = ay + av + 12;
+        g.drawString(this.font, Component.translatable("gui.lanplus.profile.about"), cx0 + 12, sy, LanPlusUI.LIME, false);
+        g.fill(cx0 + 12, sy + 11, cx0 + cw - 12, sy + 12, DIVIDER);
+        sy += 18;
+        String bio = profile.bio();
+        if (bio == null || bio.isBlank()) {
+            g.drawString(this.font, Component.translatable("gui.lanplus.profile.nobio"), cx0 + 12, sy, FAINT, false);
+        } else {
+            for (FormattedCharSequence line : this.font.split(Component.literal(bio), cw - 24)) {
+                if (sy > cy0 + ch - 12) {
+                    break;
+                }
+                g.drawString(this.font, line, cx0 + 12, sy, 0xFFE6E8EC, false);
+                sy += 11;
+            }
+        }
+        g.disableScissor();
+        LanPlusUI.outline1(g, cx0, cy0, cx0 + cw, cy0 + ch, LanPlusUI.EDGE_DARK);
+    }
+
+    private Component ellipsizeC(Component c, int maxWidth) {
+        return Component.literal(ellipsize(c.getString(), maxWidth));
     }
 
     private void renderEditTabs(GuiGraphics g, int mouseX, int mouseY) {
@@ -1610,7 +1615,7 @@ public final class ProfileScreen extends LanPlusScreen {
         SkinTextures.Resolved res = st == null ? null : st.get(uuid);
         ResourceLocation skin = res != null ? res.texture() : resolveFallbackSkin();
         boolean slim = res != null && res.slim();
-        PlayerPreview.render(g, cx, feetY, 52f, modelYaw, modelPitch, skin, slim, uuid);
+        PlayerPreview.render(g, cx, feetY, 52f * modelZoom, modelYaw, modelPitch, skin, slim, uuid);
     }
 
     private void drawBorder(GuiGraphics g, int x1, int y1, int x2, int y2, int color) {
@@ -1683,6 +1688,10 @@ public final class ProfileScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double delta) {
+        if (!editing && inCmBox(mouseX, mouseY)) {
+            modelZoom = Math.clamp(modelZoom + (float) delta * 0.15f, 0.6f, 2.5f);
+            return true;
+        }
         if (!editing) {
             if (mouseX >= sbLeft && mouseX <= sbLeft + SIDEBAR_W && mouseY >= sbTop && mouseY <= sbBottom) {
                 sbScrollY = Math.max(0, Math.min(sbMaxScroll, sbScrollY - (int) (delta * 16)));

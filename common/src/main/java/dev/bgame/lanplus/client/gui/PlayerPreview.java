@@ -47,10 +47,18 @@ final class PlayerPreview {
         return wideModel;
     }
 
+    // fucking player model
     static void render(GuiGraphics g, int cx, int feetY, float scale, float yaw, float pitch,
                        ResourceLocation skin, boolean slim, UUID uuid) {
         PlayerModel<LivingEntity> model = model(slim);
-        model.setAllVisible(true);
+        model.setAllVisible(false); // true
+
+        // for test
+        model.body.visible = true;
+        model.rightArm.visible = true;
+        model.leftArm.visible = true;
+        //
+
         model.young = false;
         model.crouching = false;
         model.attackTime = 0f;
@@ -61,7 +69,7 @@ final class PlayerPreview {
         PoseStack ps = g.pose();
         ps.pushPose();
         ps.translate(cx, feetY, 200.0);
-        ps.mulPose(new Matrix4f().scaling(scale, scale, -scale));
+        ps.scale(scale, scale, scale); // matrix4f at negative scale
         ps.mulPose(Axis.ZP.rotationDegrees(180f));
         ps.mulPose(Axis.XP.rotationDegrees(pitch));
         ps.mulPose(Axis.YP.rotationDegrees(-yaw));
@@ -72,8 +80,14 @@ final class PlayerPreview {
         MultiBufferSource.BufferSource buffers = g.bufferSource();
 
         RenderSystem.enableDepthTest();
-        VertexConsumer vc = buffers.getBuffer(RenderType.entityCutoutNoCull(skin));
+        VertexConsumer vc = buffers.getBuffer(RenderType.entityCutout(skin));
         model.renderToBuffer(ps, vc, 0xF000F0, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
+
+        if (!slim) {
+            model.rightArm.x = -6.0F;
+            model.leftArm.x = 6.0F;
+        }
+
         renderCosmetics(ps, buffers, model, uuid);
         buffers.endBatch();
         Lighting.setupFor3DItems();
