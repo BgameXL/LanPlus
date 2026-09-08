@@ -129,10 +129,10 @@ public final class ProfileScreen extends LanPlusScreen {
     private int cmBoxX, cmBoxY, cmBoxW, cmBoxH;
     private EditBox bioBox;
     private Button pronounButton;
-    private Button invisibleButton;
     private Button bannerButton;
     private int pronounIndex;
     private boolean invisibleToggle;
+    private Component hoverTip;
 
     private static final class LinkRow {
         int platform;
@@ -162,7 +162,8 @@ public final class ProfileScreen extends LanPlusScreen {
     private int editTab;
     private int editBodyBottom;
     private int aAboutHdrY, aBioY, aBioToolbarY, aBioPreviewY, aLinksHdrY, aLinksRowsY, aAddLinkY,
-            aQHdrY, aQRowsY, aIdentityHdrY, aIdentityY, aMpHdrY, aMpValuesY, aMpRowY,
+            aQHdrY, aQRowsY, aIdentityHdrY, aIdProfileHdrY, aIdPronounY, aIdStatusY,
+            aIdActivityHdrY, aIdInvisibleY, aIdCurrentY, aIdRecentY, aIdFavoriteY, aIdLastSeenY,
             aBgRowY, aBannerRowY, aSkinRowY;
     private int pvX, pvY, pvW, pvH;
 
@@ -235,7 +236,7 @@ public final class ProfileScreen extends LanPlusScreen {
                         + 16 + n * 24 + (addRow ? 20 : 0) + EDIT_SECTION_GAP
                         + 16 + MAX_SLOTS * 24;
             }
-            case 1 -> 16 + 20;
+            case 1 -> 22 + 26 + 24 + 32 + 10 + 26 + 30 + 4 * 22;
             default -> 3 * APP_ROW_H + 2 * APP_ROW_GAP;
         };
     }
@@ -306,8 +307,24 @@ public final class ProfileScreen extends LanPlusScreen {
             }
             case 1 -> {
                 aIdentityHdrY = y;
-                y += 16;
-                aIdentityY = y;
+                y += 22;
+                aIdProfileHdrY = y;
+                y += 26;
+                aIdPronounY = y;
+                y += 24;
+                aIdStatusY = y;
+                y += 32 + 10;
+                aIdActivityHdrY = y;
+                y += 26;
+                aIdInvisibleY = y;
+                y += 30;
+                aIdCurrentY = y;
+                y += 22;
+                aIdRecentY = y;
+                y += 22;
+                aIdFavoriteY = y;
+                y += 22;
+                aIdLastSeenY = y;
             }
             default -> {
                 aBgRowY = y;
@@ -382,17 +399,11 @@ public final class ProfileScreen extends LanPlusScreen {
                 buildSlotWidgets();
             }
             case 1 -> {
-                int half = (colW - 6) / 2;
-                pronounButton = LanplusButton.create(pronounLabel(), b -> {
+                pronounButton = LanplusButton.create(pronounValueLabel(), b -> {
                     pronounIndex = (pronounIndex + 1) % PRONOUN_CYCLE.length;
-                    pronounButton.setMessage(pronounLabel());
-                }).bounds(colLX, aIdentityY, half, 20).build();
+                    pronounButton.setMessage(pronounValueLabel());
+                }).bounds(colLX + colW - 150, aIdPronounY, 150, 20).build();
                 addRenderableWidget(pronounButton);
-                invisibleButton = LanplusButton.create(invisibleLabel(), b -> {
-                    invisibleToggle = !invisibleToggle;
-                    invisibleButton.setMessage(invisibleLabel());
-                }).bounds(colLX + half + 6, aIdentityY, colW - half - 6, 20).build();
-                addRenderableWidget(invisibleButton);
             }
             default -> {
                 buildBackgroundWidgets();
@@ -747,6 +758,7 @@ public final class ProfileScreen extends LanPlusScreen {
         }
 
         hits.clear();
+        hoverTip = null;
         if (editing) {
             editTop = computeEditTop();
             renderEditDecor(g, mouseX, mouseY);
@@ -769,6 +781,8 @@ public final class ProfileScreen extends LanPlusScreen {
         super.render(g, pickerOpen ? -1 : mouseX, pickerOpen ? -1 : mouseY, partialTick);
         if (pickerOpen) {
             renderLinkPicker(g, mouseX, mouseY);
+        } else if (hoverTip != null) {
+            g.renderTooltip(this.font, hoverTip, mouseX, mouseY);
         }
     }
 
@@ -864,9 +878,86 @@ public final class ProfileScreen extends LanPlusScreen {
                 editHeader(g, Component.translatable("gui.lanplus.profile.links"), colLX, colW, aLinksHdrY);
                 editHeader(g, Component.translatable("gui.lanplus.profile.questions"), colLX, colW, aQHdrY);
             }
-            case 1 -> editHeader(g, Component.translatable("gui.lanplus.profile.identity"), colLX, colW, aIdentityHdrY);
+            case 1 -> renderIdentityEdit(g, mouseX, mouseY);
             default -> renderAppearanceEdit(g, mouseX, mouseY);
         }
+    }
+
+    private void renderIdentityEdit(GuiGraphics g, int mouseX, int mouseY) {
+        editHeader(g, Component.translatable("gui.lanplus.profile.identity"), colLX, colW, aIdentityHdrY);
+
+        identitySubHeader(g, "gui.lanplus.profile.id.profile", "gui.lanplus.profile.id.profile.desc", aIdProfileHdrY);
+
+        g.drawString(this.font, Component.translatable("gui.lanplus.profile.id.pronouns"),
+                colLX, aIdPronounY + 6, TEXT, false);
+
+        g.drawString(this.font, Component.translatable("gui.lanplus.profile.id.status"),
+                colLX, aIdStatusY + 5, MUTED, false);
+        int fieldW = 150;
+        int fieldX = colLX + colW - fieldW;
+        LanPlusUI.slot(g, fieldX, aIdStatusY, fieldX + fieldW, aIdStatusY + 18);
+        g.drawString(this.font, Component.translatable("gui.lanplus.profile.id.status.hint"),
+                fieldX + 6, aIdStatusY + 5, FAINT, false);
+        Component counter = Component.literal("0/100");
+        g.drawString(this.font, counter, colLX + colW - this.font.width(counter), aIdStatusY + 22, FAINT, false);
+        if (mouseX >= fieldX && mouseX < fieldX + fieldW && mouseY >= aIdStatusY && mouseY < aIdStatusY + 18) {
+            hoverTip = Component.translatable("gui.lanplus.profile.id.soon");
+        }
+
+        identitySubHeader(g, "gui.lanplus.profile.id.activity", "gui.lanplus.profile.id.activity.desc", aIdActivityHdrY);
+
+        identityRow(g, aIdInvisibleY, 26, "gui.lanplus.profile.id.invisible", "gui.lanplus.profile.id.invisible.desc",
+                invisibleToggle, true, () -> invisibleToggle = !invisibleToggle, mouseX, mouseY, null);
+
+        boolean fieldsOn = !invisibleToggle;
+        String overridden = fieldsOn ? null : "gui.lanplus.profile.id.overridden";
+        identityRow(g, aIdCurrentY, 22, "gui.lanplus.profile.id.current", null, playingVisibleToggle, fieldsOn,
+                () -> playingVisibleToggle = !playingVisibleToggle, mouseX, mouseY, overridden);
+        identityRow(g, aIdRecentY, 22, "gui.lanplus.profile.id.recent", null, recentlyPlayedVisibleToggle, fieldsOn,
+                () -> recentlyPlayedVisibleToggle = !recentlyPlayedVisibleToggle, mouseX, mouseY, overridden);
+        identityRow(g, aIdFavoriteY, 22, "gui.lanplus.profile.id.favorite", null, favoriteVisibleToggle, fieldsOn,
+                () -> favoriteVisibleToggle = !favoriteVisibleToggle, mouseX, mouseY, overridden);
+        identityRow(g, aIdLastSeenY, 22, "gui.lanplus.profile.id.lastseen", null, false, false,
+                null, mouseX, mouseY, "gui.lanplus.profile.id.soon");
+    }
+
+    private void identitySubHeader(GuiGraphics g, String titleKey, String descKey, int y) {
+        g.drawString(this.font, Component.translatable(titleKey), colLX, y, TEXT, false);
+        g.drawString(this.font, Component.translatable(descKey), colLX, y + 11, MUTED, false);
+    }
+
+    private void identityRow(GuiGraphics g, int y, int rowH, String labelKey, String descKey,
+                             boolean on, boolean enabled, Runnable act, int mouseX, int mouseY, String tipKey) {
+        int labelY = descKey == null ? y + (rowH - 8) / 2 : y;
+        g.drawString(this.font, Component.translatable(labelKey), colLX, labelY, enabled ? TEXT : FAINT, false);
+        if (descKey != null) {
+            g.drawString(this.font, Component.translatable(descKey), colLX, y + 11, enabled ? MUTED : FAINT, false);
+        }
+        int rowRight = colLX + colW;
+        Component txt = Component.translatable(on ? "gui.lanplus.toggle.on" : "gui.lanplus.toggle.off");
+        int pillY = y + (rowH - 14) / 2;
+        int txtX = rowRight - this.font.width(txt);
+        g.drawString(this.font, txt, txtX, pillY + 3, !enabled ? FAINT : (on ? TEXT : MUTED), false);
+        drawPill(g, txtX - 6 - 28, pillY, on, enabled);
+        if (enabled && act != null) {
+            hits.add(new Hit(colLX, y, colW, rowH, act));
+        } else if (tipKey != null && mouseX >= colLX && mouseX < rowRight && mouseY >= y && mouseY < y + rowH) {
+            hoverTip = Component.translatable(tipKey);
+        }
+    }
+
+    private void drawPill(GuiGraphics g, int x, int y, boolean on, boolean enabled) {
+        int w = 28;
+        int h = 14;
+        g.fill(x, y, x + w, y + h, enabled && on ? ACCENT : SLOT);
+        LanPlusUI.outline1(g, x, y, x + w, y + h, LanPlusUI.EDGE_DARK);
+        int kx = on ? x + w - 12 : x + 2;
+        g.fill(kx, y + 2, kx + 10, y + h - 2, !enabled ? FAINT : (on ? 0xFFFFFFFF : MUTED));
+    }
+
+    private Component pronounValueLabel() {
+        String p = PRONOUN_CYCLE[pronounIndex];
+        return p == null ? Component.translatable("gui.lanplus.profile.pronouns.none") : Component.literal(p);
     }
 
     private void renderAppearanceEdit(GuiGraphics g, int mouseX, int mouseY) {
@@ -1037,30 +1128,6 @@ public final class ProfileScreen extends LanPlusScreen {
         return i >= 0 && i < EDIT_TABS.length ? i : -1;
     }
 
-    private void renderModpackToggles(GuiGraphics g) {
-        int gap = 6;
-        int chipW = (colW - 2 * gap) / 3;
-        modpackChip(g, colLX, aMpRowY, chipW, "gui.lanplus.profile.mp.favorite", favoriteVisibleToggle,
-                () -> favoriteVisibleToggle = !favoriteVisibleToggle);
-        modpackChip(g, colLX + chipW + gap, aMpRowY, chipW, "gui.lanplus.profile.mp.playing", playingVisibleToggle,
-                () -> playingVisibleToggle = !playingVisibleToggle);
-        modpackChip(g, colLX + 2 * (chipW + gap), aMpRowY, colW - 2 * (chipW + gap), "gui.lanplus.profile.mp.recent",
-                recentlyPlayedVisibleToggle, () -> recentlyPlayedVisibleToggle = !recentlyPlayedVisibleToggle);
-    }
-
-    private void renderModpackValues(GuiGraphics g) {
-        int gap = 6;
-        int chipW = (colW - 2 * gap) / 3;
-        drawMpValue(g, colLX, chipW, profile.favorite());
-        drawMpValue(g, colLX + chipW + gap, chipW, profile.currentlyPlaying());
-        drawMpValue(g, colLX + 2 * (chipW + gap), colW - 2 * (chipW + gap), profile.recentlyPlayed());
-    }
-
-    private void drawMpValue(GuiGraphics g, int x, int w, ModpackRef ref) {
-        String name = ref == null || ref.name() == null ? "—" : ellipsize(ref.name(), w);
-        g.drawString(this.font, name, x + (w - this.font.width(name)) / 2, aMpValuesY, MUTED, false);
-    }
-
     private void editHeader(GuiGraphics g, Component label, int x, int w, int y) {
         g.fill(x, y + 1, x + 2, y + 9, ACCENT);
         g.drawString(this.font, label, x + 6, y, HEADER_COLOR);
@@ -1126,17 +1193,6 @@ public final class ProfileScreen extends LanPlusScreen {
 
     static String sectionToAmp(String s) {
         return s == null ? "" : s.replace('§', '&');
-    }
-
-    private void modpackChip(GuiGraphics g, int x, int y, int w, String key, boolean on, Runnable toggle) {
-        int h = 18;
-        g.fill(x, y, x + w, y + h, on ? ACCENT : SURFACE_RAISED);
-        if (on) {
-            g.fill(x, y, x + w, y + 1, ACCENT_HOVER);
-        }
-        Component label = Component.translatable(key);
-        g.drawString(this.font, label, x + (w - this.font.width(label)) / 2, y + 5, on ? TEXT : MUTED);
-        hits.add(new Hit(x, y, w, h, toggle));
     }
 
     private void renderSidebar(GuiGraphics g) {
@@ -1878,18 +1934,6 @@ public final class ProfileScreen extends LanPlusScreen {
         }
         this.minecraft.keyboardHandler.setClipboard(text);
         setStatus(Component.translatable("gui.lanplus.profile.copied"));
-    }
-
-    private Component pronounLabel() {
-        String p = PRONOUN_CYCLE[pronounIndex];
-        Component value = p == null ? Component.translatable("gui.lanplus.profile.pronouns.none") : Component.literal(p);
-        return Component.translatable("gui.lanplus.profile.pronouns", value);
-    }
-
-    private Component invisibleLabel() {
-        Component value = Component.translatable(invisibleToggle
-                ? "gui.lanplus.profile.invisible.on" : "gui.lanplus.profile.invisible.off");
-        return Component.translatable("gui.lanplus.profile.invisible", value);
     }
 
     private int pickerWidth() {

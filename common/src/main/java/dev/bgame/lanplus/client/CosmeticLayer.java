@@ -5,7 +5,6 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import dev.bgame.lanplus.cosmetics.CosmeticModel;
 import dev.bgame.lanplus.cosmetics.CosmeticSlot;
 import net.minecraft.client.model.PlayerModel;
-import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -38,24 +37,12 @@ public final class CosmeticLayer extends RenderLayer<AbstractClientPlayer, Playe
                 continue;
             }
             poseStack.pushPose();
-            anchor(entry.getKey(), poseStack);
+            CosmeticGeoRender.anchor(getParentModel(), entry.getKey(), poseStack);
             models.animate(entry.getValue(), player.getUUID(), limbSwing, limbSwingAmount, partialTick);
             VertexConsumer buffer = bufferSource.getBuffer(RenderType.entityCutoutNoCull(model.texture()));
             CosmeticGeoRender.render(poseStack, model.geometry(), buffer, packedLight, OverlayTexture.NO_OVERLAY,
                     model.colour());
             poseStack.popPose();
         }
-    }
-
-    private void anchor(CosmeticSlot slot, PoseStack poseStack) {
-        PlayerModel<AbstractClientPlayer> model = getParentModel();
-        ModelPart part = switch (slot) {
-            case HEAD, FACE -> model.head;
-            case MAIN_HAND -> model.rightArm;
-            case OFF_HAND -> model.leftArm;
-            case BODY, BACK, WAIST, LEGS -> model.body;
-        };
-        part.translateAndRotate(poseStack);
-        poseStack.scale(-1f, -1f, 1f);
     }
 }

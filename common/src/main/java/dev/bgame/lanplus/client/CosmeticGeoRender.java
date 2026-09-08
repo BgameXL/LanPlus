@@ -1,5 +1,6 @@
 /*
  * This file contains code derived from GeckoLib.
+ * It is not a copy of GeckoLib renderer, the render loop is reimplemented here to draw a static BakedGeoModel to a vertexConsumer.
  *
  * Original project:
  * https://github.com/bernie-g/geckolib
@@ -21,6 +22,9 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import dev.bgame.lanplus.cosmetics.CosmeticModel;
+import dev.bgame.lanplus.cosmetics.CosmeticSlot;
+import net.minecraft.client.model.PlayerModel;
+import net.minecraft.client.model.geom.ModelPart;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.BakedGeoModel;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoBone;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoCube;
@@ -39,6 +43,17 @@ import org.joml.Vector4f;
 public final class CosmeticGeoRender {
 
     private CosmeticGeoRender() {
+    }
+
+    public static void anchor(PlayerModel<?> model, CosmeticSlot slot, PoseStack poseStack) {
+        ModelPart part = switch (slot) {
+            case HEAD, FACE -> model.head;
+            case MAIN_HAND -> model.rightArm;
+            case OFF_HAND -> model.leftArm;
+            case BODY, BACK, WAIST, LEGS -> model.body;
+        };
+        part.translateAndRotate(poseStack);
+        poseStack.scale(-1f, -1f, 1f);
     }
 
     public static void render(PoseStack poseStack, BakedGeoModel model, VertexConsumer buffer, int packedLight, int packedOverlay, int colour) {

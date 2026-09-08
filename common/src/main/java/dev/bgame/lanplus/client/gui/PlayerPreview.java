@@ -14,7 +14,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelLayers;
-import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
@@ -112,22 +111,11 @@ final class PlayerPreview {
                 continue;
             }
             ps.pushPose();
-            anchor(model, e.getKey(), ps);
+            CosmeticGeoRender.anchor(model, e.getKey(), ps);
             cm.animate(e.getValue(), uuid, 0f, 0f, 0f);
             VertexConsumer cvc = buffers.getBuffer(RenderType.entityCutoutNoCull(cosmetic.texture()));
             CosmeticGeoRender.render(ps, cosmetic.geometry(), cvc, 0xF000F0, OverlayTexture.NO_OVERLAY, cosmetic.colour());
             ps.popPose();
         }
-    }
-
-    private static void anchor(PlayerModel<LivingEntity> model, CosmeticSlot slot, PoseStack ps) {
-        ModelPart part = switch (slot) {
-            case HEAD, FACE -> model.head;
-            case MAIN_HAND -> model.rightArm;
-            case OFF_HAND -> model.leftArm;
-            case BODY, BACK, WAIST, LEGS -> model.body;
-        };
-        part.translateAndRotate(ps);
-        ps.scale(-1f, -1f, 1f);
     }
 }
