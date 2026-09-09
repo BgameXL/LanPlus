@@ -236,7 +236,7 @@ public final class ProfileScreen extends LanPlusScreen {
                         + 16 + n * 24 + (addRow ? 20 : 0) + EDIT_SECTION_GAP
                         + 16 + MAX_SLOTS * 24;
             }
-            case 1 -> 22 + 26 + 24 + 32 + 10 + 26 + 30 + 4 * 22;
+            case 1 -> 22 + 26 + 24 + 32 + 10 + 26 + 26 + 4 * 22;
             default -> 3 * APP_ROW_H + 2 * APP_ROW_GAP;
         };
     }
@@ -317,7 +317,7 @@ public final class ProfileScreen extends LanPlusScreen {
                 aIdActivityHdrY = y;
                 y += 26;
                 aIdInvisibleY = y;
-                y += 30;
+                y += 26;
                 aIdCurrentY = y;
                 y += 22;
                 aIdRecentY = y;
@@ -906,19 +906,18 @@ public final class ProfileScreen extends LanPlusScreen {
 
         identitySubHeader(g, "gui.lanplus.profile.id.activity", "gui.lanplus.profile.id.activity.desc", aIdActivityHdrY);
 
-        identityRow(g, aIdInvisibleY, 26, "gui.lanplus.profile.id.invisible", "gui.lanplus.profile.id.invisible.desc",
-                invisibleToggle, true, () -> invisibleToggle = !invisibleToggle, mouseX, mouseY, null);
+        identityRow(g, aIdInvisibleY, "gui.lanplus.profile.id.invisible", "gui.lanplus.profile.id.invisible.desc",
+                invisibleToggle, true, () -> invisibleToggle = !invisibleToggle, mouseX, mouseY);
 
         boolean fieldsOn = !invisibleToggle;
-        String overridden = fieldsOn ? null : "gui.lanplus.profile.id.overridden";
-        identityRow(g, aIdCurrentY, 22, "gui.lanplus.profile.id.current", null, playingVisibleToggle, fieldsOn,
-                () -> playingVisibleToggle = !playingVisibleToggle, mouseX, mouseY, overridden);
-        identityRow(g, aIdRecentY, 22, "gui.lanplus.profile.id.recent", null, recentlyPlayedVisibleToggle, fieldsOn,
-                () -> recentlyPlayedVisibleToggle = !recentlyPlayedVisibleToggle, mouseX, mouseY, overridden);
-        identityRow(g, aIdFavoriteY, 22, "gui.lanplus.profile.id.favorite", null, favoriteVisibleToggle, fieldsOn,
-                () -> favoriteVisibleToggle = !favoriteVisibleToggle, mouseX, mouseY, overridden);
-        identityRow(g, aIdLastSeenY, 22, "gui.lanplus.profile.id.lastseen", null, false, false,
-                null, mouseX, mouseY, "gui.lanplus.profile.id.soon");
+        identityRow(g, aIdCurrentY, "gui.lanplus.profile.id.current", "gui.lanplus.profile.id.current.desc",
+                playingVisibleToggle, fieldsOn, () -> playingVisibleToggle = !playingVisibleToggle, mouseX, mouseY);
+        identityRow(g, aIdRecentY, "gui.lanplus.profile.id.recent", "gui.lanplus.profile.id.recent.desc",
+                recentlyPlayedVisibleToggle, fieldsOn, () -> recentlyPlayedVisibleToggle = !recentlyPlayedVisibleToggle, mouseX, mouseY);
+        identityRow(g, aIdFavoriteY, "gui.lanplus.profile.id.favorite", "gui.lanplus.profile.id.favorite.desc",
+                favoriteVisibleToggle, fieldsOn, () -> favoriteVisibleToggle = !favoriteVisibleToggle, mouseX, mouseY);
+        identityRow(g, aIdLastSeenY, "gui.lanplus.profile.id.lastseen", "gui.lanplus.profile.id.soon",
+                false, false, null, mouseX, mouseY);
     }
 
     private void identitySubHeader(GuiGraphics g, String titleKey, String descKey, int y) {
@@ -926,22 +925,20 @@ public final class ProfileScreen extends LanPlusScreen {
         g.drawString(this.font, Component.translatable(descKey), colLX, y + 11, MUTED, false);
     }
 
-    private void identityRow(GuiGraphics g, int y, int rowH, String labelKey, String descKey,
-                             boolean on, boolean enabled, Runnable act, int mouseX, int mouseY, String tipKey) {
-        int labelY = descKey == null ? y + (rowH - 8) / 2 : y;
-        g.drawString(this.font, Component.translatable(labelKey), colLX, labelY, enabled ? TEXT : FAINT, false);
-        if (descKey != null) {
-            g.drawString(this.font, Component.translatable(descKey), colLX, y + 11, enabled ? MUTED : FAINT, false);
-        }
+    private void identityRow(GuiGraphics g, int y, String labelKey, String tipKey,
+                             boolean on, boolean enabled, Runnable act, int mouseX, int mouseY) {
+        int rowH = 22;
+        g.drawString(this.font, Component.translatable(labelKey), colLX, y + 7, enabled ? TEXT : FAINT, false);
         int rowRight = colLX + colW;
         Component txt = Component.translatable(on ? "gui.lanplus.toggle.on" : "gui.lanplus.toggle.off");
         int pillY = y + (rowH - 14) / 2;
-        int txtX = rowRight - this.font.width(txt);
-        g.drawString(this.font, txt, txtX, pillY + 3, !enabled ? FAINT : (on ? TEXT : MUTED), false);
-        drawPill(g, txtX - 6 - 28, pillY, on, enabled);
+        int pillX = rowRight - 24 - 28;
+        drawPill(g, pillX, pillY, on, enabled);
+        g.drawString(this.font, txt, pillX + 28 + 6, pillY + 3, !enabled ? FAINT : (on ? TEXT : MUTED), false);
         if (enabled && act != null) {
             hits.add(new Hit(colLX, y, colW, rowH, act));
-        } else if (tipKey != null && mouseX >= colLX && mouseX < rowRight && mouseY >= y && mouseY < y + rowH) {
+        }
+        if (tipKey != null && mouseX >= colLX && mouseX < rowRight && mouseY >= y && mouseY < y + rowH) {
             hoverTip = Component.translatable(tipKey);
         }
     }
@@ -949,7 +946,7 @@ public final class ProfileScreen extends LanPlusScreen {
     private void drawPill(GuiGraphics g, int x, int y, boolean on, boolean enabled) {
         int w = 28;
         int h = 14;
-        g.fill(x, y, x + w, y + h, enabled && on ? ACCENT : SLOT);
+        g.fill(x, y, x + w, y + h, enabled && on ? LanPlusUI.LIME : SLOT);
         LanPlusUI.outline1(g, x, y, x + w, y + h, LanPlusUI.EDGE_DARK);
         int kx = on ? x + w - 12 : x + 2;
         g.fill(kx, y + 2, kx + 10, y + h - 2, !enabled ? FAINT : (on ? 0xFFFFFFFF : MUTED));
