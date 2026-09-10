@@ -178,7 +178,7 @@ public final class ClientPresenceDetector {
 
     private static SkinRef detectSkin() {
         if (Config.skinCustomActive && !Config.skinUrl.isBlank()) {
-            return new SkinRef(SkinType.CUSTOM, Config.skinUrl, null, Config.skinSlim ? "slim" : null);
+            return new SkinRef(SkinType.CUSTOM, Config.skinUrl, null, Config.skinSlim ? "slim" : "classic");
         }
         UUID self = LanPlusClient.selfUuid();
         return self == null ? null : new SkinRef(SkinType.MOJANG, self.toString(), null, null);

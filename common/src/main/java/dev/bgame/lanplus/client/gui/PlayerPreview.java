@@ -46,31 +46,34 @@ final class PlayerPreview {
         return wideModel;
     }
 
-    // fucking player model
     static void render(GuiGraphics g, int cx, int feetY, float scale, float yaw, float pitch,
                        ResourceLocation skin, boolean slim, UUID uuid) {
         PlayerModel<LivingEntity> model = model(slim);
-        model.setAllVisible(false); // true
-
-        // for test
+        model.setAllVisible(true);
         model.body.visible = true;
         model.rightArm.visible = true;
         model.leftArm.visible = true;
-        model.rightSleeve.visible = false;
-        model.leftSleeve.visible = false;
-        //
-
+        model.rightSleeve.visible = true;
+        model.leftSleeve.visible = true;
         model.young = false;
         model.crouching = false;
         model.attackTime = 0f;
         model.riding = false;
+
+        float armY = slim ? 2.5f : 2.0f;
+        model.rightArm.setPos(-5.0f, armY, 0.0f);
+        model.leftArm.setPos(5.0f, armY, 0.0f);
+        model.rightArm.xRot = model.rightArm.yRot = model.rightArm.zRot = 0f;
+        model.leftArm.xRot = model.leftArm.yRot = model.leftArm.zRot = 0f;
+        model.rightSleeve.copyFrom(model.rightArm);
+        model.leftSleeve.copyFrom(model.leftArm);
 
         g.flush();
 
         PoseStack ps = g.pose();
         ps.pushPose();
         ps.translate(cx, feetY, 200.0);
-        ps.scale(scale, scale, scale); // matrix4f at negative scale
+        ps.mulPose(new Matrix4f().scaling(scale, scale, -scale));
         ps.mulPose(Axis.ZP.rotationDegrees(180f));
         ps.mulPose(Axis.XP.rotationDegrees(pitch));
         ps.mulPose(Axis.YP.rotationDegrees(-yaw));
@@ -81,13 +84,8 @@ final class PlayerPreview {
         MultiBufferSource.BufferSource buffers = g.bufferSource();
 
         RenderSystem.enableDepthTest();
-        VertexConsumer vc = buffers.getBuffer(RenderType.entityCutout(skin));
+        VertexConsumer vc = buffers.getBuffer(RenderType.entityTranslucent(skin));
         model.renderToBuffer(ps, vc, 0xF000F0, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
-
-        if (!slim) {
-            model.rightArm.x = -6.0F;
-            model.leftArm.x = 6.0F;
-        }
 
         renderCosmetics(ps, buffers, model, uuid);
         buffers.endBatch();

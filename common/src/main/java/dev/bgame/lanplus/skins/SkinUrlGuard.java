@@ -52,6 +52,17 @@ final class SkinUrlGuard {
         return true;
     }
 
+    private static boolean trustedBackend(String url) {
+        String base = dev.bgame.lanplus.Config.backendUrl;
+        if (base == null || base.isBlank() || url == null) {
+            return false;
+        }
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return url.equals(base) || url.startsWith(base + "/");
+    }
+
     private static boolean isPublic(InetAddress a) {
         if (a.isLoopbackAddress() || a.isAnyLocalAddress() || a.isLinkLocalAddress()
                 || a.isSiteLocalAddress() || a.isMulticastAddress()) {
@@ -62,7 +73,7 @@ final class SkinUrlGuard {
     }
 
     static byte[] fetch(HttpClient http, String url) {
-        if (!isSafe(url)) {
+        if (!isSafe(url) && !trustedBackend(url)) {
             return null;
         }
         try {

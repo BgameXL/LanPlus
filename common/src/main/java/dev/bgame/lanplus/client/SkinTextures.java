@@ -28,9 +28,39 @@ public final class SkinTextures implements SkinTextureSink {
         byPlayer.remove(player);
     }
 
+    public static boolean detectSlim(byte[] png) {
+        try (NativeImage img = NativeImage.read(png)) {
+            return img.getWidth() == 64 && img.getHeight() == 64 && img.format() == NativeImage.Format.RGBA
+                    && armColumnTransparent(img, 50, 16, 2, 4)
+                    && armColumnTransparent(img, 54, 20, 2, 12)
+                    && armColumnTransparent(img, 42, 48, 2, 4)
+                    && armColumnTransparent(img, 46, 52, 2, 12);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static boolean armColumnTransparent(NativeImage img, int x, int y, int w, int h) {
+        for (int i = x; i < x + w; i++) {
+            for (int j = y; j < y + h; j++) {
+                if ((img.getPixelRGBA(i, j) >>> 24) != 0) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     @Override
     public void accept(UUID player, String key, byte[] png, String model) {
-        boolean slim = "slim".equalsIgnoreCase(model);
+        boolean slim;
+        if ("slim".equalsIgnoreCase(model)) {
+            slim = true;
+        } else if ("classic".equalsIgnoreCase(model) || "wide".equalsIgnoreCase(model) || "default".equalsIgnoreCase(model)) {
+            slim = false;
+        } else {
+            slim = detectSlim(png);
+        }
         Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> {
             ResourceLocation loc = byKey.computeIfAbsent(key, k -> register(mc, png));

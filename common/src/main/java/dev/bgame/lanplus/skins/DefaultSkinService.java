@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import dev.bgame.lanplus.api.LibrarySkin;
 import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.core.AssetCache;
@@ -12,6 +13,7 @@ import dev.bgame.lanplus.network.LanPlusNetwork;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -36,16 +38,27 @@ public final class DefaultSkinService implements SkinService {
     }
 
     @Override
-    public CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, boolean slim) {
-        if (network == null) {
-            return CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"));
-        }
-        return network.uploadSkin(png, slim ? "slim" : null);
+    public CompletableFuture<List<LibrarySkin>> library() {
+        return network == null ? CompletableFuture.completedFuture(List.of()) : network.listSkins();
     }
 
     @Override
-    public CompletableFuture<Boolean> deleteSkin() {
-        return network == null ? CompletableFuture.completedFuture(false) : network.deleteSkin();
+    public CompletableFuture<SkinUploadResult> addSkin(byte[] png, boolean slim) {
+        return network == null
+                ? CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"))
+                : network.addSkin(png, slim ? "slim" : "classic");
+    }
+
+    @Override
+    public CompletableFuture<SkinUploadResult> selectSkin(String skinId) {
+        return network == null
+                ? CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"))
+                : network.selectSkin(skinId);
+    }
+
+    @Override
+    public CompletableFuture<Boolean> deleteLibrarySkin(String skinId) {
+        return network == null ? CompletableFuture.completedFuture(false) : network.deleteLibrarySkin(skinId);
     }
 
     @Override

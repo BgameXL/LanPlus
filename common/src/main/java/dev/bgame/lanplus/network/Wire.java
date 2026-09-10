@@ -297,6 +297,12 @@ final class Wire {
     record SkinUploadResponse(String error, String url, String hash) {
     }
 
+    record SkinLibraryEntry(String skinId, String model, String url) {
+    }
+
+    record SkinLibraryResponse(String active, List<SkinLibraryEntry> skins) {
+    }
+
     record ChallengeResponse(String serverId) {
     }
 
