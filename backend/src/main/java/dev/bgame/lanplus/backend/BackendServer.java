@@ -159,7 +159,12 @@ public final class BackendServer {
                 return relayGuestValidate(req);
             }
             if (m.equals("GET") && path.startsWith("/skins/") && path.endsWith(".png")) {
-                return skinPng(path.substring("/skins/".length(), path.length() - ".png".length()));
+                String mid = path.substring("/skins/".length(), path.length() - ".png".length());
+                int slash = mid.indexOf('/');
+                if (slash > 0) {
+                    return librarySkinPng(mid.substring(0, slash), mid.substring(slash + 1));
+                }
+                return skinPng(mid);
             }
             if (m.equals("GET") && path.startsWith("/backgrounds/") && path.endsWith(".png")) {
                 return catalogPng(backgrounds, path.substring("/backgrounds/".length(), path.length() - ".png".length()));
@@ -267,6 +272,19 @@ public final class BackendServer {
             if (m.equals("POST") && path.equals("/skin/delete")) {
                 store.deleteHostedSkin(self);
                 return ok(Map.of("success", true));
+            }
+            if (m.equals("GET") && path.equals("/skins")) {
+                return skinLibraryList(self);
+            }
+            if (m.equals("POST") && path.equals("/skins")) {
+                return skinLibraryAdd(req, self);
+            }
+            if (m.equals("POST") && path.startsWith("/skins/") && path.endsWith("/select")) {
+                return skinLibrarySelect(self, path.substring("/skins/".length(), path.length() - "/select".length()));
+            }
+            if (m.equals("POST") && path.startsWith("/skins/") && path.endsWith("/delete")) {
+                store.deleteLibrarySkin(self, path.substring("/skins/".length(), path.length() - "/delete".length()));
+                return ok(ordered("success", true));
             }
             if (m.equals("GET") && path.equals("/modpacks")) {
                 return ok(store.listModpacks());
@@ -769,6 +787,7 @@ public final class BackendServer {
     // hosted skins
     private static final int MAX_SKIN_B64_CHARS = 44 * 1024;
     private static final int MAX_SKIN_PNG_BYTES = 32 * 1024;
+    private static final int MAX_LIBRARY_SKINS = 10;
 
     private Resp skinUpload(Http.Request req, UUID self) {
         Map<String, Object> b = Json.parseObject(req.body());
@@ -818,6 +837,80 @@ public final class BackendServer {
         }
         byte[] png = store.hostedSkinPng(uuid);
         return png == null ? NOT_FOUND : new Resp(200, null, png, "image/png");
+    }
+
+    private Resp librarySkinPng(String uuidPart, String skinId) {
+        UUID uuid;
+        try {
+            uuid = UUID.fromString(uuidPart);
+        } catch (IllegalArgumentException e) {
+            return NOT_FOUND;
+        }
+        byte[] png = store.librarySkinPng(uuid, skinId);
+        return png == null ? NOT_FOUND : new Resp(200, null, png, "image/png");
+    }
+
+    private Resp skinLibraryList(UUID self) {
+        if (store.countLibrarySkins(self) == 0) {
+            Object[] active = store.activeSkin(self);
+            if (active != null) {
+                store.addLibrarySkin(self, (String) active[1], (byte[]) active[0], (String) active[2]);
+            }
+        }
+        String active = store.activeSkinHash(self);
+        List<Map<String, Object>> skins = store.listLibrarySkins(self);
+        for (Map<String, Object> s : skins) {
+            s.put("url", "/skins/" + self + "/" + s.get("skinId") + ".png");
+        }
+        return ok(ordered("active", active, "skins", skins));
+    }
+
+    private Resp skinLibraryAdd(Http.Request req, UUID self) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        Object modelObj = b.get("model");
+        String model = modelObj == null ? null : String.valueOf(modelObj);
+        if (model != null && !model.equals("slim") && !model.equals("classic")) {
+            return ok(error("bad_model"));
+        }
+        if (!(b.get("png") instanceof String b64) || b64.isEmpty()) {
+            return ok(error("bad_png"));
+        }
+        if (b64.length() > MAX_SKIN_B64_CHARS) {
+            return ok(error("too_large"));
+        }
+        byte[] png;
+        try {
+            png = Base64.getDecoder().decode(b64);
+        } catch (IllegalArgumentException e) {
+            return ok(error("bad_png"));
+        }
+        if (png.length > MAX_SKIN_PNG_BYTES) {
+            return ok(error("too_large"));
+        }
+        int[] dims = pngDimensions(png);
+        if (dims == null) {
+            return ok(error("bad_png"));
+        }
+        if (!(dims[0] == 64 && (dims[1] == 64 || dims[1] == 32))) {
+            return ok(error("bad_dimensions"));
+        }
+        String hash = Store.sha256Hex(png);
+        if (store.librarySkinPng(self, hash) == null && store.countLibrarySkins(self) >= MAX_LIBRARY_SKINS) {
+            return ok(error("library_full"));
+        }
+        store.addLibrarySkin(self, hash, png, model);
+        store.putHostedSkin(self, png, hash, model);
+        return ok(ordered("skinId", hash, "url", "/skins/" + self + ".png", "hash", hash));
+    }
+
+    private Resp skinLibrarySelect(UUID self, String skinId) {
+        byte[] png = store.librarySkinPng(self, skinId);
+        if (png == null) {
+            return ok(error("not_found"));
+        }
+        String model = store.librarySkinModel(self, skinId);
+        store.putHostedSkin(self, png, skinId, model);
+        return ok(ordered("url", "/skins/" + self + ".png", "hash", skinId, "model", model));
     }
 
     private static int[] pngDimensions(byte[] png) {

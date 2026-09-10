@@ -263,6 +263,9 @@ final class Store {
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS skin_data ("
                         + "uuid TEXT PRIMARY KEY, png BLOB NOT NULL, hash TEXT NOT NULL, model TEXT, "
                         + "updated_at INTEGER NOT NULL)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS skin_library ("
+                        + "uuid TEXT NOT NULL, skin_id TEXT NOT NULL, png BLOB NOT NULL, model TEXT, "
+                        + "created_at INTEGER NOT NULL, PRIMARY KEY (uuid, skin_id))");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS sessions ("
                         + "token_hash TEXT PRIMARY KEY, uuid TEXT NOT NULL, verified INTEGER NOT NULL DEFAULT 0, "
                         + "created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)");
@@ -607,6 +610,129 @@ final class Store {
                 }
             } catch (SQLException e) {
                 throw fail("hostedSkinPng", e);
+            }
+        }
+    }
+
+    Object[] activeSkin(UUID uuid) {
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "SELECT png, hash, model FROM skin_data WHERE uuid=?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? new Object[]{rs.getBytes(1), rs.getString(2), rs.getString(3)} : null;
+                }
+            } catch (SQLException e) {
+                throw fail("activeSkin", e);
+            }
+        }
+    }
+
+    String activeSkinHash(UUID uuid) {
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "SELECT hash FROM skin_data WHERE uuid=?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getString(1) : null;
+                }
+            } catch (SQLException e) {
+                throw fail("activeSkinHash", e);
+            }
+        }
+    }
+
+    void addLibrarySkin(UUID uuid, String skinId, byte[] png, String model) {
+        synchronized (lock) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "INSERT INTO skin_library (uuid, skin_id, png, model, created_at) VALUES (?,?,?,?,?) "
+                            + "ON CONFLICT(uuid, skin_id) DO UPDATE SET created_at=excluded.created_at")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, skinId);
+                ps.setBytes(3, png);
+                ps.setString(4, model);
+                ps.setLong(5, System.currentTimeMillis());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("addLibrarySkin", e);
+            }
+        }
+    }
+
+    void deleteLibrarySkin(UUID uuid, String skinId) {
+        synchronized (lock) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "DELETE FROM skin_library WHERE uuid=? AND skin_id=?")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, skinId);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("deleteLibrarySkin", e);
+            }
+        }
+    }
+
+    List<Map<String, Object>> listLibrarySkins(UUID uuid) {
+        try (Reader r = read()) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "SELECT skin_id, model FROM skin_library WHERE uuid=? ORDER BY created_at DESC")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("skinId", rs.getString(1));
+                        m.put("model", rs.getString(2));
+                        out.add(m);
+                    }
+                }
+                return out;
+            } catch (SQLException e) {
+                throw fail("listLibrarySkins", e);
+            }
+        }
+    }
+
+    int countLibrarySkins(UUID uuid) {
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "SELECT COUNT(*) FROM skin_library WHERE uuid=?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getInt(1) : 0;
+                }
+            } catch (SQLException e) {
+                throw fail("countLibrarySkins", e);
+            }
+        }
+    }
+
+    byte[] librarySkinPng(UUID uuid, String skinId) {
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "SELECT png FROM skin_library WHERE uuid=? AND skin_id=?")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, skinId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getBytes(1) : null;
+                }
+            } catch (SQLException e) {
+                throw fail("librarySkinPng", e);
+            }
+        }
+    }
+
+    String librarySkinModel(UUID uuid, String skinId) {
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "SELECT model FROM skin_library WHERE uuid=? AND skin_id=?")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, skinId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getString(1) : null;
+                }
+            } catch (SQLException e) {
+                throw fail("librarySkinModel", e);
             }
         }
     }
