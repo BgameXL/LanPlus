@@ -33,7 +33,7 @@ import java.util.concurrent.CompletionException;
 public final class SkinScreen extends LanPlusScreen {
 
     private static final int PAD = 12;
-    private static final int LEFT_W = 140;
+    private static final int LEFT_W = 154;
     private static final int TILE = 32;
     private static final int GAP = 6;
     private static final long STATUS_MS = 4000;
@@ -144,13 +144,13 @@ public final class SkinScreen extends LanPlusScreen {
     private void renderModel(GuiGraphics g) {
         LanPlusUI.slot(g, mx0, my0, mx1, my1);
         int cx = (mx0 + mx1) / 2;
-        int feetY = my1 - 14;
+        int feetY = my1 - 26;
         SkinTextures st = LanPlusClient.skinTextures();
         SkinTextures.Resolved res = st == null || uuid == null ? null : st.get(uuid);
         ResourceLocation skin = res != null ? res.texture()
                 : DefaultPlayerSkin.get(uuid == null ? UUID.randomUUID() : uuid).texture();
         boolean modelSlim = res != null ? res.slim() : slim;
-        float scale = Math.min(72f, (feetY - my0 - 14) * 0.5f) * modelZoom;
+        float scale = Math.min(79f, (feetY - my0 - 14) * 0.5f) * modelZoom;
         g.enableScissor(mx0 + 1, my0 + 1, mx1 - 1, my1 - 1);
         g.fill(cx - 22, feetY - 1, cx + 22, feetY, 0x44000000);
         PlayerPreview.render(g, cx, feetY, scale, modelYaw, modelPitch, skin, modelSlim, uuid);
