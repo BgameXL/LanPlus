@@ -122,10 +122,7 @@ public final class ProfileScreen extends LanPlusScreen {
     private int panelX, panelTop, panelRight, panelBottom;
     private int sbScrollY, sbMaxScroll, sbLeft, sbTop, sbBottom;
     private final List<Hit> hits = new ArrayList<>();
-    private float modelYaw;
-    private float modelPitch;
-    private float modelZoom = 1f;
-    private boolean draggingModel;
+    private final ModelView view = new ModelView(35f, 0.6f, 2.5f);
     private int cmBoxX, cmBoxY, cmBoxW, cmBoxH;
     private EditBox bioBox;
     private Button pronounButton;
@@ -1671,7 +1668,7 @@ public final class ProfileScreen extends LanPlusScreen {
         SkinTextures.Resolved res = st == null ? null : st.get(uuid);
         ResourceLocation skin = res != null ? res.texture() : resolveFallbackSkin();
         boolean slim = res != null && res.slim();
-        PlayerPreview.render(g, cx, feetY, 52f * modelZoom, modelYaw, modelPitch, skin, slim, uuid);
+        PlayerPreview.render(g, cx, feetY, 52f * view.zoom(), view.yaw(), view.pitch(), skin, slim, uuid);
     }
 
     private void drawBorder(GuiGraphics g, int x1, int y1, int x2, int y2, int color) {
@@ -1705,7 +1702,7 @@ public final class ProfileScreen extends LanPlusScreen {
             return true;
         }
         if (button == 0 && !editing && inCmBox(mouseX, mouseY)) {
-            draggingModel = true;
+            view.beginDrag();
             return true;
         }
         if (button == 0) {
@@ -1721,9 +1718,7 @@ public final class ProfileScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (draggingModel && button == 0) {
-            modelYaw -= (float) dragX;
-            modelPitch = Math.clamp(modelPitch - (float) dragY, -35f, 35f);
+        if (button == 0 && view.drag(dragX, dragY)) {
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
@@ -1731,8 +1726,8 @@ public final class ProfileScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (button == 0 && draggingModel) {
-            draggingModel = false;
+        if (button == 0 && view.dragging()) {
+            view.endDrag();
             return true;
         }
         return super.mouseReleased(mouseX, mouseY, button);
@@ -1745,16 +1740,16 @@ public final class ProfileScreen extends LanPlusScreen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double delta) {
         if (!editing && inCmBox(mouseX, mouseY)) {
-            modelZoom = Math.clamp(modelZoom + (float) delta * 0.15f, 0.6f, 2.5f);
+            view.zoomBy(delta);
             return true;
         }
         if (!editing) {
             if (mouseX >= sbLeft && mouseX <= sbLeft + SIDEBAR_W && mouseY >= sbTop && mouseY <= sbBottom) {
-                sbScrollY = Math.max(0, Math.min(sbMaxScroll, sbScrollY - (int) (delta * 16)));
+                sbScrollY = Math.clamp(sbScrollY - (int) (delta * 16), 0, sbMaxScroll);
                 return true;
             }
             if (mouseX >= panelX && mouseX <= panelRight && mouseY >= panelTop && mouseY <= panelBottom) {
-                scrollY = Math.max(0, Math.min(maxScroll, scrollY - (int) (delta * 16)));
+                scrollY = Math.clamp(scrollY - (int) (delta * 16), 0, maxScroll);
                 return true;
             }
         }

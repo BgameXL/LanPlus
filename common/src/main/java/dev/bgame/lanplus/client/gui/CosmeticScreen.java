@@ -37,10 +37,7 @@ public final class CosmeticScreen extends LanPlusScreen {
     private final Screen parent;
     private final UUID uuid;
     private CosmeticSlot selected = CosmeticSlot.HEAD;
-    private float modelYaw;
-    private float modelPitch;
-    private float zoom = 1f;
-    private boolean dragging;
+    private final ModelView view = new ModelView(40f, 0.5f, 3f);
     private int catScroll;
     private List<Component> tip;
     private int tipX;
@@ -129,13 +126,13 @@ public final class CosmeticScreen extends LanPlusScreen {
         boolean slim = res != null && res.slim();
 
         float base = Math.min(85f, (clipBottom - clipTop) * 0.30f);
-        float scale = base * zoom;
+        float scale = base * view.zoom();
         int bodyCenterY = (clipBottom - 12) - Math.round(base * 0.92f);
         int feetY = bodyCenterY + Math.round(scale * 0.92f);
         g.enableScissor(clipL, clipTop, clipR, clipBottom);
         g.fill(cx - 30, feetY - 1, cx + 30, feetY, 0x44000000);
         g.fill(cx - 22, feetY - 2, cx + 22, feetY - 1, 0x33000000);
-        PlayerPreview.render(g, cx, feetY, scale, modelYaw, modelPitch, skin, slim, uuid);
+        PlayerPreview.render(g, cx, feetY, scale, view.yaw(), view.pitch(), skin, slim, uuid);
         g.disableScissor();
 
         int total = CTRL_W * 2 + CTRL_GAP;
@@ -331,13 +328,11 @@ public final class CosmeticScreen extends LanPlusScreen {
     }
 
     private void rotate() {
-        modelYaw += 90f;
+        view.rotateBy(90f);
     }
 
     private void resetView() {
-        modelYaw = 0f;
-        modelPitch = 0f;
-        zoom = 1f;
+        view.reset();
     }
 
     private void equipSelected(String id) {
@@ -363,7 +358,7 @@ public final class CosmeticScreen extends LanPlusScreen {
             }
             int bx = leftColX + SLOT + 6;
             if (inside((int) mouseX, (int) mouseY, bx, bandTop, listX - 6 - bx, bandBottom - bandTop)) {
-                dragging = true;
+                view.beginDrag();
                 return true;
             }
         }
@@ -372,9 +367,7 @@ public final class CosmeticScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (dragging && button == 0) {
-            modelYaw -= (float) dragX;
-            modelPitch = Math.clamp(modelPitch - (float) dragY, -40f, 40f);
+        if (button == 0 && view.drag(dragX, dragY)) {
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
@@ -382,7 +375,7 @@ public final class CosmeticScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        dragging = false;
+        view.endDrag();
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
@@ -395,7 +388,7 @@ public final class CosmeticScreen extends LanPlusScreen {
         int clipL = leftColX + SLOT + 6;
         int clipR = listX - 6;
         if (mouseX >= clipL && mouseX <= clipR && mouseY >= bandTop && mouseY <= bandBottom) {
-            zoom = Math.clamp(zoom + (float) dy * 0.15f, 0.5f, 3f);
+            view.zoomBy(dy);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, dx, dy);

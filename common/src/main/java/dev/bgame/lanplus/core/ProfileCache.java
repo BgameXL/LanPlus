@@ -54,7 +54,7 @@ public final class ProfileCache {
             } catch (AtomicMoveNotSupportedException e) {
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
             }
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException ignored) {
         }
     }
 }

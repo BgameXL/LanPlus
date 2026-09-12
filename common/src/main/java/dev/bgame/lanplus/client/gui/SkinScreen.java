@@ -41,10 +41,7 @@ public final class SkinScreen extends LanPlusScreen {
     private final Screen parent;
     private final UUID uuid;
     private boolean slim;
-    private float modelYaw;
-    private float modelPitch;
-    private float modelZoom = 1f;
-    private boolean dragging;
+    private final ModelView view = new ModelView(35f, 0.6f, 2.5f);
     private Component status;
     private long statusUntil;
 
@@ -150,10 +147,10 @@ public final class SkinScreen extends LanPlusScreen {
         ResourceLocation skin = res != null ? res.texture()
                 : DefaultPlayerSkin.get(uuid == null ? UUID.randomUUID() : uuid).texture();
         boolean modelSlim = res != null ? res.slim() : slim;
-        float scale = Math.min(79f, (feetY - my0 - 14) * 0.5f) * modelZoom;
+        float scale = Math.min(79f, (feetY - my0 - 14) * 0.5f) * view.zoom();
         g.enableScissor(mx0 + 1, my0 + 1, mx1 - 1, my1 - 1);
         g.fill(cx - 22, feetY - 1, cx + 22, feetY, 0x44000000);
-        PlayerPreview.render(g, cx, feetY, scale, modelYaw, modelPitch, skin, modelSlim, uuid);
+        PlayerPreview.render(g, cx, feetY, scale, view.yaw(), view.pitch(), skin, modelSlim, uuid);
         g.disableScissor();
     }
 
@@ -221,7 +218,7 @@ public final class SkinScreen extends LanPlusScreen {
                 }
             }
             if (inModel(mouseX, mouseY)) {
-                dragging = true;
+                view.beginDrag();
                 return true;
             }
         }
@@ -401,9 +398,7 @@ public final class SkinScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
-        if (dragging && button == 0) {
-            modelYaw -= (float) dx;
-            modelPitch = Math.clamp(modelPitch - (float) dy, -35f, 35f);
+        if (button == 0 && view.drag(dx, dy)) {
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dx, dy);
@@ -411,7 +406,7 @@ public final class SkinScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        dragging = false;
+        view.endDrag();
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
@@ -422,7 +417,7 @@ public final class SkinScreen extends LanPlusScreen {
             return true;
         }
         if (inModel(mouseX, mouseY)) {
-            modelZoom = Math.clamp(modelZoom + (float) delta * 0.15f, 0.6f, 2.5f);
+            view.zoomBy(delta);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, sx, delta);

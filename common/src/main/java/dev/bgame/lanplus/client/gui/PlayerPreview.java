@@ -50,23 +50,10 @@ final class PlayerPreview {
                        ResourceLocation skin, boolean slim, UUID uuid) {
         PlayerModel<LivingEntity> model = model(slim);
         model.setAllVisible(true);
-        model.body.visible = true;
-        model.rightArm.visible = true;
-        model.leftArm.visible = true;
-        model.rightSleeve.visible = true;
-        model.leftSleeve.visible = true;
         model.young = false;
         model.crouching = false;
         model.attackTime = 0f;
         model.riding = false;
-
-        float armY = slim ? 2.5f : 2.0f;
-        model.rightArm.setPos(-5.0f, armY, 0.0f);
-        model.leftArm.setPos(5.0f, armY, 0.0f);
-        model.rightArm.xRot = model.rightArm.yRot = model.rightArm.zRot = 0f;
-        model.leftArm.xRot = model.leftArm.yRot = model.leftArm.zRot = 0f;
-        model.rightSleeve.copyFrom(model.rightArm);
-        model.leftSleeve.copyFrom(model.leftArm);
 
         g.flush();
 
