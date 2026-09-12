@@ -879,7 +879,7 @@ public final class ProfileScreen extends LanPlusScreen {
                 editHeader(g, Component.translatable("gui.lanplus.profile.questions"), colLX, colW, aQHdrY);
             }
             case 1 -> renderIdentityEdit(g, mouseX, mouseY);
-            default -> renderAppearanceEdit(g, mouseX, mouseY);
+            default -> renderAppearanceEdit(g);
         }
     }
 
@@ -957,7 +957,7 @@ public final class ProfileScreen extends LanPlusScreen {
         return p == null ? Component.translatable("gui.lanplus.profile.pronouns.none") : Component.literal(p);
     }
 
-    private void renderAppearanceEdit(GuiGraphics g, int mouseX, int mouseY) {
+    private void renderAppearanceEdit(GuiGraphics g) {
         appearanceRow(g, aBgRowY, Component.translatable("gui.lanplus.profile.bg.header"), bgRowValue());
         drawBgSwatch(g, colLX + 6, aBgRowY + 8);
 
@@ -967,7 +967,7 @@ public final class ProfileScreen extends LanPlusScreen {
         appearanceRow(g, aSkinRowY, Component.translatable("gui.lanplus.profile.skin.header"), skinStateSubtitle());
         drawFacePreview(g, colLX + 6, aSkinRowY + 8);
 
-        renderEditPreview(g, mouseX, mouseY);
+        renderEditPreview(g);
     }
 
     private void appearanceRow(GuiGraphics g, int rowY, Component title, Component subtitle) {
@@ -1028,7 +1028,7 @@ public final class ProfileScreen extends LanPlusScreen {
         PlayerFaceRenderer.draw(g, skin, x + 2, y + 2, 24);
     }
 
-    private void renderEditPreview(GuiGraphics g, int mouseX, int mouseY) {
+    private void renderEditPreview(GuiGraphics g) {
         LanPlusUI.slot(g, pvX, pvY, pvX + pvW, pvY + pvH);
         g.drawString(this.font, Component.translatable("gui.lanplus.profile.preview.header"), pvX + 8, pvY + 7, TEXT, false);
         g.fill(pvX + 8, pvY + 18, pvX + pvW - 8, pvY + 19, DIVIDER);
@@ -1634,8 +1634,6 @@ public final class ProfileScreen extends LanPlusScreen {
         g.enableScissor(x + 1, y + 1, x + renderW - 1, y + renderH - 1);
         drawPlayerModel(g, x + renderW / 2, y + renderH - 26);
         g.disableScissor();
-        g.drawString(this.font, Component.translatable("gui.lanplus.profile.cosmetics.rotate"),
-                x + 8, y + renderH - 12, FAINT);
         int sx = x + renderW + 8;
         int sw = textW - renderW - 8;
         int slotH = 26;
@@ -1646,21 +1644,26 @@ public final class ProfileScreen extends LanPlusScreen {
             LanPlusUI.button3d(g, sx, sy, sx + sw, sy + slotH, SURFACE_RAISED);
             g.drawString(this.font, Component.translatable("gui.lanplus.profile.cosmetics." + COSMETIC_SLOTS[i]),
                     sx + 7, sy + 5, 0xFFD3D6DC);
-            Component sub = soon;
-            if (COSMETIC_SLOTS[i].equals("background")) {
-                sub = bgStyle == BG_IMAGE && bgImageId != null
-                        ? Component.literal(bgImageId)
-                        : Component.translatable(switch (bgStyle) {
-                    case BG_SOLID -> "gui.lanplus.profile.bg.solid";
-                    case BG_MINECRAFT -> "gui.lanplus.profile.bg.minecraft";
-                    case BG_IMAGE -> "gui.lanplus.profile.bg.image";
-                    default -> "gui.lanplus.profile.bg.dark";
-                });
-            }
+            Component sub = getSub(soon, i);
             g.drawString(this.font, ellipsize(sub.getString(), sw - 14), sx + 7, sy + 15, FAINT);
         }
         int slotsH = COSMETIC_SLOTS.length * (slotH + slotGap) - slotGap;
-        return y + Math.max(renderH, slotsH);
+        return y + renderH;
+    }
+
+    private Component getSub(Component soon, int i) {
+        Component sub = soon;
+        if (COSMETIC_SLOTS[i].equals("background")) {
+            sub = bgStyle == BG_IMAGE && bgImageId != null
+                    ? Component.literal(bgImageId)
+                    : Component.translatable(switch (bgStyle) {
+                case BG_SOLID -> "gui.lanplus.profile.bg.solid";
+                case BG_MINECRAFT -> "gui.lanplus.profile.bg.minecraft";
+                case BG_IMAGE -> "gui.lanplus.profile.bg.image";
+                default -> "gui.lanplus.profile.bg.dark";
+            });
+        }
+        return sub;
     }
 
     private void drawPlayerModel(GuiGraphics g, int cx, int feetY) {

@@ -45,9 +45,7 @@ public final class CosmeticScreen extends LanPlusScreen {
     private List<Component> tip;
     private int tipX;
     private int tipY;
-
     private int cardX, cardY, cardW, cardH;
-    private int contentTop;
     private int bandTop, bandBottom;
     private int leftColX;
     private int listX, listW;
@@ -78,7 +76,7 @@ public final class CosmeticScreen extends LanPlusScreen {
         cardH = Math.min(this.height - 60, 360);
         cardX = (this.width - cardW) / 2;
         cardY = Math.max(20, (this.height - cardH) / 2);
-        contentTop = cardY + 30;
+        int contentTop = cardY + 30;
         int doneY = cardY + cardH - PAD - 20;
         bandTop = contentTop;
         bandBottom = doneY - 8;

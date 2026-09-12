@@ -144,7 +144,7 @@ public final class SkinScreen extends LanPlusScreen {
     private void renderModel(GuiGraphics g) {
         LanPlusUI.slot(g, mx0, my0, mx1, my1);
         int cx = (mx0 + mx1) / 2;
-        int feetY = my1 - 26;
+        int feetY = my1 - 40;
         SkinTextures st = LanPlusClient.skinTextures();
         SkinTextures.Resolved res = st == null || uuid == null ? null : st.get(uuid);
         ResourceLocation skin = res != null ? res.texture()
