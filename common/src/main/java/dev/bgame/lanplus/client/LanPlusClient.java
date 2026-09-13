@@ -199,6 +199,26 @@ public final class LanPlusClient {
         }
     }
 
+    public static void setEnabled(boolean enabled) {
+        Config.enabled = enabled;
+        if (network == null) {
+            return;
+        }
+        if (!enabled) {
+            network.disconnect();
+            if (relayTunnel != null) {
+                relayTunnel.close();
+            }
+            return;
+        }
+        if (friends != null) {
+            friends.connect();
+        }
+        if (announcements != null) {
+            announcements.connect();
+        }
+    }
+
     public static void resolveFriendSkins(List<Friend> list) {
         if (skins == null) {
             return;

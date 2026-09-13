@@ -669,7 +669,7 @@ public final class ProfileScreen extends LanPlusScreen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackdrop(g);
+        renderBackdrop(g, this.width, this.height);
         g.drawCenteredString(this.font, this.title, this.width / 2, 12, LanPlusUI.TEXT);
 
         if (!loaded) {
@@ -762,24 +762,24 @@ public final class ProfileScreen extends LanPlusScreen {
         return -1;
     }
 
-    void renderBackdrop(GuiGraphics g) {
-        renderTransparentBackground(g);
+    void renderBackdrop(GuiGraphics g, int screenWidth, int screenHeight) {
+        g.fillGradient(0, 0, screenWidth, screenHeight, 0xC0101010, 0xD0101010);
         if (bgStyle == BG_MINECRAFT || bgStyle == BG_NONE) {
             return;
         }
         if (bgStyle == BG_IMAGE) {
             ProfileImages.Tex tex = ProfileImages.get(bgImage);
             if (tex != null) {
-                ProfileImages.blitCover(g, tex, 0, 0, this.width, this.height);
-                g.fill(0, 0, this.width, this.height, alpha(bgOpacity));
+                ProfileImages.blitCover(g, tex, 0, 0, screenWidth, screenHeight);
+                g.fill(0, 0, screenWidth, screenHeight, alpha(bgOpacity));
                 return;
             }
         }
         if (bgStyle == BG_SOLID) {
-            g.fill(0, 0, this.width, this.height, 0xFF000000 | (bgColor & 0xFFFFFF));
+            g.fill(0, 0, screenWidth, screenHeight, 0xFF000000 | (bgColor & 0xFFFFFF));
             return;
         }
-        g.fill(0, 0, this.width, this.height, alpha(bgOpacity) | 0x0C0D10);
+        g.fill(0, 0, screenWidth, screenHeight, alpha(bgOpacity) | 0x0C0D10);
     }
 
     private static int alpha(int opacity0to100) {
