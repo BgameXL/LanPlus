@@ -8,8 +8,8 @@ buildscript {
 }
 
 plugins {
-    id 'architectury-plugin' version '3.4.164'
-    id 'dev.architectury.loom' version '1.7.435' apply false
+    id 'architectury-plugin' version '3.5.169'
+    id 'dev.architectury.loom' version '1.17.491' apply false
 }
 
 architectury {

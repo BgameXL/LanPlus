@@ -7,8 +7,8 @@ base {
 }
 
 repositories {
-    maven { url 'https://maven.neoforged.net/releases/' }
-    maven { url 'https://api.modrinth.com/maven' }
+    maven { url = 'https://maven.neoforged.net/releases/' }
+    maven { url = 'https://api.modrinth.com/maven' }
 }
 
 loom {
@@ -61,7 +61,7 @@ processResources {
     ]
     inputs.properties replaceProperties
     filesMatching(['META-INF/neoforge.mods.toml', 'pack.mcmeta']) {
-        expand replaceProperties + [project: project]
+        expand replaceProperties
     }
 }
 
