@@ -26,6 +26,8 @@ public final class SettingsScreen extends LanPlusScreen {
     private final Screen parent;
     private Cat selected = Cat.GENERAL;
     private EditBox backendBox;
+    private EditBox relayAddrBox;
+    private EditBox voiceHostBox;
     private int px, py, pw, ph, headerBottom, sidebarX, contentX, contentW, contentTop;
     private final List<Row> rows = new ArrayList<>();
 
@@ -59,15 +61,27 @@ public final class SettingsScreen extends LanPlusScreen {
                 .bounds(px + 8, py + 7, 54, 18).build());
 
         if (selected == Cat.ADVANCED) {
-            backendBox = new EditBox(this.font, contentX, contentTop + 32, contentW, 20,
-                    Component.translatable("gui.lanplus.settings.backend"));
-            backendBox.setMaxLength(200);
-            backendBox.setValue(Config.backendUrl);
-            backendBox.setHint(Component.translatable("gui.lanplus.settings.backend"));
-            addRenderableWidget(backendBox);
+            backendBox = advancedBox(Config.backendUrl,
+                    "gui.lanplus.settings.backend", "gui.lanplus.settings.backend");
+            relayAddrBox = advancedBox(Config.relayDevAddress,
+                    "gui.lanplus.settings.relayaddr", "gui.lanplus.settings.relayaddr.hint");
+            voiceHostBox = advancedBox(Config.voiceHost,
+                    "gui.lanplus.settings.voicehost", "gui.lanplus.settings.voicehost.hint");
         } else {
             backendBox = null;
+            relayAddrBox = null;
+            voiceHostBox = null;
         }
+    }
+
+    private EditBox advancedBox(String value, String labelKey, String hintKey) {
+        EditBox box = new EditBox(this.font, contentX, contentTop, contentW, 20,
+                Component.translatable(labelKey));
+        box.setMaxLength(64);
+        box.setValue(value);
+        box.setHint(Component.translatable(hintKey));
+        addRenderableWidget(box);
+        return box;
     }
 
     private void flip(Runnable change) {
@@ -75,7 +89,7 @@ public final class SettingsScreen extends LanPlusScreen {
         Config.save();
     }
 
-    private void commitBackend() {
+    private void commitBoxes() {
         if (backendBox != null) {
             String v = backendBox.getValue().trim();
             if (!v.equals(Config.backendUrl)) {
@@ -83,11 +97,25 @@ public final class SettingsScreen extends LanPlusScreen {
                 Config.save();
             }
         }
+        if (relayAddrBox != null) {
+            String v = relayAddrBox.getValue().trim();
+            if (!v.equals(Config.relayDevAddress)) {
+                Config.relayDevAddress = v;
+                Config.save();
+            }
+        }
+        if (voiceHostBox != null) {
+            String v = voiceHostBox.getValue().trim();
+            if (!v.equals(Config.voiceHost)) {
+                Config.voiceHost = v;
+                Config.save();
+            }
+        }
     }
 
     private void selectCat(Cat c) {
         if (c != selected) {
-            commitBackend();
+            commitBoxes();
             selected = c;
             rebuildWidgets();
         }
@@ -120,16 +148,15 @@ public final class SettingsScreen extends LanPlusScreen {
 
     private void renderSidebar(GuiGraphics g, int mouseX, int mouseY) {
         int y = contentTop;
-        for (Cat c : Cat.values()) {
+        for (Cat pick : Cat.values()) {
             int h = 18;
-            boolean sel = c == selected;
+            boolean sel = pick == selected;
             boolean hover = mouseX >= sidebarX && mouseX < sidebarX + SIDEBAR_W && mouseY >= y && mouseY < y + h;
             if (sel) {
                 g.drawString(this.font, "+", sidebarX + 4, y + 5, LanPlusUI.LIME, false);
             }
-            g.drawString(this.font, Component.translatable("gui.lanplus.settings." + c.key),
+            g.drawString(this.font, Component.translatable("gui.lanplus.settings." + pick.key),
                     sidebarX + 14, y + 5, sel || hover ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
-            Cat pick = c;
             rows.add(new Row(sidebarX, y, SIDEBAR_W, h, () -> selectCat(pick)));
             y += h + 2;
         }
@@ -142,7 +169,8 @@ public final class SettingsScreen extends LanPlusScreen {
             Config.discordEnabled = !Config.discordEnabled;
             LanPlusClient.setDiscordEnabled(Config.discordEnabled);
         }));
-        toggleRow(g, y, "relay", Config.relayEnabled, () -> flip(() -> Config.relayEnabled = !Config.relayEnabled));
+        y = toggleRow(g, y, "relay", Config.relayEnabled, () -> flip(() -> Config.relayEnabled = !Config.relayEnabled));
+        toggleRow(g, y, "voice", Config.voiceEnabled, () -> flip(() -> Config.voiceEnabled = !Config.voiceEnabled));
     }
 
     private int toggleRow(GuiGraphics g, int y, String key, boolean on, Runnable act) {
@@ -182,9 +210,28 @@ public final class SettingsScreen extends LanPlusScreen {
 
     private void renderAdvanced(GuiGraphics g) {
         int x = contentX;
-        int y = contentTop + 2;
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings.backend"), x, y + 6, LanPlusUI.TEXT, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings.backend.desc"), x, y + 18, LanPlusUI.MUTED, false);
+        int y = toggleRow(g, contentTop + 2, "relayplain", Config.relayDevPlaintext,
+                () -> flip(() -> Config.relayDevPlaintext = !Config.relayDevPlaintext));
+        y = fieldRow(g, x, y, "backend", backendBox);
+        y = fieldRow(g, x, y, "relayaddr", relayAddrBox);
+        fieldRow(g, x, y, "voicehost", voiceHostBox);
+    }
+
+    private int fieldRow(GuiGraphics g, int x, int y, String key, EditBox box) {
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings." + key), x, y, LanPlusUI.TEXT, false);
+        y += 11;
+        List<FormattedCharSequence> desc = this.font.split(
+                Component.translatable("gui.lanplus.settings." + key + ".desc"), contentW);
+        for (int i = 0; i < desc.size() && i < 2; i++) {
+            g.drawString(this.font, desc.get(i), x, y, LanPlusUI.MUTED, false);
+            y += 10;
+        }
+        y += 2;
+        if (box != null) {
+            box.setPosition(x, y);
+            box.setWidth(contentW);
+        }
+        return y + 28;
     }
 
     @Override
@@ -202,7 +249,7 @@ public final class SettingsScreen extends LanPlusScreen {
 
     @Override
     public void onClose() {
-        commitBackend();
+        commitBoxes();
         this.minecraft.setScreen(parent);
     }
 }

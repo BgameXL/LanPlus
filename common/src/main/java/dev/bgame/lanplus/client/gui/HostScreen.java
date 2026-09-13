@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.function.IntFunction;
 
 public final class HostScreen extends LanPlusScreen {
 
@@ -224,11 +224,11 @@ public final class HostScreen extends LanPlusScreen {
     private void renderOpenDropdowns(GuiGraphics g, int mouseX, int mouseY) {
         if (gameTypeOpen) {
             renderSelectItems(g, ctrlX, gameRowY + DROPDOWN_H, ctrlW, GAME_TYPES.length,
-                    i -> gameTypeLabel(GAME_TYPES[i]), indexOf(gameType, GAME_TYPES), mouseX, mouseY);
+                    i -> gameTypeLabel(GAME_TYPES[i]), gameType.ordinal(), mouseX, mouseY);
         }
         if (difficultyOpen) {
             renderSelectItems(g, ctrlX, diffRowY + DROPDOWN_H, ctrlW, DIFFICULTIES.length,
-                    i -> difficultyLabel(DIFFICULTIES[i]), indexOf(difficulty, DIFFICULTIES), mouseX, mouseY);
+                    i -> difficultyLabel(DIFFICULTIES[i]), difficulty.ordinal(), mouseX, mouseY);
         }
     }
 
@@ -269,7 +269,7 @@ public final class HostScreen extends LanPlusScreen {
     }
 
     private void renderSelectItems(GuiGraphics g, int x, int menuTop, int w, int count,
-                                   Function<Integer, Component> labelFn, int selectedIdx,
+                                   IntFunction<Component> labelFn, int selectedIdx,
                                    int mouseX, int mouseY) {
         int menuH = count * ITEM_H + 4;
         g.pose().pushPose();
@@ -294,7 +294,7 @@ public final class HostScreen extends LanPlusScreen {
 
     private void renderAccess(GuiGraphics g, int mouseX, int mouseY) {
         renderSectionHeader(g, Component.translatable("gui.lanplus.host.access"), accessLabelY);
-        int chipW = (cardW - 2 * PAD - 2 * 6) / 3;
+        int chipW = accessChipW();
         renderModeChip(g, mouseX, mouseY, HostAccessMode.EVERYONE, "gui.lanplus.host.access.everyone",
                 cardX + PAD, chipW);
         renderModeChip(g, mouseX, mouseY, HostAccessMode.FRIENDS, "gui.lanplus.host.access.friends",
@@ -321,39 +321,26 @@ public final class HostScreen extends LanPlusScreen {
                 accessMode == mode, true, hover);
     }
 
-    private static <T> int indexOf(T value, T[] values) {
-        for (int i = 0; i < values.length; i++) {
-            if (values[i] == value) {
-                return i;
-            }
-        }
-        return -1;
+    private int accessChipW() {
+        return (cardW - 2 * PAD - 2 * 6) / 3;
     }
 
-    private static String gameTypeKey(GameType gt) {
-        return switch (gt) {
+    private Component gameTypeLabel(GameType gt) {
+        return Component.translatable(switch (gt) {
             case CREATIVE -> "selectWorld.gameMode.creative";
             case ADVENTURE -> "selectWorld.gameMode.adventure";
             case SPECTATOR -> "selectWorld.gameMode.spectator";
             default -> "gameMode.survival";
-        };
+        });
     }
 
-    private Component gameTypeLabel(GameType gt) {
-        return Component.translatable(gameTypeKey(gt));
-    }
-
-    private static String difficultyKey(Difficulty d) {
-        return switch (d) {
+    private Component difficultyLabel(Difficulty d) {
+        return Component.translatable(switch (d) {
             case PEACEFUL -> "options.difficulty.peaceful";
             case EASY -> "options.difficulty.easy";
             case HARD -> "options.difficulty.hard";
             default -> "options.difficulty.normal";
-        };
-    }
-
-    private Component difficultyLabel(Difficulty d) {
-        return Component.translatable(difficultyKey(d));
+        });
     }
 
     private void renderWorldList(GuiGraphics g, int mouseX, int mouseY) {
@@ -476,7 +463,7 @@ public final class HostScreen extends LanPlusScreen {
     private boolean handleSharedClick(double mouseX, double mouseY, int button) {
         if (button == 0) {
             if (in(mouseX, mouseY, cardX + PAD, accessRowY, cardW - 2 * PAD, DROPDOWN_H)) {
-                int chipW = (cardW - 2 * PAD - 2 * 6) / 3;
+                int chipW = accessChipW();
                 if (mouseX < cardX + PAD + chipW) {
                     accessMode = HostAccessMode.EVERYONE;
                 } else if (mouseX < cardX + PAD + 2 * chipW + 6) {
@@ -536,7 +523,7 @@ public final class HostScreen extends LanPlusScreen {
                 image.close();
                 tex.close();
             }
-        } catch (Throwable t) {
+        } catch (Exception e) {
             tex.close();
         }
     }
@@ -550,9 +537,9 @@ public final class HostScreen extends LanPlusScreen {
     }
 
     private void doStart() {
+        HostController.HostSettings settings = new HostController.HostSettings(
+                accessMode, Set.of(), allowNonPremium, gameType, difficulty, allowCheats);
         if (inWorld) {
-            HostController.HostSettings settings = new HostController.HostSettings(
-                    accessMode, Set.of(), allowNonPremium, gameType, difficulty, allowCheats);
             if (accessMode == HostAccessMode.INVITED) {
                 this.minecraft.setScreen(new InviteOverlay(this, settings));
                 return;
@@ -567,9 +554,9 @@ public final class HostScreen extends LanPlusScreen {
             return;
         }
         if (accessMode == HostAccessMode.INVITED) {
-            this.minecraft.setScreen(new InviteOverlay(this, world, accessMode, allowNonPremium));
+            this.minecraft.setScreen(new InviteOverlay(this, world, settings));
         } else {
-            HostController.requestHost(accessMode, Set.of(), allowNonPremium);
+            HostController.requestHost(settings);
             this.minecraft.createWorldOpenFlows().openWorld(world.getLevelId(), () -> this.minecraft.setScreen(this));
         }
     }

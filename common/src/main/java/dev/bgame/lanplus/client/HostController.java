@@ -35,18 +35,10 @@ public final class HostController {
 
     public record HostSettings(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium,
                                GameType gameType, Difficulty difficulty, boolean allowCommands) {
-
-        public static HostSettings defaults(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium) {
-            return new HostSettings(mode, preInvited, allowNonPremium, null, null, true);
-        }
     }
 
     public static boolean isOfflineHosting() {
         return offlineHosting;
-    }
-
-    public static void requestHost(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium) {
-        requestHost(HostSettings.defaults(mode, preInvited, allowNonPremium));
     }
 
     public static void requestHost(HostSettings settings) {

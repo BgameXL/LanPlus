@@ -54,7 +54,7 @@ public final class Config {
                 theme = getString(json, "theme", theme);
                 voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
                 voiceHost = getString(json, "voiceHost", voiceHost);
-            } catch (Exception e) {
+            } catch (Exception ignored) {
             }
         }
         save();
@@ -83,7 +83,7 @@ public final class Config {
             try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
                 GSON.toJson(json, writer);
             }
-        } catch (IOException e) {
+        } catch (IOException ignored) {
         }
     }
 

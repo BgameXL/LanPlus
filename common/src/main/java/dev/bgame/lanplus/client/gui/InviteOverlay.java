@@ -1,7 +1,6 @@
 package dev.bgame.lanplus.client.gui;
 
 import dev.bgame.lanplus.api.Friend;
-import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.PauseMenuButtons;
@@ -24,31 +23,22 @@ public final class InviteOverlay extends LanPlusScreen {
 
     private final Screen parent;
     private final LevelSummary world;
-    private final HostAccessMode mode;
-    private final boolean allowNonPremium;
-    private final HostController.HostSettings inWorldBase;
+    private final HostController.HostSettings base;
     private final Set<UUID> picked = new HashSet<>();
     private boolean launched;
 
     private int panelX;
     private int panelY;
 
-    public InviteOverlay(Screen parent, LevelSummary world, HostAccessMode mode, boolean allowNonPremium) {
-        this(parent, world, mode, allowNonPremium, null);
-    }
-
-    public InviteOverlay(Screen parent, HostController.HostSettings inWorldBase) {
-        this(parent, null, inWorldBase.mode(), inWorldBase.allowNonPremium(), inWorldBase);
-    }
-
-    private InviteOverlay(Screen parent, LevelSummary world, HostAccessMode mode,
-                          boolean allowNonPremium, HostController.HostSettings inWorldBase) {
+    public InviteOverlay(Screen parent, LevelSummary world, HostController.HostSettings base) {
         super(Component.translatable("gui.lanplus.invite.title"));
         this.parent = parent;
         this.world = world;
-        this.mode = mode;
-        this.allowNonPremium = allowNonPremium;
-        this.inWorldBase = inWorldBase;
+        this.base = base;
+    }
+
+    public InviteOverlay(Screen parent, HostController.HostSettings base) {
+        this(parent, null, base);
     }
 
     @Override
@@ -127,16 +117,16 @@ public final class InviteOverlay extends LanPlusScreen {
             return;
         }
         launched = true;
-        if (inWorldBase != null) {
+        HostController.HostSettings settings = new HostController.HostSettings(
+                base.mode(), picked, base.allowNonPremium(), base.gameType(), base.difficulty(), base.allowCommands());
+        if (world == null) {
             PauseMenuButtons.markHostedInWorld();
-            HostController.requestHost(new HostController.HostSettings(
-                    mode, picked, inWorldBase.allowNonPremium(), inWorldBase.gameType(),
-                    inWorldBase.difficulty(), inWorldBase.allowCommands()));
+            HostController.requestHost(settings);
             notifyInvited();
             this.minecraft.setScreen(null);
             return;
         }
-        HostController.requestHost(mode, picked, allowNonPremium);
+        HostController.requestHost(settings);
         notifyInvited();
         this.minecraft.createWorldOpenFlows().openWorld(world.getLevelId(), () -> this.minecraft.setScreen(parent));
     }
