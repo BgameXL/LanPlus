@@ -4,7 +4,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.platform.PlatformHolder;
+import org.slf4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -15,6 +17,7 @@ import java.nio.file.Path;
 
 public final class Config {
 
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String FILE_NAME = "lanplus.json";
     public static boolean enabled = true;
@@ -60,7 +63,7 @@ public final class Config {
         save();
     }
 
-    public static void save() {
+    public static boolean save() {
         Path file = PlatformHolder.get().getConfigDir().resolve(FILE_NAME);
         JsonObject json = new JsonObject();
         json.addProperty("enabled", enabled);
@@ -83,7 +86,10 @@ public final class Config {
             try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
                 GSON.toJson(json, writer);
             }
-        } catch (IOException ignored) {
+            return true;
+        } catch (IOException e) {
+            LOGGER.warn("Failed to save LAN+ configuration to {}", file, e);
+            return false;
         }
     }
 
@@ -99,9 +105,9 @@ public final class Config {
         save();
     }
 
-    public static void setTheme(String id) {
+    public static boolean setTheme(String id) {
         theme = id;
-        save();
+        return save();
     }
 
     private static boolean getBool(JsonObject json, String key, boolean fallback) {

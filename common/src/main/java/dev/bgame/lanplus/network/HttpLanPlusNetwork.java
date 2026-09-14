@@ -561,12 +561,14 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     @Override
     public CompletableFuture<Void> reportUser(UUID targetUuid, String reason) {
         if (!configured() || targetUuid == null || reason == null) {
-            return CompletableFuture.completedFuture(null);
+            return CompletableFuture.failedFuture(new IllegalStateException("Reporting is unavailable"));
         }
         return post("/report", new Wire.ReportUser(targetUuid.toString(), reason))
                 .thenAccept(resp -> {
-                })
-                .exceptionally(this::onErrorVoid);
+                    if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                        throw new IllegalStateException("Report request failed with HTTP " + resp.statusCode());
+                    }
+                });
     }
 
     @Override
@@ -647,6 +649,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     @Override
     public void disconnect() {
         this.eventsEnabled = false;
+        this.reachable = false;
         WebSocket ws = this.webSocket;
         if (ws != null) {
             ws.sendClose(WebSocket.NORMAL_CLOSURE, "client shutdown");
@@ -845,6 +848,10 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 scheduleReconnect();
                 return;
             }
+            if (!eventsEnabled) {
+                connecting.set(false);
+                return;
+            }
             URI uri = URI.create(toWebSocketUrl(base()) + "/events");
             http.newWebSocketBuilder()
                     .connectTimeout(Duration.ofSeconds(5))
@@ -854,6 +861,8 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                         if (err != null) {
                             LOGGER.warn("LAN+ WebSocket connect failed: {}", err.toString());
                             scheduleReconnect();
+                        } else if (!eventsEnabled) {
+                            ws.sendClose(WebSocket.NORMAL_CLOSURE, "client disabled");
                         } else {
                             this.webSocket = ws;
                             reconnectAttempts.set(0);

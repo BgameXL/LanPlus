@@ -194,7 +194,7 @@ public final class DefaultProfilesService implements ProfilesService {
     @Override
     public CompletableFuture<Void> reportUser(UUID targetUuid, String reason) {
         if (targetUuid == null || reason == null) {
-            return CompletableFuture.completedFuture(null);
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Report target and reason are required"));
         }
         return network.reportUser(targetUuid, reason);
     }
