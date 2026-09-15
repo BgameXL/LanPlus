@@ -4,6 +4,7 @@ import dev.bgame.lanplus.announcements.AnnouncementsService;
 import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.client.LanPlusClient;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -18,7 +19,6 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -62,6 +62,10 @@ public final class Announcements extends LanPlusScreen {
     private record BodyHit(int x, int y, FormattedCharSequence seq) {
     }
 
+    private record EntryLayout(Announcement announcement, FormattedCharSequence title, List<Line> body,
+                               ProfileImages.Tex image, int imageHeight, int height) {
+    }
+
     public Announcements(Screen parent) {
         super(Component.translatable("gui.lanplus.announcements.title"));
         this.parent = parent;
@@ -74,7 +78,7 @@ public final class Announcements extends LanPlusScreen {
                 .bounds(cardX + cardW - 90 - PAD, cardY + cardH - 26, 90, 20).build());
         AnnouncementsService svc = LanPlusClient.announcements();
         if (svc != null && newIds.isEmpty()) {
-            newIds = new HashSet<>(svc.unseenIds());
+            newIds = Set.copyOf(svc.unseenIds());
         }
         markSeen();
     }
@@ -104,9 +108,7 @@ public final class Announcements extends LanPlusScreen {
         svc.markSeen(ids);
     }
 
-    private List<Announcement> filtered() {
-        AnnouncementsService svc = LanPlusClient.announcements();
-        List<Announcement> all = svc == null ? List.of() : svc.announcements();
+    private List<Announcement> filtered(List<Announcement> all) {
         if (selected == Filter.ALL) {
             return all;
         }
@@ -123,7 +125,6 @@ public final class Announcements extends LanPlusScreen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         drawBackdrop(g);
-        layout();
         hoverTip = null;
         bodyHits.clear();
 
@@ -135,9 +136,11 @@ public final class Announcements extends LanPlusScreen {
         g.fill(cardX + PAD, cardY + cardH - FOOTER_H + 4, cardX + cardW - PAD, cardY + cardH - FOOTER_H + 5,
                 LanPlusUI.DIVIDER);
 
-        renderSidebar(g, mouseX, mouseY);
+        AnnouncementsService service = LanPlusClient.announcements();
+        List<Announcement> all = service == null ? List.of() : service.announcements();
+        renderSidebar(g, mouseX, mouseY, all);
 
-        List<Announcement> list = filtered();
+        List<Announcement> list = filtered(all);
         if (list.isEmpty()) {
             Component empty = selected == Filter.ALL
                     ? Component.translatable("gui.lanplus.announcements.empty")
@@ -148,18 +151,21 @@ public final class Announcements extends LanPlusScreen {
             return;
         }
 
-        int total = 0;
+        List<EntryLayout> entries = new ArrayList<>(list.size());
+        int totalHeight = 0;
         for (Announcement a : list) {
-            total += entryHeight(a) + ENTRY_GAP;
+            EntryLayout entry = layoutEntry(a);
+            entries.add(entry);
+            totalHeight += entry.height() + ENTRY_GAP;
         }
-        int maxScroll = Math.max(0, total - (listBottom - listTop));
+        int maxScroll = Math.max(0, totalHeight - (listBottom - listTop));
         scrollY = Math.clamp(scrollY, 0, maxScroll);
 
         g.enableScissor(listX, listTop, cardX + cardW - PAD, listBottom);
         int y = listTop - scrollY;
-        for (Announcement a : list) {
-            renderEntry(g, listX, y, a, mouseX, mouseY);
-            y += entryHeight(a) + ENTRY_GAP;
+        for (EntryLayout entry : entries) {
+            renderEntry(g, listX, y, entry, mouseX, mouseY);
+            y += entry.height() + ENTRY_GAP;
             g.fill(listX, y - ENTRY_GAP / 2, listX + contentW, y - ENTRY_GAP / 2 + 1, LanPlusUI.DIVIDER);
         }
         g.disableScissor();
@@ -171,9 +177,7 @@ public final class Announcements extends LanPlusScreen {
         }
     }
 
-    private void renderSidebar(GuiGraphics g, int mouseX, int mouseY) {
-        AnnouncementsService svc = LanPlusClient.announcements();
-        List<Announcement> all = svc == null ? List.of() : svc.announcements();
+    private void renderSidebar(GuiGraphics g, int mouseX, int mouseY, List<Announcement> all) {
         for (int i = 0; i < FILTERS.length; i++) {
             Filter f = FILTERS[i];
             int y = sidebarTop + i * SB_ROW_H;
@@ -209,7 +213,8 @@ public final class Announcements extends LanPlusScreen {
         return n;
     }
 
-    private void renderEntry(GuiGraphics g, int x, int y, Announcement a, int mouseX, int mouseY) {
+    private void renderEntry(GuiGraphics g, int x, int y, EntryLayout entry, int mouseX, int mouseY) {
+        Announcement a = entry.announcement();
         g.drawString(this.font, typeLabel(a.type()), x, y, typeColor(a.type()), false);
         int rightX = x + contentW;
         if (a.createdAt() > 0) {
@@ -226,25 +231,23 @@ public final class Announcements extends LanPlusScreen {
             int tagW = this.font.width("NEW");
             g.drawString(this.font, "NEW", rightX - tagW, y, LanPlusUI.LIME, false);
         }
-        FormattedCharSequence titleSeq = MarkdownText.line(a.title(), MD_CODE, MD_LINK).getVisualOrderText();
-        g.drawString(this.font, titleSeq, x, y + TITLE_DY, LanPlusUI.TEXT, false);
-        registerLine(titleSeq, x, y + TITLE_DY, mouseX, mouseY);
+        g.drawString(this.font, entry.title(), x, y + TITLE_DY, LanPlusUI.TEXT, false);
+        registerLine(entry.title(), x, y + TITLE_DY, mouseX, mouseY);
         int by = y + BODY_DY;
-        for (Line ln : bodyLines(a)) {
+        for (Line ln : entry.body()) {
             by += ln.gapAbove();
             int lx = x + ln.indent();
             g.drawString(this.font, ln.seq(), lx, by, LanPlusUI.MUTED, false);
             registerLine(ln.seq(), lx, by, mouseX, mouseY);
             by += LINE_H;
         }
-        int ih = imageHeight(a);
+        int ih = entry.imageHeight();
         if (ih > 0) {
             int iy = by + IMG_GAP;
             g.fill(x, iy, x + contentW, iy + ih, LanPlusUI.SLOT);
             LanPlusUI.outline1(g, x, iy, x + contentW, iy + ih, LanPlusUI.BORDER);
-            ProfileImages.Tex tex = ProfileImages.get(a.image());
-            if (tex != null) {
-                ProfileImages.blitContain(g, tex, x + 1, iy + 1, contentW - 2, ih - 2);
+            if (entry.image() != null) {
+                ProfileImages.blitContain(g, entry.image(), x + 1, iy + 1, contentW - 2, ih - 2);
             }
         }
     }
@@ -263,25 +266,25 @@ public final class Announcements extends LanPlusScreen {
         }
     }
 
-    private int imageHeight(Announcement a) {
-        if (a.image() == null) {
-            return 0;
+    private EntryLayout layoutEntry(Announcement announcement) {
+        List<Line> body = bodyLines(announcement);
+        ProfileImages.Tex image = announcement.image() == null ? null : ProfileImages.get(announcement.image());
+        int imageHeight = 0;
+        if (announcement.image() != null) {
+            imageHeight = image == null || image.width() <= 0
+                    ? MAX_IMG_H
+                    : Math.clamp((long) contentW * image.height() / image.width(), MIN_IMG_H, MAX_IMG_H);
         }
-        ProfileImages.Tex tex = ProfileImages.get(a.image());
-        if (tex == null || tex.width() <= 0) {
-            return MAX_IMG_H;
-        }
-        int natural = contentW * tex.height() / tex.width();
-        return Math.clamp(natural, MIN_IMG_H, MAX_IMG_H);
-    }
-
-    private int entryHeight(Announcement a) {
-        int ih = imageHeight(a);
         int h = BODY_DY;
-        for (Line ln : bodyLines(a)) {
-            h += ln.gapAbove() + LINE_H;
+        for (Line line : body) {
+            h += line.gapAbove() + LINE_H;
         }
-        return h + (ih > 0 ? IMG_GAP + ih : 0);
+        if (imageHeight > 0) {
+            h += IMG_GAP + imageHeight;
+        }
+        return new EntryLayout(announcement,
+                MarkdownText.line(announcement.title(), MD_CODE, MD_LINK).getVisualOrderText(),
+                body, image, imageHeight, h);
     }
 
     private List<Line> bodyLines(Announcement a) {
@@ -340,11 +343,9 @@ public final class Announcements extends LanPlusScreen {
                     }
                 }
             }
-        }
-        if (button == 0 && mouseX >= sidebarX && mouseX < sidebarX + SIDEBAR_W
-                && mouseY >= sidebarTop && mouseY < sidebarTop + FILTERS.length * SB_ROW_H) {
-            int idx = (int) ((mouseY - sidebarTop) / SB_ROW_H);
-            if (idx >= 0 && idx < FILTERS.length) {
+            if (mouseX >= sidebarX && mouseX < sidebarX + SIDEBAR_W
+                    && mouseY >= sidebarTop && mouseY < sidebarTop + FILTERS.length * SB_ROW_H) {
+                int idx = (int) ((mouseY - sidebarTop) / SB_ROW_H);
                 if (FILTERS[idx] != selected) {
                     selected = FILTERS[idx];
                     scrollY = 0;
@@ -368,17 +369,18 @@ public final class Announcements extends LanPlusScreen {
         if (url == null) {
             return;
         }
-        this.minecraft.setScreen(new ConfirmLinkScreen(yes -> {
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.setScreen(new ConfirmLinkScreen(yes -> {
             if (yes) {
                 Util.getPlatform().openUri(url);
             }
-            this.minecraft.setScreen(this);
+            minecraft.setScreen(this);
         }, url, false));
     }
 
     @Override
     public void onClose() {
-        this.minecraft.setScreen(parent);
+        Minecraft.getInstance().setScreen(parent);
     }
 
     @Override

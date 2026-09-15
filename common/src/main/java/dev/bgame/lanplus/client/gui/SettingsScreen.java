@@ -71,14 +71,7 @@ public final class SettingsScreen extends LanPlusScreen {
 
         int categoryY = contentTop;
         for (Cat category : Cat.values()) {
-            LanplusButton.Builder builder = LanplusButton.create(
-                            Component.translatable("gui.lanplus.settings." + category.key),
-                            button -> selectCat(category))
-                    .bounds(sidebarX - 4, categoryY, CATEGORY_W, 18);
-            if (category == selected) {
-                builder.primary();
-            }
-            addRenderableWidget(builder.build());
+            addRenderableWidget(new CategoryButton(sidebarX - 4, categoryY, category));
             categoryY += 20;
         }
 
@@ -361,6 +354,33 @@ public final class SettingsScreen extends LanPlusScreen {
                     isHoveredOrFocused() ? LanPlusUI.ACCENT_HOVER : LanPlusUI.EDGE_DARK);
             int knobX = on ? x + WIDTH - 12 : x + 2;
             g.fill(knobX, y + 2, knobX + 10, y + HEIGHT - 2, on ? LanPlusUI.SURFACE : LanPlusUI.MUTED);
+        }
+    }
+
+    private final class CategoryButton extends Button {
+        private final Cat category;
+
+        private CategoryButton(int x, int y, Cat category) {
+            super(x, y, CATEGORY_W, 18,
+                    Component.translatable("gui.lanplus.settings." + category.key),
+                    button -> selectCat(category), DEFAULT_NARRATION);
+            this.category = category;
+        }
+
+        @Override
+        protected void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+            int x = getX();
+            int y = getY();
+            boolean selected = category == SettingsScreen.this.selected;
+            boolean highlighted = isHoveredOrFocused();
+            if (selected) {
+                LanPlusUI.button3d(g, x, y, x + getWidth(), y + getHeight(), LanPlusUI.SURFACE_RAISED);
+                g.fill(x + 2, y + 2, x + 4, y + getHeight() - 2, LanPlusUI.LIME);
+            } else if (highlighted) {
+                g.fill(x, y, x + getWidth(), y + getHeight(), LanPlusUI.SURFACE_HOVER);
+            }
+            g.drawString(SettingsScreen.this.font, getMessage(), x + 9, y + (getHeight() - 8) / 2,
+                    selected || highlighted ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
         }
     }
 }
