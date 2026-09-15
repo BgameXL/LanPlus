@@ -3,7 +3,6 @@ package dev.bgame.lanplus.client.gui;
 import dev.bgame.lanplus.api.CatalogImage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -26,10 +25,6 @@ public final class BackgroundPicker extends LanPlusScreen {
     private static final int PAD = 12;
     private static final int SWATCH = 24;
     private static final int SWATCH_GAP = 6;
-    private static final int SV_W = 104;
-    private static final int SV_H = 104;
-    private static final int HUE_W = 14;
-    private static final int SIDE_W = 84;
     private static final int IMG_COLS = 3;
     private static final int IMG_GAP = 8;
 
@@ -38,16 +33,13 @@ public final class BackgroundPicker extends LanPlusScreen {
     private final List<CatalogImage> images;
     private final String currentImageId;
     private final Sink sink;
+    private final int initialColor;
 
     private int tab;
-    private float hue, sat, val;
-    private int color;
-    private boolean svDrag, hueDrag;
     private int scrollY;
-    private EditBox hexBox;
+    private ColorPicker picker;
 
     private int boxX, contentW, panelTop, panelBottom, bodyTop;
-    private int svX, svY, hueX, customTop;
     private int imgTop, imgBottom, cellW, cellH, rowH;
     private final List<int[]> swatchCells = new ArrayList<>();
     private final List<ImgCell> imgCells = new ArrayList<>();
@@ -67,22 +59,7 @@ public final class BackgroundPicker extends LanPlusScreen {
         this.currentImageId = currentImageId;
         this.sink = sink;
         this.tab = style == 3 ? 1 : 0;
-        setColor(color & 0xFFFFFF);
-    }
-
-    private void setColor(int rgb) {
-        this.color = rgb & 0xFFFFFF;
-        float[] hsv = toHSV(this.color);
-        this.hue = hsv[0];
-        this.sat = hsv[1];
-        this.val = hsv[2];
-    }
-
-    private void syncColor() {
-        this.color = hsv(hue, sat, val);
-        if (hexBox != null) {
-            hexBox.setValue(String.format("%06X", color));
-        }
+        this.initialColor = color & 0xFFFFFF;
     }
 
     @Override
@@ -95,10 +72,7 @@ public final class BackgroundPicker extends LanPlusScreen {
 
         int presetCols = Math.min(8, palette.length);
         int presetRows = (palette.length + presetCols - 1) / presetCols;
-        customTop = bodyTop + presetRows * (SWATCH + SWATCH_GAP) + 12;
-        svX = boxX + PAD;
-        svY = customTop;
-        hueX = svX + SV_W + 10;
+        int customTop = bodyTop + presetRows * (SWATCH + SWATCH_GAP) + 12;
 
         imgTop = bodyTop;
         imgBottom = panelBottom - 6;
@@ -110,27 +84,15 @@ public final class BackgroundPicker extends LanPlusScreen {
                 .bounds(boxX + contentW - 90, panelBottom + 8, 90, 20).build());
 
         if (tab == 0) {
-            int rx = hueX + HUE_W + 14;
-            hexBox = new EditBox(this.font, rx, customTop + 52, SIDE_W, 18, Component.literal("hex"));
-            hexBox.setMaxLength(6);
-            hexBox.setValue(String.format("%06X", color));
-            hexBox.setResponder(this::onHexTyped);
-            addRenderableWidget(hexBox);
+            picker = new ColorPicker(this.font, initialColor);
+            picker.layout(boxX + PAD, customTop);
+            addRenderableWidget(picker.hexBox());
+            var hex = picker.hexBox();
             addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.bg.use"),
                             b -> commitSolid())
-                    .bounds(rx, customTop + 74, SIDE_W, 18).primary().build());
+                    .bounds(hex.getX(), hex.getY() + 22, hex.getWidth(), 18).primary().build());
         } else {
-            hexBox = null;
-        }
-    }
-
-    private void onHexTyped(String s) {
-        String t = s.trim();
-        if (t.length() == 6) {
-            try {
-                setColor(Integer.parseInt(t, 16));
-            } catch (NumberFormatException ignored) {
-            }
+            picker = null;
         }
     }
 
@@ -180,51 +142,23 @@ public final class BackgroundPicker extends LanPlusScreen {
         swatchCells.clear();
         int cols = Math.min(8, palette.length);
         int x0 = boxX + PAD;
+        int active = picker.color();
         for (int i = 0; i < palette.length; i++) {
             int cx = x0 + (i % cols) * (SWATCH + SWATCH_GAP);
             int cy = bodyTop + (i / cols) * (SWATCH + SWATCH_GAP);
             int c = palette[i] & 0xFFFFFF;
             swatchCells.add(new int[]{cx, cy, c});
             g.fill(cx, cy, cx + SWATCH, cy + SWATCH, 0xFF000000 | c);
-            if (c == color) {
+            if (c == active) {
                 LanPlusUI.outline1(g, cx - 2, cy - 2, cx + SWATCH + 2, cy + SWATCH + 2, LanPlusUI.ACCENT);
             } else {
                 LanPlusUI.outline1(g, cx, cy, cx + SWATCH, cy + SWATCH, LanPlusUI.EDGE_DARK);
             }
-            if (mouseX >= cx && mouseX < cx + SWATCH && mouseY >= cy && mouseY < cy + SWATCH && c != color) {
+            if (mouseX >= cx && mouseX < cx + SWATCH && mouseY >= cy && mouseY < cy + SWATCH && c != active) {
                 g.fill(cx, cy, cx + SWATCH, cy + SWATCH, 0x22FFFFFF);
             }
         }
-
-        int step = 4;
-        for (int px = 0; px < SV_W; px += step) {
-            float s = px / (float) (SV_W - 1);
-            for (int py = 0; py < SV_H; py += step) {
-                float v = 1f - py / (float) (SV_H - 1);
-                g.fill(svX + px, svY + py, svX + Math.min(px + step, SV_W), svY + Math.min(py + step, SV_H),
-                        0xFF000000 | hsv(hue, s, v));
-            }
-        }
-
-        // sv picker don't forget bgame
-        LanPlusUI.outline1(g, svX, svY, svX + SV_W, svY + SV_H, LanPlusUI.EDGE_DARK);
-        int hx = Math.clamp(svX + Math.round(sat * (SV_W - 1)), svX + 4, svX + SV_W - 5);
-        int hy = Math.clamp(svY + Math.round((1f - val) * (SV_H - 1)), svY + 4, svY + SV_H - 5);
-        LanPlusUI.outline1(g, hx - 4, hy - 4, hx + 5, hy + 5, 0xFF000000);
-        LanPlusUI.outline1(g, hx - 3, hy - 3, hx + 4, hy + 4, 0xFFFFFFFF);
-
-        for (int py = 0; py < SV_H; py += 3) {
-            float h = py / (float) (SV_H - 1) * 360f;
-            g.fill(hueX, svY + py, hueX + HUE_W, svY + Math.min(py + 3, SV_H), 0xFF000000 | hsv(h, 1f, 1f));
-        }
-        LanPlusUI.outline1(g, hueX, svY, hueX + HUE_W, svY + SV_H, LanPlusUI.EDGE_DARK);
-        int huey = svY + Math.round(hue / 360f * (SV_H - 1));
-        g.fill(hueX - 2, huey - 1, hueX + HUE_W + 2, huey + 1, 0xFFFFFFFF);
-
-        int rx = hueX + HUE_W + 14;
-        g.fill(rx, customTop, rx + SIDE_W, customTop + 44, 0xFF000000 | color);
-        LanPlusUI.outline1(g, rx, customTop, rx + SIDE_W, customTop + 44, LanPlusUI.EDGE_DARK);
-        g.drawString(this.font, "#", rx - 9, customTop + 57, LanPlusUI.FAINT, false);
+        picker.render(g);
     }
 
     private void renderImages(GuiGraphics g, int mouseX, int mouseY) {
@@ -289,14 +223,7 @@ public final class BackgroundPicker extends LanPlusScreen {
                     return true;
                 }
             }
-            if (mouseX >= svX && mouseX < svX + SV_W && mouseY >= svY && mouseY < svY + SV_H) {
-                svDrag = true;
-                setSV(mouseX, mouseY);
-                return true;
-            }
-            if (mouseX >= hueX && mouseX < hueX + HUE_W && mouseY >= svY && mouseY < svY + SV_H) {
-                hueDrag = true;
-                setHUE(mouseY);
+            if (picker.mouseClicked(mouseX, mouseY, button)) {
                 return true;
             }
         }
@@ -318,12 +245,7 @@ public final class BackgroundPicker extends LanPlusScreen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
-        if (svDrag) {
-            setSV(mouseX, mouseY);
-            return true;
-        }
-        if (hueDrag) {
-            setHUE(mouseY);
+        if (picker != null && picker.mouseDragged(mouseX, mouseY)) {
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dx, dy);
@@ -331,8 +253,9 @@ public final class BackgroundPicker extends LanPlusScreen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        svDrag = false;
-        hueDrag = false;
+        if (picker != null) {
+            picker.mouseReleased();
+        }
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
@@ -341,81 +264,15 @@ public final class BackgroundPicker extends LanPlusScreen {
         if (tab == 1) {
             int rows = (imgCells.size() + IMG_COLS - 1) / IMG_COLS;
             int max = Math.max(0, rows * rowH - (imgBottom - imgTop));
-            scrollY = Math.max(0, Math.min(max, scrollY - (int) (delta * 24)));
+            scrollY = Math.clamp(scrollY - (int) (delta * 24), 0, max);
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, sx, delta);
     }
 
-    private void setSV(double mx, double my) {
-        sat = Math.clamp((float) (mx - svX) / (SV_W - 1), 0f, 1f);
-        val = 1f - Math.clamp((float) (my - svY) / (SV_H - 1), 0f, 1f);
-        syncColor();
-    }
-
-    private void setHUE(double my) {
-        hue = Math.clamp((float) (my - svY) / (SV_H - 1), 0f, 1f) * 360f;
-        syncColor();
-    }
-
     private void commitSolid() {
-        sink.solid(color);
+        sink.solid(picker.color());
         onClose();
-    }
-
-    private static int hsv(float h, float s, float v) {
-        float c = v * s;
-        float hp = ((h % 360f) + 360f) % 360f / 60f;
-        float x = c * (1f - Math.abs(hp % 2f - 1f));
-        float r = 0, g = 0, b = 0;
-        if (hp < 1) {
-            r = c;
-            g = x;
-        } else if (hp < 2) {
-            r = x;
-            g = c;
-        } else if (hp < 3) {
-            g = c;
-            b = x;
-        } else if (hp < 4) {
-            g = x;
-            b = c;
-        } else if (hp < 5) {
-            r = x;
-            b = c;
-        } else {
-            r = c;
-            b = x;
-        }
-        float m = v - c;
-        int ri = Math.round((r + m) * 255f);
-        int gi = Math.round((g + m) * 255f);
-        int bi = Math.round((b + m) * 255f);
-        return (ri << 16) | (gi << 8) | bi;
-    }
-
-    private static float[] toHSV(int rgb) {
-        float r = ((rgb >> 16) & 0xFF) / 255f;
-        float g = ((rgb >> 8) & 0xFF) / 255f;
-        float b = (rgb & 0xFF) / 255f;
-        float max = Math.max(r, Math.max(g, b));
-        float min = Math.min(r, Math.min(g, b));
-        float d = max - min;
-        float h = 0f;
-        if (d != 0f) {
-            if (max == r) {
-                h = ((g - b) / d) % 6f;
-            } else if (max == g) {
-                h = (b - r) / d + 2f;
-            } else {
-                h = (r - g) / d + 4f;
-            }
-            h *= 60f;
-            if (h < 0) {
-                h += 360f;
-            }
-        }
-        return new float[]{h, max == 0f ? 0f : d / max, max};
     }
 
     @Override

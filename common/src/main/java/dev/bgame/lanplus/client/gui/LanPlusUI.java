@@ -34,7 +34,7 @@ final class LanPlusUI {
     private static Theme current;
 
     static {
-        apply(Themes.byId(Config.theme));
+        apply(Themes.resolve(Config.theme));
     }
 
     private LanPlusUI() {
