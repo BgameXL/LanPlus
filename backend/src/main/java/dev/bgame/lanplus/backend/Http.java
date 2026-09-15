@@ -11,7 +11,10 @@ import java.util.Map;
 
 final class Http {
 
-    private Http() {}
+    private static final int MAX_BODY = 1024 * 1024;
+
+    private Http() {
+    }
 
     record Request(String method, String path, String query, Map<String, String> headers, String body) {
 
@@ -68,7 +71,15 @@ final class Http {
         String body = "";
         String len = headers.get("content-length");
         if (len != null) {
-            int n = Integer.parseInt(len.trim());
+            int n;
+            try {
+                n = Integer.parseInt(len.trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+            if (n < 0 || n > MAX_BODY) {
+                return null;
+            }
             byte[] buf = in.readNBytes(n);
             body = new String(buf, StandardCharsets.UTF_8);
         }
@@ -92,14 +103,7 @@ final class Http {
 
     static void writeJson(OutputStream out, int status, Object body) throws IOException {
         byte[] payload = (body == null ? "" : Json.write(body)).getBytes(StandardCharsets.UTF_8);
-        StringBuilder head = new StringBuilder();
-        head.append("HTTP/1.1 ").append(status).append(' ').append(reason(status)).append("\r\n");
-        head.append("Content-Type: application/json\r\n");
-        head.append("Content-Length: ").append(payload.length).append("\r\n");
-        head.append("Connection: close\r\n\r\n");
-        out.write(head.toString().getBytes(StandardCharsets.UTF_8));
-        out.write(payload);
-        out.flush();
+        writeBytes(out, status, "application/json", payload, null);
     }
 
     private static String readLine(InputStream in) throws IOException {

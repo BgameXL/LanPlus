@@ -11,6 +11,7 @@ import java.util.Base64;
 final class WebSocket {
 
     private static final String MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+    private static final long MAX_FRAME = 1024 * 1024;
     private final Socket socket;
     private final InputStream in;
     private final OutputStream out;
@@ -57,6 +58,9 @@ final class WebSocket {
                 for (int i = 0; i < 8; i++) {
                     len = (len << 8) | read1();
                 }
+            }
+            if (len < 0 || len > MAX_FRAME) {
+                return null;
             }
             byte[] mask = new byte[4];
             if (masked) {

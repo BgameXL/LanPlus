@@ -405,7 +405,7 @@ final class Store {
                     if (rs.next()) {
                         UUID uuid = UUID.fromString(rs.getString(1));
                         return ordered("uuid", rs.getString(1), "username", rs.getString(2),
-                                "online", "ONLINE".equals(connectivity(uuid)));
+                                "online", isOnline(uuid));
                     }
                 }
             } catch (SQLException e) {
@@ -431,7 +431,7 @@ final class Store {
                     while (rs.next()) {
                         UUID uuid = UUID.fromString(rs.getString(1));
                         out.add(ordered("uuid", rs.getString(1), "username", rs.getString(2),
-                                "online", "ONLINE".equals(connectivity(uuid))));
+                                "online", isOnline(uuid)));
                     }
                 }
             } catch (SQLException e) {
@@ -541,6 +541,10 @@ final class Store {
 
     private static boolean isLive(String connectivity) {
         return "ONLINE".equals(connectivity) || "STALE".equals(connectivity);
+    }
+
+    private boolean isOnline(UUID uuid) {
+        return "ONLINE".equals(connectivity(uuid));
     }
 
     private void saveSkinRef(UUID uuid, String skinJson, long now) {
@@ -890,7 +894,7 @@ final class Store {
                     while (rs.next()) {
                         UUID rid = UUID.fromString(rs.getString(1));
                         out.add(ordered("uuid", rs.getString(1), "username", rs.getString(2),
-                                "online", "ONLINE".equals(connectivity(rid))));
+                                "online", isOnline(rid)));
                     }
                 }
             } catch (SQLException e) {

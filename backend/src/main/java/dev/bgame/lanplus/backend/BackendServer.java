@@ -115,8 +115,6 @@ public final class BackendServer {
                 Http.writeJson(socket.getOutputStream(), r.status, r.body);
             }
             socket.close();
-        } catch (SocketTimeoutException e) {
-            close(socket);
         } catch (IOException e) {
             close(socket);
         }
