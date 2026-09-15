@@ -534,7 +534,19 @@ public final class BackendServer {
             return adminAnnouncement(req);
         }
         if (m.equals("POST") && path.equals("/admin/announcement-image")) {
-            return adminAnnouncementImage(req);
+            return adminImageUpload(announcementImages, "announcement", req);
+        }
+        if (m.equals("POST") && path.equals("/admin/background-image")) {
+            return adminImageUpload(backgrounds, "background", req);
+        }
+        if (m.equals("POST") && path.equals("/admin/banner-image")) {
+            return adminImageUpload(banners, "banner", req);
+        }
+        if (m.equals("GET") && path.equals("/admin/backgrounds")) {
+            return ok(backgrounds.list());
+        }
+        if (m.equals("GET") && path.equals("/admin/banners")) {
+            return ok(banners.list());
         }
         if (m.equals("GET") && path.equals("/admin/announcements")) {
             return ok(store.announcementsAll());
@@ -591,10 +603,10 @@ public final class BackendServer {
         return ok(row);
     }
 
-    private static final int MAX_ANN_IMAGE_B64_CHARS = 700 * 1024;
-    private static final int MAX_ANN_IMAGE_DIM = 4096;
+    private static final int MAX_IMAGE_B64_CHARS = 700 * 1024;
+    private static final int MAX_IMAGE_DIM = 4096;
 
-    private Resp adminAnnouncementImage(Http.Request req) {
+    private Resp adminImageUpload(AssetCatalog catalog, String label, Http.Request req) {
         Map<String, Object> b = Json.parseObject(req.body());
         String id = b.get("id") == null ? null : String.valueOf(b.get("id"));
         if (!AssetCatalog.validId(id)) {
@@ -603,7 +615,7 @@ public final class BackendServer {
         if (!(b.get("png") instanceof String b64) || b64.isEmpty()) {
             return ok(error("bad_png"));
         }
-        if (b64.length() > MAX_ANN_IMAGE_B64_CHARS) {
+        if (b64.length() > MAX_IMAGE_B64_CHARS) {
             return ok(error("too_large"));
         }
         byte[] png;
@@ -619,15 +631,15 @@ public final class BackendServer {
         if (dims == null) {
             return ok(error("bad_png"));
         }
-        if (dims[0] < 1 || dims[1] < 1 || dims[0] > MAX_ANN_IMAGE_DIM || dims[1] > MAX_ANN_IMAGE_DIM) {
+        if (dims[0] < 1 || dims[1] < 1 || dims[0] > MAX_IMAGE_DIM || dims[1] > MAX_IMAGE_DIM) {
             return ok(error("bad_dimensions"));
         }
-        String hash = announcementImages.write(id, png);
+        String hash = catalog.write(id, png);
         if (hash == null) {
             return ok(error("write_failed"));
         }
-        log("admin announcement image uploaded: " + id);
-        return ok(ordered("id", id, "url", announcementImages.url(id), "hash", hash));
+        log("admin " + label + " image uploaded: " + id);
+        return ok(ordered("id", id, "url", catalog.url(id), "hash", hash));
     }
 
     private Resp adminScrub(Http.Request req) {

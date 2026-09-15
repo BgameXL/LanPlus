@@ -46,6 +46,10 @@ final class AdminPanel {
               #msg { min-height:18px; font-size:13px; margin-bottom:8px; }
               .grid2 { display:flex; gap:8px; flex-wrap:wrap; }
               .grid2 input { flex:1; min-width:180px; }
+              .thumbs { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+              .thumb { width:96px; }
+              .thumb img { width:96px; height:54px; object-fit:cover; border:1px solid #2a2833; border-radius:6px; background:#14121a; display:block; }
+              .thumb .cap { font-size:11px; color:#9a97a8; word-break:break-all; margin-top:2px; }
               label { font-size:12px; color:#9a97a8; display:block; margin-bottom:6px; }
               select, textarea { width:100%; padding:10px 12px; border-radius:8px; border:1px solid #34313f;
                 background:#14131a; color:#e8e8ef; font-size:14px; }
@@ -106,6 +110,22 @@ final class AdminPanel {
                   </div>
                   <div id="annList"></div>
                 </div>
+
+                <div class="card">
+                  <label>Cosmetics catalog</label>
+                  <div class="grid2">
+                    <input id="bgId" type="text" placeholder="Background id (optional)">
+                    <input id="bgFile" type="file" accept="image/png">
+                    <button class="ghost" onclick="uploadImage('/admin/background-image','bgFile','bgId').then(loadCosmetics)">Upload background</button>
+                  </div>
+                  <div id="bgList" class="thumbs"></div>
+                  <div class="grid2">
+                    <input id="bannerId" type="text" placeholder="Banner id (optional)">
+                    <input id="bannerFile" type="file" accept="image/png">
+                    <button class="ghost" onclick="uploadImage('/admin/banner-image','bannerFile','bannerId').then(loadCosmetics)">Upload banner</button>
+                  </div>
+                  <div id="bannerList" class="thumbs"></div>
+                </div>
               </div>
             </main>
             <script>
@@ -121,7 +141,7 @@ final class AdminPanel {
               const v = document.getElementById('key').value.trim();
               if (!v) return;
               localStorage.setItem(KS, v);
-              show(true); loadReports(); loadAnnouncements();
+              show(true); loadReports(); loadAnnouncements(); loadCosmetics();
             }
             function logout() { localStorage.removeItem(KS); show(false); msg(''); }
             
@@ -213,24 +233,44 @@ final class AdminPanel {
               } catch (e) { msg('Network error', true); }
             }
 
-            async function uploadAnnImage() {
-              const f = document.getElementById('annImageFile').files[0];
+            async function uploadImage(path, fileId, idField) {
+              const f = document.getElementById(fileId).files[0];
               if (!f) { msg('Pick a PNG first', true); return; }
-              let id = document.getElementById('annImage').value.trim();
+              let id = idField ? document.getElementById(idField).value.trim() : '';
               if (!id) { id = f.name.replace(/\\.png$/i, '').toLowerCase().replace(/[^a-z0-9_-]/g, '-').slice(0, 64); }
               try {
                 const bytes = new Uint8Array(await f.arrayBuffer());
                 let bin = '';
                 for (let i = 0; i < bytes.length; i++) { bin += String.fromCharCode(bytes[i]); }
-                const r = await api('/admin/announcement-image', { id, png: btoa(bin) });
+                const r = await api(path, { id, png: btoa(bin) });
                 if (r.status === 401) { msg('Invalid admin key', true); show(false); return; }
                 const data = await r.json().catch(() => ({}));
                 if (!r.ok || data.error) { msg('Upload failed' + (data.error ? ': ' + data.error : ''), true); return; }
-                document.getElementById('annImage').value = data.id;
-                document.getElementById('annImageFile').value = '';
-                msg('Image uploaded: ' + data.id);
+                if (idField) document.getElementById(idField).value = data.id;
+                document.getElementById(fileId).value = '';
+                msg('Uploaded: ' + data.id);
               } catch (e) { msg('Network error', true); }
             }
+
+            function uploadAnnImage() { uploadImage('/admin/announcement-image', 'annImageFile', 'annImage'); }
+
+            async function loadCatalog(path, containerId) {
+              let r;
+              try { r = await api(path); } catch (e) { return; }
+              if (!r.ok) return;
+              const list = await r.json();
+              const box = document.getElementById(containerId);
+              box.textContent = '';
+              if (!list.length) { box.append(el('div','muted','Nothing uploaded yet.')); return; }
+              for (const a of list) {
+                const cell = el('div','thumb');
+                const img = el('img'); img.src = a.url + '?v=' + (a.hash||'').slice(0,16); img.alt = a.id;
+                cell.append(img); cell.append(el('div','cap', a.id));
+                box.append(cell);
+              }
+            }
+
+            function loadCosmetics() { loadCatalog('/admin/backgrounds','bgList'); loadCatalog('/admin/banners','bannerList'); }
 
             async function loadAnnouncements() {
               let r;
@@ -262,7 +302,7 @@ final class AdminPanel {
             }
             
             // Boot
-            if (key()) { show(true); loadReports(); loadAnnouncements(); } else { show(false); }
+            if (key()) { show(true); loadReports(); loadAnnouncements(); loadCosmetics(); } else { show(false); }
             </script>
             </body>
             </html>
