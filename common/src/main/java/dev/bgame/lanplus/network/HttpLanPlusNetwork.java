@@ -640,6 +640,13 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         openSocket();
     }
 
+    @Override
+    public void addEventListener(BackendEventListener listener) {
+        if (listener != null && !eventsListeners.contains(listener)) {
+            eventsListeners.add(listener);
+        }
+    }
+
     private void fanout(java.util.function.Consumer<BackendEventListener> action) {
         for (BackendEventListener l : eventsListeners) {
             action.accept(l);
@@ -999,6 +1006,12 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                         JsonObject d = obj.getAsJsonObject("data");
                         int id = d.has("id") && !d.get("id").isJsonNull() ? d.get("id").getAsInt() : 0;
                         fanout(l -> l.onAnnouncementDeleted(id));
+                    }
+                    case "TEST_NOTIFICATION" -> {
+                        JsonObject d = obj.getAsJsonObject("data");
+                        String title = optionalString(d, "title");
+                        String body = optionalString(d, "body");
+                        fanout(l -> l.onTestNotification(title, body));
                     }
                     case "PING" -> webSocket.sendText(GSON.toJson(Map.of("type", "PONG")), true);
                     default -> {

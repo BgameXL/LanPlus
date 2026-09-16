@@ -73,8 +73,7 @@ public final class LanPlusClient {
         if (presence != null) {
             return;
         }
-        network = new HttpLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity,
-                new ClientMinecraftAuth());
+        network = new HttpLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity, new ClientMinecraftAuth());
         AssetCache assetCache = new AssetCache(PlatformHolder.get().getGameDir().resolve("lanplus/cache/assets"));
         ProfileCache profileCache = new ProfileCache(PlatformHolder.get().getGameDir().resolve("lanplus/cache/profiles"));
         presence = new DefaultPresenceManager(network);
@@ -88,23 +87,19 @@ public final class LanPlusClient {
         friends.addListener(LanPlusClient::resolveFriendSkins);
         friends.addListener(new SocialToastListener());
 
-        discord = new DiscordRichPresence(Config.discordAppId, Config.discordEnabled,
-                LanPlusClient::integratedPartySize, LanPlusClient::joinByInviteCode);
+        discord = new DiscordRichPresence(Config.discordAppId, Config.discordEnabled, LanPlusClient::integratedPartySize, LanPlusClient::joinByInviteCode);
         presence.addListener(discord::update);
         discord.update(presence.current());
 
         boolean relayDev = !Config.relayDevAddress.isBlank();
         relayTunnel = new TcpRelayTunnel(Config.relayDevPlaintext);
-        new RelayHostingCoordinator(presence, relayTunnel, network,
-                () -> Config.relayEnabled, HostController::isOfflineHosting,
-                relayDev ? LanPlusClient::devRelayTicket : null);
+        new RelayHostingCoordinator(presence, relayTunnel, network, () -> Config.relayEnabled, HostController::isOfflineHosting, relayDev ? LanPlusClient::devRelayTicket : null);
 
         if (Config.voiceEnabled) {
             SvcBridge.applyVoiceHost(Config.voiceHost);
         }
 
-        invites = new DefaultInviteService(network, presence, LanPlusClient::localIdentity,
-                () -> Config.relayEnabled, HostController::isOfflineHosting);
+        invites = new DefaultInviteService(network, presence, LanPlusClient::localIdentity, () -> Config.relayEnabled, HostController::isOfflineHosting);
 
         announcements = new DefaultAnnouncementsService(network, LanPlusClient::localIdentity);
         announcements.addListener(new AnnouncementsService.AnnouncementsListener() {
@@ -115,6 +110,13 @@ public final class LanPlusClient {
             @Override
             public void onNewAnnouncement(Announcement announcement) {
                 LanPlusNotifications.announcement(announcement);
+            }
+        });
+
+        network.addEventListener(new LanPlusNetwork.BackendEventListener() {
+            @Override
+            public void onTestNotification(String title, String body) {
+                LanPlusNotifications.test(title, body);
             }
         });
 
@@ -169,12 +171,8 @@ public final class LanPlusClient {
                 Path anim = dir.resolve(id + ".animation.json");
                 Path png = dir.resolve(id + ".png");
                 Path metaFile = dir.resolve(id + ".cosmetic.json");
-                cosmetics.register(id,
-                        Files.readAllBytes(geo),
-                        Files.isRegularFile(anim) ? Files.readAllBytes(anim) : null,
-                        Files.isRegularFile(png) ? Files.readAllBytes(png) : null);
-                CosmeticMeta meta = CosmeticMeta.parse(id,
-                        Files.isRegularFile(metaFile) ? Files.readString(metaFile) : null);
+                cosmetics.register(id, Files.readAllBytes(geo), Files.isRegularFile(anim) ? Files.readAllBytes(anim) : null, Files.isRegularFile(png) ? Files.readAllBytes(png) : null);
+                CosmeticMeta meta = CosmeticMeta.parse(id, Files.isRegularFile(metaFile) ? Files.readString(metaFile) : null);
                 cosmetics.putMeta(meta);
                 if (self != null) {
                     cosmetics.equip(self, meta.slot(), id);

@@ -1,5 +1,6 @@
 package dev.bgame.lanplus.client.gui;
 
+import dev.bgame.lanplus.LanplusCommon;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
 import net.minecraft.client.Minecraft;
@@ -22,14 +23,17 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class LanPlusNotifications {
 
-    private static final int W = 196;
-    private static final int H = 44;
+    private static final int W = 216;
+    private static final int H = 50;
     private static final int MARGIN = 8;
     private static final int GAP = 6;
     private static final long RISE_MS = 220;
     private static final long FALL_MS = 220;
     private static final long HOLD_ACTION_MS = 9000;
     private static final long HOLD_INFO_MS = 5000;
+
+    private static final ResourceLocation ANNOUNCE_ICON =
+            ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "textures/gui/announcements.png");
 
     private static final CopyOnWriteArrayList<Notif> active = new CopyOnWriteArrayList<>();
 
@@ -43,7 +47,7 @@ public final class LanPlusNotifications {
         Component action = invited ? Component.translatable("gui.lanplus.notif.view") : null;
         Runnable onAction = invited ? () -> LanPlusClient.openFriendsFocused(friend) : null;
         push(new Notif(friend, Component.literal(name), subtitle, action, onAction,
-                invited ? HOLD_ACTION_MS : HOLD_INFO_MS));
+                invited ? HOLD_ACTION_MS : HOLD_INFO_MS, LanPlusUI.LIME, null, null));
     }
 
     public static void friendRequest(UUID from, String name) {
@@ -54,11 +58,18 @@ public final class LanPlusNotifications {
                     if (LanPlusClient.friends() != null) {
                         LanPlusClient.friends().accept(from);
                     }
-                }, HOLD_ACTION_MS));
+                }, HOLD_ACTION_MS, LanPlusUI.LIME, null, null));
     }
 
     public static void info(Component title, Component subtitle) {
-        push(new Notif(null, title, subtitle, null, null, HOLD_INFO_MS));
+        push(new Notif(null, title, subtitle, null, null, HOLD_INFO_MS, LanPlusUI.ACCENT, "+", null));
+    }
+
+    public static void test(String title, String body) {
+        push(new Notif(null,
+                Component.literal(title == null || title.isBlank() ? "Test" : title),
+                body == null || body.isBlank() ? null : Component.literal(body),
+                null, null, HOLD_INFO_MS, LanPlusUI.ACCENT, "+", null));
     }
 
     public static void announcement(dev.bgame.lanplus.api.Announcement a) {
@@ -71,7 +82,16 @@ public final class LanPlusNotifications {
                 () -> {
                     Minecraft mc = Minecraft.getInstance();
                     mc.setScreen(new Announcements(mc.screen));
-                }, HOLD_ACTION_MS));
+                }, HOLD_ACTION_MS, announcementTint(a.type()), null, ANNOUNCE_ICON));
+    }
+
+    private static int announcementTint(dev.bgame.lanplus.api.Announcement.Type type) {
+        return switch (type) {
+            case UPDATE -> 0xFF55FF55;
+            case MAINTENANCE -> 0xFFFFFF55;
+            case GENERAL -> 0xFF55FFFF;
+            default -> LanPlusUI.LIME;
+        };
     }
 
     private static void push(Notif n) {
@@ -146,7 +166,7 @@ public final class LanPlusNotifications {
                 slide = 0f;
             }
             int x = screenW - MARGIN - W + (int) (slide * (W + MARGIN));
-            int y = screenH - MARGIN - H - slot * (H + GAP);
+            int y = MARGIN + slot * (H + GAP);
             renderOne(g, n, x, y, alpha, mouseX, mouseY);
             slot++;
         }
@@ -156,41 +176,58 @@ public final class LanPlusNotifications {
     private static void renderOne(GuiGraphics g, Notif n, int x, int y, float alpha, double mx, double my) {
         n.x = x;
         n.y = y;
-        g.fill(x, y, x + W, y + H, col(LanPlusUI.SURFACE, alpha * 0.95f));
-        borderAlpha(g, x, y, x + W, y + H, alpha);
-        g.fill(x, y, x + 2, y + H, col(LanPlusUI.ACCENT, alpha));
+        LanPlusUI.outline1(g, x, y, x + W, y + H, col(LanPlusUI.EDGE_DARK, alpha));
+        g.fill(x + 1, y + 1, x + W - 1, y + H - 1, col(LanPlusUI.SURFACE, alpha * 0.96f));
+        g.fill(x + 1, y + 1, x + W - 1, y + 2, col(LanPlusUI.shade(LanPlusUI.SURFACE, 1.6f), alpha * 0.6f));
+        g.fill(x, y, x + 3, y + H, col(n.tint, alpha));
 
         Font font = Minecraft.getInstance().font;
-        int textX = x + 8;
+        int textX = x + 12;
+        int iconY = y + (H - 24) / 2;
         if (n.avatar != null) {
             SkinTextures textures = LanPlusClient.skinTextures();
             SkinTextures.Resolved resolved = textures == null ? null : textures.get(n.avatar);
             ResourceLocation tex = resolved != null ? resolved.texture() : DefaultPlayerSkin.get(n.avatar).texture();
             g.setColor(1f, 1f, 1f, alpha);
-            PlayerFaceRenderer.draw(g, tex, x + 8, y + 10, 24);
+            PlayerFaceRenderer.draw(g, tex, x + 10, iconY, 24);
             g.setColor(1f, 1f, 1f, 1f);
-            textX = x + 40;
+            textX = x + 42;
+        } else if (n.icon != null || n.glyph != null) {
+            int ix = x + 10;
+            g.fill(ix, iconY, ix + 24, iconY + 24, col(LanPlusUI.SURFACE_RAISED, alpha));
+            LanPlusUI.outline1(g, ix, iconY, ix + 24, iconY + 24, col(LanPlusUI.EDGE_DARK, alpha));
+            if (n.icon != null) {
+                g.setColor(1f, 1f, 1f, alpha);
+                g.blit(n.icon, ix + 4, iconY + 4, 0, 0, 16, 16, 16, 16);
+                g.setColor(1f, 1f, 1f, 1f);
+            } else {
+                int gw = font.width(n.glyph);
+                g.drawString(font, n.glyph, ix + (24 - gw) / 2, iconY + 8, col(n.tint, alpha), false);
+            }
+            textX = x + 42;
         }
 
         boolean hasAction = n.action != null;
-        n.btnW = 42;
-        n.btnH = 18;
+        n.btnW = 48;
+        n.btnH = 20;
         n.btnX = x + W - n.btnW - 8;
         n.btnY = y + (H - n.btnH) / 2;
-        int textRight = hasAction ? n.btnX - 6 : x + W - 8;
+        int textRight = hasAction ? n.btnX - 8 : x + W - 10;
 
-        g.drawString(font, ellipsize(font, n.title, textRight - textX), textX, y + 9, col(LanPlusUI.TEXT, alpha), false);
+        g.drawString(font, ellipsize(font, n.title, textRight - textX), textX, y + 12, col(LanPlusUI.TEXT, alpha), false);
         if (n.subtitle != null) {
-            g.drawString(font, ellipsize(font, n.subtitle, textRight - textX), textX, y + 22,
+            g.drawString(font, ellipsize(font, n.subtitle, textRight - textX), textX, y + 27,
                     col(LanPlusUI.MUTED, alpha), false);
         }
 
         if (hasAction) {
             boolean hover = mx >= n.btnX && mx < n.btnX + n.btnW && my >= n.btnY && my < n.btnY + n.btnH;
             g.fill(n.btnX, n.btnY, n.btnX + n.btnW, n.btnY + n.btnH,
+                    col(hover ? LanPlusUI.shade(LanPlusUI.ACCENT_STRONG, 0.4f) : LanPlusUI.SURFACE_RAISED, alpha));
+            LanPlusUI.outline1(g, n.btnX, n.btnY, n.btnX + n.btnW, n.btnY + n.btnH,
                     col(hover ? LanPlusUI.ACCENT_HOVER : LanPlusUI.ACCENT, alpha));
             int tw = font.width(n.action);
-            g.drawString(font, n.action, n.btnX + (n.btnW - tw) / 2, n.btnY + 5, col(LanPlusUI.TEXT, alpha), false);
+            g.drawString(font, n.action, n.btnX + (n.btnW - tw) / 2, n.btnY + 6, col(LanPlusUI.TEXT, alpha), false);
         }
     }
 
@@ -220,11 +257,6 @@ public final class LanPlusNotifications {
         return Component.literal(font.plainSubstrByWidth(s, maxWidth - font.width("…")) + "…");
     }
 
-    private static void borderAlpha(GuiGraphics g, int x0, int y0, int x1, int y1, float a) {
-        int c = col(0xFFFFFF, a * 0.25f);
-        LanPlusUI.outline1(g, x0, y0, x1, y1, c);
-    }
-
     private static int col(int rgb, float alpha) {
         int a = Math.clamp((int) (alpha * 255), 0, 255);
         return (a << 24) | (rgb & 0xFFFFFF);
@@ -241,18 +273,25 @@ public final class LanPlusNotifications {
         final Component action;
         final Runnable onAction;
         final long hold;
+        final int tint;
+        final String glyph;
+        final ResourceLocation icon;
         final long bornAt = System.currentTimeMillis();
         boolean dismissed;
         long dismissedAt;
         int x, y, btnX, btnY, btnW, btnH;
 
-        Notif(UUID avatar, Component title, Component subtitle, Component action, Runnable onAction, long hold) {
+        Notif(UUID avatar, Component title, Component subtitle, Component action, Runnable onAction, long hold,
+              int tint, String glyph, ResourceLocation icon) {
             this.avatar = avatar;
             this.title = title;
             this.subtitle = subtitle;
             this.action = action;
             this.onAction = onAction;
             this.hold = hold;
+            this.tint = tint;
+            this.glyph = glyph;
+            this.icon = icon;
         }
     }
 }

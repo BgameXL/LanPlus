@@ -59,6 +59,7 @@ public interface LanPlusNetwork {
     CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);
 
     void connectEvents(UUID uuid, BackendEventListener listener);
+    void addEventListener(BackendEventListener listener);
     void disconnect();
     boolean isConnected();
 
@@ -87,6 +88,9 @@ public interface LanPlusNetwork {
         }
 
         default void onAnnouncementDeleted(int id) {
+        }
+
+        default void onTestNotification(String title, String body) {
         }
 
         default void onConnected() {
