@@ -104,7 +104,7 @@ public final class BackendServer {
                 return;
             }
             if (req.path().equals("/events") && req.isWebSocketUpgrade()) {
-                serveEvents(socket, req); // owns the socket until close
+                serveEvents(socket, req);
                 return;
             }
             Resp r = route(req);
@@ -546,6 +546,9 @@ public final class BackendServer {
         if (m.equals("GET") && path.equals("/admin/banners")) {
             return ok(banners.list());
         }
+        if (m.equals("POST") && path.equals("/admin/test-notification")) {
+            return adminTestNotification(req);
+        }
         if (m.equals("GET") && path.equals("/admin/announcements")) {
             return ok(store.announcementsAll());
         }
@@ -603,6 +606,14 @@ public final class BackendServer {
 
     private static final int MAX_IMAGE_B64_CHARS = 700 * 1024;
     private static final int MAX_IMAGE_DIM = 4096;
+
+    private Resp adminTestNotification(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        String title = b.get("title") == null ? "Test notification" : String.valueOf(b.get("title"));
+        String body = b.get("body") == null ? "" : String.valueOf(b.get("body"));
+        hub.sendAll(ordered("type", "TEST_NOTIFICATION", "data", ordered("title", title, "body", body)));
+        return OK_EMPTY;
+    }
 
     private Resp adminImageUpload(AssetCatalog catalog, String label, Http.Request req) {
         Map<String, Object> b = Json.parseObject(req.body());

@@ -110,7 +110,7 @@ final class AdminPanel {
                   </div>
                   <div id="annList"></div>
                 </div>
-
+            
                 <div class="card">
                   <label>Cosmetics catalog</label>
                   <div class="grid2">
@@ -125,6 +125,15 @@ final class AdminPanel {
                     <button class="ghost" onclick="uploadImage('/admin/banner-image','bannerFile','bannerId').then(loadCosmetics)">Upload banner</button>
                   </div>
                   <div id="bannerList" class="thumbs"></div>
+                </div>
+            
+                <div class="card">
+                  <label>Test notification</label>
+                  <div class="grid2">
+                    <input id="testTitle" type="text" placeholder="Title">
+                    <input id="testBody" type="text" placeholder="Body">
+                    <button class="accent" onclick="sendTestNotification()">Send test</button>
+                  </div>
                 </div>
               </div>
             </main>
@@ -232,7 +241,7 @@ final class AdminPanel {
                 loadAnnouncements();
               } catch (e) { msg('Network error', true); }
             }
-
+            
             async function uploadImage(path, fileId, idField) {
               const f = document.getElementById(fileId).files[0];
               if (!f) { msg('Pick a PNG first', true); return; }
@@ -251,9 +260,9 @@ final class AdminPanel {
                 msg('Uploaded: ' + data.id);
               } catch (e) { msg('Network error', true); }
             }
-
+            
             function uploadAnnImage() { uploadImage('/admin/announcement-image', 'annImageFile', 'annImage'); }
-
+            
             async function loadCatalog(path, containerId) {
               let r;
               try { r = await api(path); } catch (e) { return; }
@@ -269,9 +278,20 @@ final class AdminPanel {
                 box.append(cell);
               }
             }
-
+            
             function loadCosmetics() { loadCatalog('/admin/backgrounds','bgList'); loadCatalog('/admin/banners','bannerList'); }
-
+            
+            async function sendTestNotification() {
+              const title = document.getElementById('testTitle').value.trim();
+              const body = document.getElementById('testBody').value.trim();
+              try {
+                const r = await api('/admin/test-notification', { title, body });
+                if (r.status === 401) { msg('Invalid admin key', true); show(false); return; }
+                if (!r.ok) { msg('Error ' + r.status, true); return; }
+                msg('Test notification sent');
+              } catch (e) { msg('Network error', true); }
+            }
+            
             async function loadAnnouncements() {
               let r;
               try { r = await api('/admin/announcements'); } catch (e) { return; }
