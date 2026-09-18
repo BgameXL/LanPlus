@@ -37,5 +37,12 @@ public class LanplusNeoForge {
         public boolean isClient() {
             return FMLEnvironment.dist == Dist.CLIENT;
         }
+
+        @Override
+        public String modVersion() {
+            return net.neoforged.fml.ModList.get().getModContainerById(LanplusCommon.MODID)
+                    .map(c -> c.getModInfo().getVersion().toString())
+                    .orElse("");
+        }
     }
 }

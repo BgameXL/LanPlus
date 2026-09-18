@@ -27,6 +27,7 @@ public class LanplusFabricClient implements ClientModInitializer {
             LanPlusKeybinds.onClientTick();
             ClientPresenceDetector.onClientTick();
             HostController.onClientTick();
+            LanPlusClient.onClientTick();
         });
 
         HudRenderCallback.EVENT.register((context, tickDelta) -> {

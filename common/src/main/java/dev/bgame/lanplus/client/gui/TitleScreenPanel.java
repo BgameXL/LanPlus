@@ -66,10 +66,13 @@ public final class TitleScreenPanel {
     }
 
     public static void onScreenRender(GuiGraphics g, int mouseX, int mouseY) {
-        Minecraft mc = Minecraft.getInstance();
-        if (!(mc.screen instanceof TitleScreen)) {
-            return;
+        if (Minecraft.getInstance().screen instanceof TitleScreen) {
+            render(g, mouseX, mouseY);
         }
+    }
+
+    static void render(GuiGraphics g, int mouseX, int mouseY) {
+        Minecraft mc = Minecraft.getInstance();
         Font font = mc.font;
         int screenW = mc.getWindow().getGuiScaledWidth();
         int cx = screenW / 2;

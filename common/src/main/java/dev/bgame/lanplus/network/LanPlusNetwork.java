@@ -22,45 +22,80 @@ import java.util.concurrent.CompletableFuture;
 public interface LanPlusNetwork {
 
     CompletableFuture<Void> pushPresence(PresenceSnapshot snapshot);
+
     CompletableFuture<List<Friend>> getFriends(UUID uuid);
+
     CompletableFuture<Boolean> addFriend(UUID uuid, UUID friendUuid);
+
     CompletableFuture<Boolean> removeFriend(UUID uuid, UUID friendUuid);
+
     CompletableFuture<Boolean> acceptFriend(UUID uuid, UUID friendUuid);
+
     CompletableFuture<Boolean> declineFriend(UUID uuid, UUID friendUuid);
+
     CompletableFuture<Boolean> muteFriend(UUID uuid, UUID targetUuid);
+
     CompletableFuture<Boolean> unmuteFriend(UUID uuid, UUID targetUuid);
+
     CompletableFuture<Boolean> blockFriend(UUID uuid, UUID targetUuid);
+
     CompletableFuture<Boolean> unblockFriend(UUID uuid, UUID targetUuid);
+
     CompletableFuture<List<ResolvedUser>> getFriendRequests(UUID uuid);
+
     CompletableFuture<List<ActivityEntry>> getActivity();
+
     CompletableFuture<List<Announcement>> getAnnouncements();
+
     CompletableFuture<List<Announcement>> getUnseenAnnouncements();
+
     CompletableFuture<Boolean> markAnnouncementsSeen(List<Integer> ids);
+
     CompletableFuture<ResolvedUser> resolveUser(String query);
+
     CompletableFuture<UserProfile> fetchProfile(UUID uuid);
+
     CompletableFuture<Profile> getProfile(UUID uuid, UUID viewer);
+
     CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
                                             Map<String, String> prompts, Boolean invisible,
                                             Boolean favoriteVisible, Boolean currentlyPlayingVisible,
                                             Boolean recentlyPlayedVisible);
+
     CompletableFuture<String> setFavoriteModpack(UUID uuid, String modpackId);
+
     CompletableFuture<String> setBackground(UUID uuid, String style, int color, int opacity, String imageId);
+
     CompletableFuture<String> setBanner(UUID uuid, String bannerId);
+
     CompletableFuture<List<CatalogImage>> getBackgrounds();
+
     CompletableFuture<List<CatalogImage>> getBanners();
+
     CompletableFuture<Void> reportAdvancement(UUID uuid, String advancementId);
+
     CompletableFuture<Void> reportUser(UUID targetUuid, String reason);
+
     CompletableFuture<List<LibrarySkin>> listSkins();
+
     CompletableFuture<SkinUploadResult> addSkin(byte[] png, String model);
+
     CompletableFuture<SkinUploadResult> selectSkin(String skinId);
+
     CompletableFuture<Boolean> deleteLibrarySkin(String skinId);
+
     CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated);
+
     CompletableFuture<Invite> resolveInvite(String code);
+
     CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);
 
     void connectEvents(UUID uuid, BackendEventListener listener);
+
     void addEventListener(BackendEventListener listener);
+
     void disconnect();
+
     boolean isConnected();
 
     String baseUrl();
@@ -70,6 +105,7 @@ public interface LanPlusNetwork {
     void setProfileBodySink(java.util.function.BiConsumer<UUID, String> sink);
 
     UUID sessionUuid();
+
     interface BackendEventListener {
 
         default void onPresenceUpdate(PresenceUpdate update) {
@@ -91,6 +127,9 @@ public interface LanPlusNetwork {
         }
 
         default void onTestNotification(String title, String body) {
+        }
+
+        default void onVersionInfo(String latest, String url) {
         }
 
         default void onConnected() {

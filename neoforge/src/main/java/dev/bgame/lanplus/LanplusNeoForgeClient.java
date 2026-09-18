@@ -49,6 +49,7 @@ public final class LanplusNeoForgeClient {
         LanPlusKeybinds.onClientTick();
         ClientPresenceDetector.onClientTick();
         HostController.onClientTick();
+        LanPlusClient.onClientTick();
     }
 
     private static void onRenderGui(RenderGuiEvent.Post event) {

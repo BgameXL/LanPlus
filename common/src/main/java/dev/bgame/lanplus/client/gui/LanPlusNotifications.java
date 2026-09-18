@@ -94,6 +94,27 @@ public final class LanPlusNotifications {
         };
     }
 
+    public static void updateAvailable(String version, String url) {
+        boolean hasUrl = url != null && !url.isBlank();
+        push(new Notif(null,
+                Component.translatable("gui.lanplus.notif.update.title"),
+                Component.translatable("gui.lanplus.notif.update.sub", version),
+                hasUrl ? Component.translatable("gui.lanplus.notif.get") : null,
+                hasUrl ? () -> openUrl(url) : null,
+                HOLD_ACTION_MS, LanPlusUI.LIME, null, ANNOUNCE_ICON));
+    }
+
+    private static void openUrl(String url) {
+        Minecraft mc = Minecraft.getInstance();
+        Screen prev = mc.screen;
+        mc.setScreen(new net.minecraft.client.gui.screens.ConfirmLinkScreen(yes -> {
+            if (yes) {
+                net.minecraft.Util.getPlatform().openUri(url);
+            }
+            mc.setScreen(prev);
+        }, url, false));
+    }
+
     private static void push(Notif n) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) {

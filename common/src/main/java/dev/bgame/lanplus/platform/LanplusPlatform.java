@@ -7,5 +7,8 @@ public interface LanplusPlatform {
     Path getConfigDir();
 
     Path getGameDir();
+
     boolean isClient();
+
+    String modVersion();
 }

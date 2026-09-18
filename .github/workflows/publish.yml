@@ -142,3 +142,24 @@ jobs:
           retry-attempts: 3
           retry-delay: 10000
           fail-mode: fail
+
+  notify-backend:
+    name: Notify backend
+    needs: [build, publish-fabric, publish-neoforge]
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    steps:
+      - name: Announce version to LAN+ backend
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          ADMIN_KEY: ${{ secrets.BACKEND_ADMIN_KEY }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          if [ -z "$BACKEND_URL" ] || [ -z "$ADMIN_KEY" ]; then
+            echo "BACKEND_URL/BACKEND_ADMIN_KEY not set; skipping update notice."
+            exit 0
+          fi
+          curl -fsS -X POST "$BACKEND_URL/admin/latest-version" \
+            -H "X-Admin-Key: $ADMIN_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"version\":\"$VERSION\"}"

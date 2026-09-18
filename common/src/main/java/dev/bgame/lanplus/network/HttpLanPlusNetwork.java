@@ -1013,6 +1013,12 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                         String body = optionalString(d, "body");
                         fanout(l -> l.onTestNotification(title, body));
                     }
+                    case "VERSION" -> {
+                        JsonObject d = obj.getAsJsonObject("data");
+                        String latest = optionalString(d, "latest");
+                        String vurl = optionalString(d, "url");
+                        fanout(l -> l.onVersionInfo(latest, vurl));
+                    }
                     case "PING" -> webSocket.sendText(GSON.toJson(Map.of("type", "PONG")), true);
                     default -> {
                     }

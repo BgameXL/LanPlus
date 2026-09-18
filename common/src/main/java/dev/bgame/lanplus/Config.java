@@ -37,6 +37,7 @@ public final class Config {
     public static int customText = 0xECEEF2;
     public static boolean voiceEnabled = true;
     public static String voiceHost = "";
+    public static String seenUpdateVersion = "";
 
     private Config() {
     }
@@ -63,6 +64,7 @@ public final class Config {
                 customText = getInt(json, "customText", customText);
                 voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
                 voiceHost = getString(json, "voiceHost", voiceHost);
+                seenUpdateVersion = getString(json, "seenUpdateVersion", seenUpdateVersion);
             } catch (Exception ignored) {
             }
         }
@@ -89,6 +91,7 @@ public final class Config {
         json.addProperty("customText", customText);
         json.addProperty("voiceEnabled", voiceEnabled);
         json.addProperty("voiceHost", voiceHost);
+        json.addProperty("seenUpdateVersion", seenUpdateVersion);
 
         try {
             Files.createDirectories(file.getParent());

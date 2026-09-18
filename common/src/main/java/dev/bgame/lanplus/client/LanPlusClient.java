@@ -12,6 +12,7 @@ import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.client.gui.FriendsScreen;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
+import dev.bgame.lanplus.client.gui.UpdateScreen;
 import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.core.ProfileCache;
 import dev.bgame.lanplus.cosmetics.CosmeticMeta;
@@ -65,6 +66,8 @@ public final class LanPlusClient {
     private static DiscordPresence discord;
     private static AnnouncementsService announcements;
     private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
+    private static volatile String pendingUpdateVersion;
+    private static volatile String pendingUpdateUrl;
 
     private LanPlusClient() {
     }
@@ -118,6 +121,16 @@ public final class LanPlusClient {
             public void onTestNotification(String title, String body) {
                 LanPlusNotifications.test(title, body);
             }
+
+            @Override
+            public void onVersionInfo(String latest, String url) {
+                if (!isOutdated(PlatformHolder.get().modVersion(), latest)
+                        || latest.equals(Config.seenUpdateVersion)) {
+                    return;
+                }
+                pendingUpdateVersion = latest;
+                pendingUpdateUrl = url;
+            }
         });
 
         String url = backendUrl();
@@ -125,6 +138,53 @@ public final class LanPlusClient {
 
         friends.connect();
         announcements.connect();
+    }
+
+    private static boolean isOutdated(String current, String latest) {
+        if (current == null || current.isBlank() || latest == null || latest.isBlank()) {
+            return false;
+        }
+        String[] pa = current.split("[.\\-+]");
+        String[] pb = latest.split("[.\\-+]");
+        for (int i = 0; i < Math.max(pa.length, pb.length); i++) {
+            int va = i < pa.length ? leadingInt(pa[i]) : 0;
+            int vb = i < pb.length ? leadingInt(pb[i]) : 0;
+            if (va != vb) {
+                return va < vb;
+            }
+        }
+        return false;
+    }
+
+    private static int leadingInt(String s) {
+        int i = 0;
+        while (i < s.length() && Character.isDigit(s.charAt(i))) {
+            i++;
+        }
+        return i == 0 ? 0 : Integer.parseInt(s.substring(0, i));
+    }
+
+    public static void onClientTick() {
+        String version = pendingUpdateVersion;
+        if (version == null) {
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        boolean atMenu = mc.level == null && mc.screen != null;
+        boolean inWorld = mc.level != null;
+        if (!atMenu && !inWorld) {
+            return;
+        }
+        String url = pendingUpdateUrl;
+        pendingUpdateVersion = null;
+        pendingUpdateUrl = null;
+        Config.seenUpdateVersion = version;
+        Config.save();
+        if (atMenu) {
+            mc.setScreen(new UpdateScreen(mc.screen, version, url));
+        } else {
+            LanPlusNotifications.updateAvailable(version, url);
+        }
     }
 
     public static PresenceManager presence() {
