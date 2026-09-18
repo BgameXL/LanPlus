@@ -270,6 +270,8 @@ final class Store {
                         + "token_hash TEXT PRIMARY KEY, uuid TEXT NOT NULL, verified INTEGER NOT NULL DEFAULT 0, "
                         + "created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)");
                 st.executeUpdate("CREATE INDEX IF NOT EXISTS idx_sessions_uuid ON sessions(uuid)");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS meta ("
+                        + "key TEXT PRIMARY KEY, value TEXT NOT NULL)");
                 if (columnExists(st, "users", "last_seen")) {
                     st.executeUpdate("ALTER TABLE users DROP COLUMN last_seen");
                 }
@@ -545,6 +547,33 @@ final class Store {
 
     private boolean isOnline(UUID uuid) {
         return "ONLINE".equals(connectivity(uuid));
+    }
+
+    String getMeta(String key) {
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement("SELECT value FROM meta WHERE key=?")) {
+                ps.setString(1, key);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? rs.getString(1) : null;
+                }
+            } catch (SQLException e) {
+                throw fail("getMeta", e);
+            }
+        }
+    }
+
+    void setMeta(String key, String value) {
+        synchronized (lock) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "INSERT INTO meta (key, value) VALUES (?,?) "
+                            + "ON CONFLICT(key) DO UPDATE SET value=excluded.value")) {
+                ps.setString(1, key);
+                ps.setString(2, value);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("setMeta", e);
+            }
+        }
     }
 
     private void saveSkinRef(UUID uuid, String skinJson, long now) {

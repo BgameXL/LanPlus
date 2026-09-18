@@ -135,6 +135,14 @@ final class AdminPanel {
                     <button class="accent" onclick="sendTestNotification()">Send test</button>
                   </div>
                 </div>
+            
+                <div class="card">
+                  <label>Latest version (update notice)</label>
+                  <div class="grid2">
+                    <input id="latestVersion" type="text" placeholder="e.g. 1.2.0">
+                    <button class="accent" onclick="setLatestVersion()">Set version</button>
+                  </div>
+                </div>
               </div>
             </main>
             <script>
@@ -289,6 +297,18 @@ final class AdminPanel {
                 if (r.status === 401) { msg('Invalid admin key', true); show(false); return; }
                 if (!r.ok) { msg('Error ' + r.status, true); return; }
                 msg('Test notification sent');
+              } catch (e) { msg('Network error', true); }
+            }
+            
+            async function setLatestVersion() {
+              const version = document.getElementById('latestVersion').value.trim();
+              if (!version) { msg('Version required', true); return; }
+              try {
+                const r = await api('/admin/latest-version', { version });
+                if (r.status === 401) { msg('Invalid admin key', true); show(false); return; }
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || data.error) { msg('Error' + (data.error ? ': ' + data.error : ''), true); return; }
+                msg('Update notice sent for ' + version);
               } catch (e) { msg('Network error', true); }
             }
             

@@ -24,13 +24,15 @@ final class BackendConfig {
     final Set<UUID> adminUuids;
     final String adminKey;
     final String discordWebhook;
+    final String latestVersion;
+    final String downloadUrl;
 
     private BackendConfig(InetSocketAddress bind, String baseDomain, String relayHost, int relayPort,
                           int heartbeatTtlMs, String dataFile, String sessionServerUrl, boolean allowOffline,
                           long sessionTtlMs, String backgroundsDir, String bannersDir,
                           String announcementImagesDir,
                           int workerThreads, int requestTimeoutMs, Set<UUID> adminUuids, String adminKey,
-                          String discordWebhook) {
+                          String discordWebhook, String latestVersion, String downloadUrl) {
         this.bind = bind;
         this.baseDomain = baseDomain;
         this.relayHost = relayHost;
@@ -48,6 +50,8 @@ final class BackendConfig {
         this.adminUuids = adminUuids;
         this.adminKey = adminKey;
         this.discordWebhook = discordWebhook;
+        this.latestVersion = latestVersion;
+        this.downloadUrl = downloadUrl;
     }
 
     static BackendConfig fromEnv() {
@@ -68,7 +72,9 @@ final class BackendConfig {
                 intEnv("LANPLUS_BACKEND_REQUEST_TIMEOUT_MS", 60_000),
                 uuidSet(env("LANPLUS_BACKEND_ADMIN_UUIDS", "")),
                 env("LANPLUS_BACKEND_ADMIN_KEY", ""),
-                env("LANPLUS_BACKEND_DISCORD_WEBHOOK", ""));
+                env("LANPLUS_BACKEND_DISCORD_WEBHOOK", ""),
+                env("LANPLUS_BACKEND_LATEST_VERSION", ""),
+                env("LANPLUS_BACKEND_DOWNLOAD_URL", ""));
     }
 
     private static Set<UUID> uuidSet(String raw) {

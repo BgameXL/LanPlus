@@ -35,15 +35,20 @@ public final class BackendServer {
     private final AssetCatalog backgrounds;
     private final AssetCatalog banners;
     private final AssetCatalog announcementImages;
+    private final String downloadUrl;
+    private volatile String latestVersion;
 
     private BackendServer(BackendConfig cfg) {
         this.cfg = cfg;
+        this.downloadUrl = cfg.downloadUrl;
         this.backgrounds = new AssetCatalog(java.nio.file.Path.of(cfg.backgroundsDir), "/backgrounds/");
         this.banners = new AssetCatalog(java.nio.file.Path.of(cfg.bannersDir), "/banners/");
         this.announcementImages = new AssetCatalog(java.nio.file.Path.of(cfg.announcementImagesDir), "/announcements/img/");
         this.store = new Store(cfg.heartbeatTtlMs, cfg.baseDomain, cfg.dataFile,
                 cfg.sessionServerUrl, cfg.allowOffline, cfg.sessionTtlMs, backgrounds, banners,
                 announcementImages, cfg.discordWebhook);
+        String storedVersion = store.getMeta("latest_version");
+        this.latestVersion = storedVersion != null && !storedVersion.isBlank() ? storedVersion : cfg.latestVersion;
     }
 
     public static void main(String[] args) throws Exception {
@@ -549,6 +554,9 @@ public final class BackendServer {
         if (m.equals("POST") && path.equals("/admin/test-notification")) {
             return adminTestNotification(req);
         }
+        if (m.equals("POST") && path.equals("/admin/latest-version")) {
+            return adminLatestVersion(req);
+        }
         if (m.equals("GET") && path.equals("/admin/announcements")) {
             return ok(store.announcementsAll());
         }
@@ -606,6 +614,22 @@ public final class BackendServer {
 
     private static final int MAX_IMAGE_B64_CHARS = 700 * 1024;
     private static final int MAX_IMAGE_DIM = 4096;
+
+    private Map<String, Object> versionEvent() {
+        return ordered("type", "VERSION", "data", ordered("latest", latestVersion, "url", downloadUrl));
+    }
+
+    private Resp adminLatestVersion(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        if (!(b.get("version") instanceof String s) || s.isBlank()) {
+            return ok(error("bad_version"));
+        }
+        latestVersion = s.trim();
+        store.setMeta("latest_version", latestVersion);
+        hub.sendAll(versionEvent());
+        log("latest version set: " + latestVersion);
+        return OK_EMPTY;
+    }
 
     private Resp adminTestNotification(Http.Request req) {
         Map<String, Object> b = Json.parseObject(req.body());
@@ -1030,6 +1054,9 @@ public final class BackendServer {
                         break;
                     }
                     hub.register(session.uuid(), ws);
+                    if (!latestVersion.isBlank()) {
+                        ws.sendText(Json.write(versionEvent()));
+                    }
                     log("ws auth " + session.uuid());
                 }
             }
