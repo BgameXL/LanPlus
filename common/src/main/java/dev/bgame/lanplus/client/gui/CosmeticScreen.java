@@ -395,7 +395,7 @@ public final class CosmeticScreen extends LanPlusScreen {
 
     @Override
     public void onClose() {
-        this.minecraft.setScreen(parent);
+        Minecraft.getInstance().setScreen(parent);
     }
 
     private Component slotName(CosmeticSlot slot) {

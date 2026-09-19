@@ -73,7 +73,7 @@ public final class DefaultAnnouncementsService
         }
         network.markAnnouncementsSeen(ids);
         Set<Integer> next = new HashSet<>(unseenSet);
-        next.removeAll(ids);
+        ids.forEach(next::remove);
         unseenSet = Set.copyOf(next);
         unseen = unseenSet.size();
         notifyChanged();
