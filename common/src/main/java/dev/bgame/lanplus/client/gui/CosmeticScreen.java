@@ -97,8 +97,7 @@ public final class CosmeticScreen extends LanPlusScreen {
         rows.clear();
         tip = null;
 
-        g.fill(cardX, cardY, cardX + cardW, cardY + cardH, 0x50000000);
-        LanPlusUI.outline1(g, cardX, cardY, cardX + cardW, cardY + cardH, 0x66FFFFFF);
+        LanPlusUI.panel(g, cardX, cardY, cardX + cardW, cardY + cardH);
         LanPlusUI.sectionHeader(g, this.font, this.title, cardX + PAD, cardY + PAD, cardX + cardW - PAD);
 
         renderPreview(g, mouseX, mouseY);
@@ -174,7 +173,7 @@ public final class CosmeticScreen extends LanPlusScreen {
         if (sel) {
             LanPlusUI.outline(g, x, y, x + SLOT, y + SLOT, LanPlusUI.ACCENT);
         } else if (hover) {
-            LanPlusUI.outline(g, x, y, x + SLOT, y + SLOT, LanPlusUI.LAVENDER);
+            LanPlusUI.outline(g, x, y, x + SLOT, y + SLOT, LanPlusUI.ACCENT_HOVER);
         }
         rows.add(new Row(x, y, SLOT, SLOT, () -> selected = slot));
         if (hover) {
@@ -205,7 +204,7 @@ public final class CosmeticScreen extends LanPlusScreen {
 
         int totalH = ids.size() * (LIST_ROW + LIST_GAP) - LIST_GAP;
         int viewH = listBottom - listTop;
-        catScroll = Math.max(0, Math.min(Math.max(0, totalH - viewH), catScroll));
+        catScroll = Math.clamp(catScroll, 0, Math.max(0, totalH - viewH));
 
         g.enableScissor(listX, listTop, listX + listW, listBottom);
         int y = listTop - catScroll;
@@ -238,7 +237,7 @@ public final class CosmeticScreen extends LanPlusScreen {
         LanPlusUI.button3d(g, x, y, x + w, y + LIST_ROW, fill);
 
         CosmeticMeta m = LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().meta(id);
-        g.fill(x + 2, y + 2, x + 4, y + LIST_ROW - 2, on ? LanPlusUI.LIME : rarityColor(m == null ? "common" : m.rarity()));
+        g.fill(x + 2, y + 2, x + 4, y + LIST_ROW - 2, rarityColor(m == null ? "common" : m.rarity()));
 
         int thumb = LIST_ROW - 6;
         int tx0 = x + 7;
@@ -310,7 +309,7 @@ public final class CosmeticScreen extends LanPlusScreen {
     }
 
     private static float spin() {
-        return (System.currentTimeMillis() / 40L) % 360L;
+        return((float) System.currentTimeMillis() / 40L) % 360L;
     }
 
     private static int rarityColor(String rarity) {

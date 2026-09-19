@@ -82,16 +82,7 @@ public final class LanPlusNotifications {
                 () -> {
                     Minecraft mc = Minecraft.getInstance();
                     mc.setScreen(new Announcements(mc.screen));
-                }, HOLD_ACTION_MS, announcementTint(a.type()), null, ANNOUNCE_ICON));
-    }
-
-    private static int announcementTint(dev.bgame.lanplus.api.Announcement.Type type) {
-        return switch (type) {
-            case UPDATE -> 0xFF55FF55;
-            case MAINTENANCE -> 0xFFFFFF55;
-            case GENERAL -> 0xFF55FFFF;
-            default -> LanPlusUI.LIME;
-        };
+                }, HOLD_ACTION_MS, LanPlusUI.ACCENT, null, ANNOUNCE_ICON));
     }
 
     public static void updateAvailable(String version, String url) {
@@ -200,7 +191,6 @@ public final class LanPlusNotifications {
         LanPlusUI.outline1(g, x, y, x + W, y + H, col(LanPlusUI.EDGE_DARK, alpha));
         g.fill(x + 1, y + 1, x + W - 1, y + H - 1, col(LanPlusUI.SURFACE, alpha * 0.96f));
         g.fill(x + 1, y + 1, x + W - 1, y + 2, col(LanPlusUI.shade(LanPlusUI.SURFACE, 1.6f), alpha * 0.6f));
-        g.fill(x, y, x + 3, y + H, col(n.tint, alpha));
 
         Font font = Minecraft.getInstance().font;
         int textX = x + 12;

@@ -187,7 +187,6 @@ public final class Announcements extends LanPlusScreen {
                     && mouseY >= y && mouseY < y + SB_ROW_H;
             if (sel) {
                 LanPlusUI.button3d(g, sidebarX, y, sidebarX + SIDEBAR_W, rowBottom, LanPlusUI.SURFACE_RAISED);
-                g.fill(sidebarX + 2, y + 2, sidebarX + 4, rowBottom - 2, LanPlusUI.LIME);
             } else if (hover) {
                 g.fill(sidebarX, y, sidebarX + SIDEBAR_W, rowBottom, LanPlusUI.SURFACE_HOVER);
             }

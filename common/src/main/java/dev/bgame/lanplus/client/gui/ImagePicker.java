@@ -176,7 +176,7 @@ public final class ImagePicker extends LanPlusScreen {
         int total = rows * rowH;
         int viewport = gridBottom - gridTop;
         int maxScroll = Math.max(0, total - viewport);
-        scrollY = Math.max(0, Math.min(maxScroll, scrollY - (int) (delta * 24)));
+        scrollY = Math.clamp(scrollY - (int) (delta * 24), 0, maxScroll);
         return true;
     }
 

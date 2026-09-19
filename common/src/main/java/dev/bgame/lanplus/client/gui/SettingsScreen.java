@@ -590,7 +590,6 @@ public final class SettingsScreen extends LanPlusScreen {
             boolean highlighted = isHoveredOrFocused();
             if (selected) {
                 LanPlusUI.button3d(g, x, y, x + getWidth(), y + getHeight(), LanPlusUI.SURFACE_RAISED);
-                g.fill(x + 2, y + 2, x + 4, y + getHeight() - 2, LanPlusUI.LIME);
             } else if (highlighted) {
                 g.fill(x, y, x + getWidth(), y + getHeight(), LanPlusUI.SURFACE_HOVER);
             }

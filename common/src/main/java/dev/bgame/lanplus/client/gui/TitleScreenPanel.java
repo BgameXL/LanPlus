@@ -5,7 +5,6 @@ import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
 import dev.bgame.lanplus.cosmetics.CosmeticSlot;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.User;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
@@ -88,7 +87,7 @@ public final class TitleScreenPanel {
         float ps = Math.min(1f, leftRoom / (float) PANEL_W);
         if (ps >= 0.5f) {
             int drawnW = Math.round(PANEL_W * ps);
-            int x0 = Math.max(4, Math.min(MARGIN, menuLeft - drawnW));
+            int x0 = Math.clamp(menuLeft - drawnW, 4, MARGIN);
             Rect r = layout(x0, PANEL_W, CONTENT_H, ps);
             beginScaled(g, r.x0(), r.y0(), ps);
             drawPanel(g, font, r, amX(mouseX), amY(mouseY));
@@ -148,12 +147,15 @@ public final class TitleScreenPanel {
         hits.add(new Hit(screenX(x), screenY(y), Math.round(w * curScale), Math.round(h * curScale), action));
     }
 
-    private static void drawPanel(GuiGraphics g, Font font, Rect r, int mouseX, int mouseY) {
-        int innerX = r.innerX();
-        int innerW = r.innerW();
+    private static void drawFrame(GuiGraphics g, Rect r) {
         LanPlusUI.panel(g, r.x0(), r.y0(), r.x1(), r.y1());
         LanPlusUI.rivets(g, r.x0(), r.y0(), r.x1(), r.y1(), LanPlusUI.FAINT);
+    }
 
+    private static void drawPanel(GuiGraphics g, Font font, Rect r, int mouseX, int mouseY) {
+        drawFrame(g, r);
+        int innerX = r.innerX();
+        int innerW = r.innerW();
         int cy = r.y0() + PAD;
 
         drawWordmark(g, font, innerX, cy);
@@ -163,7 +165,7 @@ public final class TitleScreenPanel {
         cy += IDENTITY_H + 10;
 
         boolean hostHover = inside(mouseX, mouseY, innerX, cy, innerW, HOST_H);
-        drawHost(g, font, innerX, cy, innerW, HOST_H, hostHover);
+        drawHost(g, font, innerX, cy, innerW, hostHover);
         addHit(innerX, cy, innerW, HOST_H, () -> open(new HostScreen(title())));
         cy += HOST_H + 8;
 
@@ -198,8 +200,7 @@ public final class TitleScreenPanel {
     }
 
     private static void drawIdentity(GuiGraphics g, Font font, int x, int y, int w) {
-        User user = Minecraft.getInstance().getUser();
-        String name = user == null ? "Player" : user.getName();
+        String name = Minecraft.getInstance().getUser().getName();
 
         int face = 24;
         int fy = y + (IDENTITY_H - face) / 2;
@@ -224,13 +225,13 @@ public final class TitleScreenPanel {
         g.pose().popPose();
     }
 
-    private static void drawHost(GuiGraphics g, Font font, int x, int y, int w, int h, boolean hover) {
-        LanPlusUI.primaryButton(g, x, y, x + w, y + h, hover, true);
+    private static void drawHost(GuiGraphics g, Font font, int x, int y, int w, boolean hover) {
+        LanPlusUI.primaryButton(g, x, y, x + w, y + HOST_H, hover, true);
         Component label = Component.translatable("gui.lanplus.menu.hostworld");
         int plusW = font.width("+");
         int total = plusW + 5 + font.width(label);
         int sx = x + (w - total) / 2;
-        int ty = y + (h - 8) / 2;
+        int ty = y + (HOST_H - 8) / 2;
         g.drawString(font, "+", sx, ty, LanPlusUI.LIME, true);
         g.drawString(font, label, sx + plusW + 5, ty, LanPlusUI.TEXT, true);
     }
@@ -249,12 +250,9 @@ public final class TitleScreenPanel {
     }
 
     private static void drawStage(GuiGraphics g, Font font, Rect r, int mouseX, int mouseY) {
+        drawFrame(g, r);
         int innerX = r.innerX();
         int innerW = r.innerW();
-
-        LanPlusUI.panel(g, r.x0(), r.y0(), r.x1(), r.y1());
-        LanPlusUI.rivets(g, r.x0(), r.y0(), r.x1(), r.y1(), LanPlusUI.FAINT);
-
         int cy = r.y0() + PAD;
         Component title = Component.translatable("gui.lanplus.menu.cosmetics");
         g.drawString(font, "+", innerX, cy, LanPlusUI.LIME, false);
@@ -262,21 +260,19 @@ public final class TitleScreenPanel {
         g.fill(innerX, cy + 11, innerX + innerW, cy + 12, LanPlusUI.BORDER);
         cy += 12 + 8;
 
-        int boxX = innerX;
         int boxY = cy;
-        int boxW = innerW;
         int boxBottom = boxY + STAGE_RENDER_H;
-        g.fill(boxX, boxY, boxX + boxW, boxBottom, LanPlusUI.SLOT);
-        LanPlusUI.outline(g, boxX, boxY, boxX + boxW, boxBottom, LanPlusUI.BORDER);
-        cornerTicks(g, boxX, boxY, boxX + boxW, boxBottom, LanPlusUI.FAINT);
+        g.fill(innerX, boxY, innerX + innerW, boxBottom, LanPlusUI.SLOT);
+        LanPlusUI.outline(g, innerX, boxY, innerX + innerW, boxBottom, LanPlusUI.BORDER);
+        cornerTicks(g, innerX, boxY, innerX + innerW, boxBottom, LanPlusUI.FAINT);
 
-        int cxModel = boxX + boxW / 2;
+        int cxModel = innerX + innerW / 2;
         int feetY = boxBottom - 18;
-        float yaw = clamp((cxModel - mouseX) * 0.45f, -45f, 45f);
-        float pitch = clamp(((boxY + (float) STAGE_RENDER_H / 2) - mouseY) * 0.25f, -25f, 25f);
+        float yaw = Math.clamp((cxModel - mouseX) * 0.45f, -45f, 45f);
+        float pitch = Math.clamp(((boxY + (float) STAGE_RENDER_H / 2) - mouseY) * 0.25f, -25f, 25f);
 
         SelfSkin self = resolveSelf();
-        g.enableScissor(screenX(boxX + 1), screenY(boxY + 1), screenX(boxX + boxW - 1), screenY(boxBottom - 1));
+        g.enableScissor(screenX(innerX + 1), screenY(boxY + 1), screenX(innerX + innerW - 1), screenY(boxBottom - 1));
         drawPlusWatermark(g, font, cxModel, boxY + STAGE_RENDER_H / 2);
         drawFeetShadow(g, cxModel, feetY);
         PlayerPreview.render(g, cxModel, feetY, 44f, yaw, pitch, self.texture(), self.slim(), LanPlusClient.selfUuid());
@@ -329,7 +325,7 @@ public final class TitleScreenPanel {
         int pw = font.width("+");
         g.drawString(font, "+", x + (STAGE_SLOT - pw) / 2, y + (STAGE_SLOT - 8) / 2, hover ? LanPlusUI.MUTED : LanPlusUI.FAINT, false);
         if (hover) {
-            LanPlusUI.outline1(g, x, y, x + STAGE_SLOT, y + STAGE_SLOT, LanPlusUI.LAVENDER);
+            LanPlusUI.outline1(g, x, y, x + STAGE_SLOT, y + STAGE_SLOT, LanPlusUI.ACCENT_HOVER);
             tooltip = Component.translatable("gui.lanplus.menu.slot." + slot.name().toLowerCase(java.util.Locale.ROOT));
             tooltipX = rawMouseX;
             tooltipY = rawMouseY;
@@ -376,13 +372,12 @@ public final class TitleScreenPanel {
 
     private static SelfSkin resolveSelf() {
         UUID id = LanPlusClient.selfUuid();
-        User user = Minecraft.getInstance().getUser();
-        if (id == null && user != null) {
-            id = user.getProfileId();
+        if (id == null) {
+            id = Minecraft.getInstance().getUser().getProfileId();
         }
         SkinTextures st = LanPlusClient.skinTextures();
-        SkinTextures.Resolved res = st == null || id == null ? null : st.get(id);
-        ResourceLocation tex = res != null ? res.texture() : DefaultPlayerSkin.get(id == null ? UUID.randomUUID() : id).texture();
+        SkinTextures.Resolved res = st == null ? null : st.get(id);
+        ResourceLocation tex = res != null ? res.texture() : DefaultPlayerSkin.get(id).texture();
         return new SelfSkin(tex, res != null && res.slim());
     }
 
@@ -391,10 +386,6 @@ public final class TitleScreenPanel {
             return Component.literal(text);
         }
         return Component.literal(font.plainSubstrByWidth(text, maxWidth - font.width("…")) + "…");
-    }
-
-    private static float clamp(float v, float min, float max) {
-        return Math.max(min, Math.min(max, v));
     }
 
     private static Rect layout(int x0, int width, int contentH, float s) {

@@ -290,9 +290,6 @@ public final class HostScreen extends LanPlusScreen {
                 bg = LanPlusUI.ACCENT_TINT;
             }
             g.fill(x + 1, iy, x + CTRL_W - 1, iy + ITEM_H, bg);
-            if (i == selectedIdx) {
-                g.fill(x + 2, iy + 2, x + 4, iy + ITEM_H - 2, LanPlusUI.LIME);
-            }
             g.drawString(this.font, labelFn.apply(i), x + 7, iy + (ITEM_H - 8) / 2,
                     i == selectedIdx ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
         }
@@ -362,14 +359,13 @@ public final class HostScreen extends LanPlusScreen {
                 if (sel || hover) {
                     int rowTop = Math.max(y, listTop + 1);
                     int rowBottom = Math.min(y + ROW_H, listBottom - 1);
-                    g.fill(x0 + 2, rowTop, x1 - 2, rowBottom,
+                    g.fill(x0 + 2, rowTop, x1 - 4, rowBottom,
                             sel ? LanPlusUI.ACCENT_TINT : LanPlusUI.SURFACE_HOVER);
                 }
                 if (sel) {
                     int rowTop = Math.max(y, listTop + 1);
                     int rowBottom = Math.min(y + ROW_H, listBottom - 1);
-                    LanPlusUI.outline1(g, x0 + 2, rowTop, x1 - 2, rowBottom, LanPlusUI.ACCENT);
-                    g.fill(x0 + 3, rowTop + 1, x0 + 5, rowBottom - 1, LanPlusUI.LIME);
+                    LanPlusUI.outline1(g, x0 + 2, rowTop, x1 - 4, rowBottom, LanPlusUI.ACCENT);
                 }
                 LevelSummary s = worlds.get(i);
                 FaviconTexture icon = icons.get(s.getLevelId());

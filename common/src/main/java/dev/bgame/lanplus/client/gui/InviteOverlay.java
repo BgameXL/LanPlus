@@ -5,6 +5,7 @@ import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.PauseMenuButtons;
 import dev.bgame.lanplus.friends.FriendsService;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -117,18 +118,19 @@ public final class InviteOverlay extends LanPlusScreen {
             return;
         }
         launched = true;
+        Minecraft mc = Minecraft.getInstance();
         HostController.HostSettings settings = new HostController.HostSettings(
                 base.mode(), picked, base.allowNonPremium(), base.gameType(), base.difficulty(), base.allowCommands());
         if (world == null) {
             PauseMenuButtons.markHostedInWorld();
             HostController.requestHost(settings);
             notifyInvited();
-            this.minecraft.setScreen(null);
+            mc.setScreen(null);
             return;
         }
         HostController.requestHost(settings);
         notifyInvited();
-        this.minecraft.createWorldOpenFlows().openWorld(world.getLevelId(), () -> this.minecraft.setScreen(parent));
+        mc.createWorldOpenFlows().openWorld(world.getLevelId(), () -> mc.setScreen(parent));
     }
 
     private void notifyInvited() {
