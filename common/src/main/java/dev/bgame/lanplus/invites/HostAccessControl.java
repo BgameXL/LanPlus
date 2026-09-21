@@ -9,17 +9,21 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class HostAccessControl {
 
+    public static final int DEFAULT_MAX_PLAYERS = 8;
+
     private static volatile HostAccessMode mode = HostAccessMode.EVERYONE;
     private static volatile UUID hostUuid;
     private static volatile boolean active = false;
+    private static volatile int maxPlayers = DEFAULT_MAX_PLAYERS;
     private static final Set<UUID> allowed = ConcurrentHashMap.newKeySet();
 
     private HostAccessControl() {
     }
 
-    public static void set(HostAccessMode newMode, UUID host, Collection<UUID> initialAllowed) {
+    public static void set(HostAccessMode newMode, UUID host, Collection<UUID> initialAllowed, int slots) {
         mode = newMode == null ? HostAccessMode.EVERYONE : newMode;
         hostUuid = host;
+        maxPlayers = slots;
         allowed.clear();
         if (initialAllowed != null) {
             allowed.addAll(initialAllowed);
@@ -37,11 +41,16 @@ public final class HostAccessControl {
         active = false;
         mode = HostAccessMode.EVERYONE;
         hostUuid = null;
+        maxPlayers = DEFAULT_MAX_PLAYERS;
         allowed.clear();
     }
 
     public static boolean isActive() {
         return active;
+    }
+
+    public static int maxPlayers() {
+        return maxPlayers;
     }
 
     public static HostAccessMode mode() {

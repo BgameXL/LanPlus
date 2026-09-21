@@ -120,7 +120,8 @@ public final class InviteOverlay extends LanPlusScreen {
         launched = true;
         Minecraft mc = Minecraft.getInstance();
         HostController.HostSettings settings = new HostController.HostSettings(
-                base.mode(), picked, base.allowNonPremium(), base.gameType(), base.difficulty(), base.allowCommands());
+                base.mode(), picked, base.allowNonPremium(), base.gameType(), base.difficulty(),
+                base.allowCommands(), base.maxPlayers());
         if (world == null) {
             PauseMenuButtons.markHostedInWorld();
             HostController.requestHost(settings);

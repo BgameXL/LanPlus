@@ -856,7 +856,8 @@ public final class ProfileScreen extends LanPlusScreen {
     private void identityRow(GuiGraphics g, int y, String labelKey, String tipKey,
                              boolean on, boolean enabled, Runnable act, int mouseX, int mouseY) {
         int rowH = 22;
-        g.drawString(this.font, Component.translatable(labelKey), colLX, y + 7, enabled ? LanPlusUI.TEXT : LanPlusUI.FAINT, false);
+        Component label = Component.translatable(labelKey);
+        g.drawString(this.font, label, colLX, y + 7, enabled ? LanPlusUI.TEXT : LanPlusUI.FAINT, false);
         int rowRight = colLX + colW;
         Component txt = Component.translatable(on ? "gui.lanplus.toggle.on" : "gui.lanplus.toggle.off");
         int pillY = y + (rowH - 14) / 2;
@@ -866,8 +867,14 @@ public final class ProfileScreen extends LanPlusScreen {
         if (enabled && act != null) {
             hits.add(new Hit(colLX, y, colW, rowH, act));
         }
-        if (tipKey != null && mouseX >= colLX && mouseX < rowRight && mouseY >= y && mouseY < y + rowH) {
-            hoverTip = Component.translatable(tipKey);
+        if (tipKey != null) {
+            boolean overLabel = mouseX >= colLX && mouseX < colLX + this.font.width(label)
+                    && mouseY >= y + 7 && mouseY < y + 7 + this.font.lineHeight;
+            boolean overToggle = mouseX >= pillX && mouseX < pillX + 28 + 6 + this.font.width(txt)
+                    && mouseY >= y && mouseY < y + rowH;
+            if (overLabel || overToggle) {
+                hoverTip = Component.translatable(tipKey);
+            }
         }
     }
 

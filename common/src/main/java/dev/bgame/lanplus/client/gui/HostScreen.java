@@ -5,6 +5,7 @@ import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.PauseMenuButtons;
+import dev.bgame.lanplus.invites.HostAccessControl;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.FaviconTexture;
@@ -45,6 +46,9 @@ public final class HostScreen extends LanPlusScreen {
     private static final int CTRL_W = 110;
     private static final GameType[] GAME_TYPES = GameType.values();
     private static final Difficulty[] DIFFICULTIES = Difficulty.values();
+    private static final int MIN_PLAYERS = 2;
+    private static final int MAX_PLAYERS = 20;
+    private static final int STEP_HIT_W = 16;
     private final Screen parent;
     private final boolean inWorld;
     private final Map<String, FaviconTexture> icons = new HashMap<>();
@@ -60,12 +64,13 @@ public final class HostScreen extends LanPlusScreen {
     private GameType gameType = GameType.SURVIVAL;
     private Difficulty difficulty = Difficulty.NORMAL;
     private boolean allowCheats;
+    private int maxPlayers = HostAccessControl.DEFAULT_MAX_PLAYERS;
     private boolean gameTypeOpen;
     private boolean difficultyOpen;
     private int cardX, cardY, cardW, cardH;
     private int worldHeaderY, listTop, listBottom;
     private int settingsHeaderY;
-    private int gameRowY, cmdRowY, diffRowY;
+    private int gameRowY, cmdRowY, diffRowY, playersRowY;
     private int accessLabelY, accessRowY, premiumRowY;
     private int ctrlX;
     private int buttonsY;
@@ -108,8 +113,9 @@ public final class HostScreen extends LanPlusScreen {
         cmdRowY = y;
         y += ROW_GAP;
         diffRowY = y;
+        y += ROW_GAP;
+        playersRowY = y;
         y += 30;
-
         accessLabelY = y;
         y += 12;
         accessRowY = y;
@@ -130,15 +136,17 @@ public final class HostScreen extends LanPlusScreen {
         gameRowY += cardY;
         cmdRowY += cardY;
         diffRowY += cardY;
+        playersRowY += cardY;
         accessLabelY += cardY;
         accessRowY += cardY;
         premiumRowY += cardY;
         buttonsY += cardY;
 
-        int labelW = Math.max(
-                Math.max(this.font.width(Component.translatable("gui.lanplus.host.gamemode")),
-                        this.font.width(Component.translatable("gui.lanplus.host.commands"))),
-                this.font.width(Component.translatable("gui.lanplus.host.difficulty")));
+        int labelW = Math.max(Math.max(
+                        Math.max(this.font.width(Component.translatable("gui.lanplus.host.gamemode")),
+                                this.font.width(Component.translatable("gui.lanplus.host.commands"))),
+                        this.font.width(Component.translatable("gui.lanplus.host.difficulty"))),
+                this.font.width(Component.translatable("gui.lanplus.host.maxplayers")));
         ctrlX = cardX + PAD + labelW + LABEL_PAD;
     }
 
@@ -240,29 +248,35 @@ public final class HostScreen extends LanPlusScreen {
     }
 
     private void renderWorldSettings(GuiGraphics g, int mouseX, int mouseY) {
-        renderSettingRow(g, gameRowY);
         g.drawString(this.font, Component.translatable("gui.lanplus.host.gamemode"),
-                cardX + PAD + 6, gameRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
+                cardX + PAD, gameRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
         renderDropdownButton(g, ctrlX, gameRowY, gameTypeLabel(gameType), gameTypeOpen, mouseX, mouseY);
 
-        renderSettingRow(g, cmdRowY);
         g.drawString(this.font, Component.translatable("gui.lanplus.host.commands"),
-                cardX + PAD + 6, cmdRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
+                cardX + PAD, cmdRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
         Component commands = Component.translatable(
                 allowCheats ? "gui.lanplus.host.commands.on" : "gui.lanplus.host.commands.off");
         LanPlusUI.chip(g, this.font, commands, ctrlX, cmdRowY, CTRL_W, DROPDOWN_H,
                 allowCheats, true, in(mouseX, mouseY, ctrlX, cmdRowY, CTRL_W, DROPDOWN_H));
 
-        renderSettingRow(g, diffRowY);
         g.drawString(this.font, Component.translatable("gui.lanplus.host.difficulty"),
-                cardX + PAD + 6, diffRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
+                cardX + PAD, diffRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
         renderDropdownButton(g, ctrlX, diffRowY, difficultyLabel(difficulty), difficultyOpen, mouseX, mouseY);
-    }
 
-    private void renderSettingRow(GuiGraphics g, int y) {
-        int x = cardX + PAD;
-        int right = cardX + cardW - PAD;
-        LanPlusUI.button3d(g, x, y, right, y + DROPDOWN_H, LanPlusUI.SURFACE_RAISED);
+        g.drawString(this.font, Component.translatable("gui.lanplus.host.maxplayers"),
+                cardX + PAD, playersRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
+        int textY = playersRowY + (DROPDOWN_H - 8) / 2;
+        boolean canDown = maxPlayers > MIN_PLAYERS;
+        boolean canUp = maxPlayers < MAX_PLAYERS;
+        boolean hoverDown = canDown && in(mouseX, mouseY, ctrlX + 4, playersRowY, STEP_HIT_W, DROPDOWN_H);
+        boolean hoverUp = canUp && in(mouseX, mouseY, ctrlX + CTRL_W - 4 - STEP_HIT_W, playersRowY, STEP_HIT_W, DROPDOWN_H);
+        LanPlusUI.button3d(g, ctrlX, playersRowY, ctrlX + CTRL_W, playersRowY + DROPDOWN_H, LanPlusUI.SURFACE_RAISED);
+        g.drawString(this.font, Component.literal("-"), ctrlX + 8, textY,
+                canDown ? (hoverDown ? LanPlusUI.TEXT : LanPlusUI.MUTED) : LanPlusUI.FAINT, false);
+        g.drawString(this.font, Component.literal("+"), ctrlX + CTRL_W - 12, textY,
+                canUp ? (hoverUp ? LanPlusUI.TEXT : LanPlusUI.MUTED) : LanPlusUI.FAINT, false);
+        g.drawCenteredString(this.font, Component.literal(Integer.toString(maxPlayers)),
+                ctrlX + CTRL_W / 2, textY, LanPlusUI.TEXT);
     }
 
     private void renderDropdownButton(GuiGraphics g, int x, int y, Component label,
@@ -459,6 +473,14 @@ public final class HostScreen extends LanPlusScreen {
             allowCheats = !allowCheats;
             return true;
         }
+        if (in(mouseX, mouseY, ctrlX + 4, playersRowY, STEP_HIT_W, DROPDOWN_H)) {
+            maxPlayers = Math.max(MIN_PLAYERS, maxPlayers - 1);
+            return true;
+        }
+        if (in(mouseX, mouseY, ctrlX + CTRL_W - 4 - STEP_HIT_W, playersRowY, STEP_HIT_W, DROPDOWN_H)) {
+            maxPlayers = Math.min(MAX_PLAYERS, maxPlayers + 1);
+            return true;
+        }
         return false;
     }
 
@@ -566,7 +588,7 @@ public final class HostScreen extends LanPlusScreen {
     private void doStart() {
         Minecraft minecraft = Minecraft.getInstance();
         HostController.HostSettings settings = new HostController.HostSettings(
-                accessMode, Set.of(), allowNonPremium, gameType, difficulty, allowCheats);
+                accessMode, Set.of(), allowNonPremium, gameType, difficulty, allowCheats, maxPlayers);
         if (inWorld) {
             if (accessMode == HostAccessMode.INVITED) {
                 minecraft.setScreen(new InviteOverlay(this, settings));

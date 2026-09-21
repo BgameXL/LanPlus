@@ -94,6 +94,7 @@
   "gui.lanplus.host.commands.on": "ON",
   "gui.lanplus.host.commands.off": "OFF",
   "gui.lanplus.host.difficulty": "Difficulty",
+  "gui.lanplus.host.maxplayers": "Max Players",
   "gui.lanplus.host.start": "Host",
 
   "gui.lanplus.invite.title": "Invite friends",

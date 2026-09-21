@@ -21,4 +21,11 @@ public abstract class PlayerListMixin {
             cir.setReturnValue(Component.translatable("disconnect.lanplus.not_invited"));
         }
     }
+
+    @Inject(method = "getMaxPlayers", at = @At("HEAD"), cancellable = true)
+    private void lanplus$maxPlayers(CallbackInfoReturnable<Integer> cir) {
+        if (HostAccessControl.isActive()) {
+            cir.setReturnValue(HostAccessControl.maxPlayers());
+        }
+    }
 }
