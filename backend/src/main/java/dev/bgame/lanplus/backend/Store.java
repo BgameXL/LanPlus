@@ -105,6 +105,8 @@ final class Store {
             .build();
 
     private static final int READER_POOL = 8;
+    private static final int SUGGESTIONS_LIMIT = 10;
+    private static final int MUTUAL_NAMES_SHOWN = 3;
 
     private final Object lock = new Object();
     private final Connection connection;
@@ -221,7 +223,8 @@ final class Store {
                         + "uuid TEXT PRIMARY KEY, discord TEXT, instagram TEXT, twitter TEXT, youtube TEXT, "
                         + "twitch TEXT, tiktok TEXT, paypal TEXT, kofi TEXT)");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_privacy ("
-                        + "uuid TEXT PRIMARY KEY, invisible_mode INTEGER NOT NULL DEFAULT 0)");
+                        + "uuid TEXT PRIMARY KEY, invisible_mode INTEGER NOT NULL DEFAULT 0, "
+                        + "discoverable INTEGER NOT NULL DEFAULT 1)");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS profile_prompts ("
                         + "uuid TEXT NOT NULL, prompt_id TEXT NOT NULL, answer TEXT NOT NULL, "
                         + "updated_at INTEGER NOT NULL, PRIMARY KEY (uuid, prompt_id))");
@@ -291,6 +294,9 @@ final class Store {
                 if (!columnExists(st, "users", "banned")) {
                     st.executeUpdate("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0");
                     st.executeUpdate("ALTER TABLE users ADD COLUMN ban_reason TEXT");
+                }
+                if (!columnExists(st, "profile_privacy", "discoverable")) {
+                    st.executeUpdate("ALTER TABLE profile_privacy ADD COLUMN discoverable INTEGER NOT NULL DEFAULT 1");
                 }
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS reports ("
                         + "id INTEGER PRIMARY KEY AUTOINCREMENT, reporter_uuid TEXT NOT NULL, "
@@ -830,6 +836,32 @@ final class Store {
         }
     }
 
+    void setDiscoverable(UUID uuid, boolean discoverable) {
+        synchronized (lock) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "INSERT INTO profile_privacy (uuid, discoverable) VALUES (?,?) "
+                            + "ON CONFLICT(uuid) DO UPDATE SET discoverable=excluded.discoverable")) {
+                ps.setString(1, uuid.toString());
+                ps.setInt(2, discoverable ? 1 : 0);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("setDiscoverable", e);
+            }
+        }
+    }
+
+    private boolean discoverableLocked(UUID uuid) {
+        try (PreparedStatement ps = conn().prepareStatement(
+                "SELECT discoverable FROM profile_privacy WHERE uuid=?")) {
+            ps.setString(1, uuid.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                return !rs.next() || rs.getInt(1) != 0;
+            }
+        } catch (SQLException e) {
+            throw fail("isDiscoverable", e);
+        }
+    }
+
     private Long lastDisconnectLocked(UUID uuid) {
         try (PreparedStatement ps = conn().prepareStatement(
                 "SELECT last_disconnect_at FROM presence_state WHERE uuid=?")) {
@@ -948,6 +980,137 @@ final class Store {
                 }
             } catch (SQLException e) {
                 throw fail("friendsOf", e);
+            }
+        }
+        return out;
+    }
+
+    List<Object> friendSuggestions(UUID u) {
+        String s = u.toString();
+        Map<UUID, String> myFriends = new LinkedHashMap<>();
+        Map<UUID, Integer> counts = new LinkedHashMap<>();
+        Map<UUID, List<String>> mutualNames = new HashMap<>();
+        List<Object> out = new ArrayList<>();
+        try (Reader r = read()) {
+            try {
+                try (PreparedStatement ps = conn().prepareStatement(
+                        "SELECT u.uuid, u.username FROM friends f "
+                                + "JOIN users u ON u.uuid = (CASE WHEN f.a=? THEN f.b ELSE f.a END) "
+                                + "WHERE f.a=? OR f.b=?")) {
+                    ps.setString(1, s);
+                    ps.setString(2, s);
+                    ps.setString(3, s);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            myFriends.put(UUID.fromString(rs.getString(1)), rs.getString(2));
+                        }
+                    }
+                }
+                if (myFriends.isEmpty()) {
+                    return out;
+                }
+                String ph = String.join(",", java.util.Collections.nCopies(myFriends.size(), "?"));
+                try (PreparedStatement ps = conn().prepareStatement(
+                        "SELECT a, b FROM friends WHERE a IN (" + ph + ") OR b IN (" + ph + ")")) {
+                    int i = 1;
+                    for (UUID w : myFriends.keySet()) {
+                        ps.setString(i, w.toString());
+                        ps.setString(i + myFriends.size(), w.toString());
+                        i++;
+                    }
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            UUID a = UUID.fromString(rs.getString(1));
+                            UUID b = UUID.fromString(rs.getString(2));
+                            UUID w;
+                            UUID v;
+                            if (myFriends.containsKey(a) && !myFriends.containsKey(b)) {
+                                w = a;
+                                v = b;
+                            } else if (myFriends.containsKey(b) && !myFriends.containsKey(a)) {
+                                w = b;
+                                v = a;
+                            } else {
+                                continue;
+                            }
+                            if (v.equals(u)) {
+                                continue;
+                            }
+                            counts.merge(v, 1, Integer::sum);
+                            List<String> ns = mutualNames.computeIfAbsent(v, k -> new ArrayList<>());
+                            if (ns.size() < MUTUAL_NAMES_SHOWN) {
+                                ns.add(myFriends.get(w));
+                            }
+                        }
+                    }
+                }
+                if (counts.isEmpty()) {
+                    return out;
+                }
+                Set<UUID> excluded = new HashSet<>();
+                try (PreparedStatement ps = conn().prepareStatement(
+                        "SELECT from_uuid, to_uuid FROM friend_requests WHERE from_uuid=? OR to_uuid=?")) {
+                    ps.setString(1, s);
+                    ps.setString(2, s);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            excluded.add(UUID.fromString(rs.getString(1)));
+                            excluded.add(UUID.fromString(rs.getString(2)));
+                        }
+                    }
+                }
+                try (PreparedStatement ps = conn().prepareStatement(
+                        "SELECT uuid, target FROM relationships WHERE blocked=1 AND (uuid=? OR target=?)")) {
+                    ps.setString(1, s);
+                    ps.setString(2, s);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            excluded.add(UUID.fromString(rs.getString(1)));
+                            excluded.add(UUID.fromString(rs.getString(2)));
+                        }
+                    }
+                }
+                try (PreparedStatement ps = conn().prepareStatement(
+                        "SELECT uuid FROM profile_privacy WHERE discoverable=0")) {
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            excluded.add(UUID.fromString(rs.getString(1)));
+                        }
+                    }
+                }
+                counts.keySet().removeAll(excluded);
+                if (counts.isEmpty()) {
+                    return out;
+                }
+                List<UUID> ids = new ArrayList<>(counts.keySet());
+                Map<UUID, String> candidateNames = new HashMap<>();
+                String idPh = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+                try (PreparedStatement ps = conn().prepareStatement(
+                        "SELECT uuid, username FROM users WHERE uuid IN (" + idPh + ")")) {
+                    for (int i = 0; i < ids.size(); i++) {
+                        ps.setString(i + 1, ids.get(i).toString());
+                    }
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            candidateNames.put(UUID.fromString(rs.getString(1)), rs.getString(2));
+                        }
+                    }
+                }
+                ids.sort((x, y) -> Integer.compare(counts.get(y), counts.get(x)));
+                for (UUID v : ids) {
+                    String name = candidateNames.get(v);
+                    if (name == null) {
+                        continue;
+                    }
+                    out.add(ordered("uuid", v.toString(), "username", name,
+                            "mutualCount", counts.get(v),
+                            "mutualNames", mutualNames.getOrDefault(v, List.of())));
+                    if (out.size() >= SUGGESTIONS_LIMIT) {
+                        break;
+                    }
+                }
+            } catch (SQLException e) {
+                throw fail("friendSuggestions", e);
             }
         }
         return out;
@@ -1449,6 +1612,7 @@ final class Store {
                 m.put("lastSeen", lastDisconnectLocked(uuid));
                 if (self) {
                     m.put("invisible", invisible);
+                    m.put("discoverable", discoverableLocked(uuid));
                 }
 
                 String favoriteId = null;

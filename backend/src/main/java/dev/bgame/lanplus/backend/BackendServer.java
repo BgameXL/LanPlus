@@ -228,6 +228,9 @@ public final class BackendServer {
             if (m.equals("GET") && path.equals("/friends/requests")) {
                 return ok(store.friendRequests(self));
             }
+            if (m.equals("GET") && path.equals("/friends/suggestions")) {
+                return ok(store.friendSuggestions(self));
+            }
             if (m.equals("GET") && path.equals("/activity")) {
                 return ok(ordered("activity", store.activityFeed(self)));
             }
@@ -744,6 +747,9 @@ public final class BackendServer {
         }
         if (b.get("invisible") instanceof Boolean invisible) {
             store.setInvisible(uuid, invisible);
+        }
+        if (b.get("discoverable") instanceof Boolean discoverable) {
+            store.setDiscoverable(uuid, discoverable);
         }
         if (b.get("prompts") instanceof Map<?, ?> prompts) {
             Map<String, String> answers = new LinkedHashMap<>();
