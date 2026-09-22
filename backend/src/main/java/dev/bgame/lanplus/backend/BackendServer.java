@@ -35,6 +35,7 @@ public final class BackendServer {
     private final AssetCatalog backgrounds;
     private final AssetCatalog banners;
     private final AssetCatalog announcementImages;
+    private final CosmeticAssets cosmetics3d;
     private final String downloadUrl;
     private volatile String latestVersion;
 
@@ -44,6 +45,7 @@ public final class BackendServer {
         this.backgrounds = new AssetCatalog(java.nio.file.Path.of(cfg.backgroundsDir), "/backgrounds/");
         this.banners = new AssetCatalog(java.nio.file.Path.of(cfg.bannersDir), "/banners/");
         this.announcementImages = new AssetCatalog(java.nio.file.Path.of(cfg.announcementImagesDir), "/announcements/img/");
+        this.cosmetics3d = new CosmeticAssets(java.nio.file.Path.of(cfg.cosmeticsDir));
         this.store = new Store(cfg.heartbeatTtlMs, cfg.baseDomain, cfg.dataFile,
                 cfg.sessionServerUrl, cfg.allowOffline, cfg.sessionTtlMs, backgrounds, banners,
                 announcementImages, cfg.discordWebhook);
@@ -179,6 +181,18 @@ public final class BackendServer {
                 return catalogPng(announcementImages,
                         path.substring("/announcements/img/".length(), path.length() - ".png".length()));
             }
+            if (m.equals("GET") && path.startsWith("/cosmetics/asset/")) {
+                String rest = path.substring("/cosmetics/asset/".length());
+                int slash = rest.indexOf('/');
+                if (slash <= 0 || slash == rest.length() - 1) {
+                    return NOT_FOUND;
+                }
+                String cid = rest.substring(0, slash);
+                String name = rest.substring(slash + 1);
+                byte[] bytes = cosmetics3d.file(cid, name);
+                return bytes == null ? NOT_FOUND
+                        : new Resp(200, null, bytes, CosmeticAssets.contentType(name));
+            }
             if (m.equals("GET") && path.equals("/admin/panel")) {
                 return new Resp(200, null,
                         AdminPanel.HTML.getBytes(java.nio.charset.StandardCharsets.UTF_8),
@@ -230,6 +244,15 @@ public final class BackendServer {
             }
             if (m.equals("GET") && path.equals("/friends/suggestions")) {
                 return ok(store.friendSuggestions(self));
+            }
+            if (m.equals("POST") && path.equals("/cosmetics/equip")) {
+                return cosmeticEquip(req, self);
+            }
+            if (m.equals("GET") && path.equals("/cosmetics/loadout")) {
+                return ok(store.cosmeticLoadout(uuid(req.param("uuid"))));
+            }
+            if (m.equals("GET") && path.equals("/cosmetics/catalog")) {
+                return ok(cosmetics3d.catalog());
             }
             if (m.equals("GET") && path.equals("/activity")) {
                 return ok(ordered("activity", store.activityFeed(self)));
@@ -706,6 +729,25 @@ public final class BackendServer {
         Object idObj = b.get("id");
         long id = idObj instanceof Number n ? n.longValue() : Long.parseLong(String.valueOf(idObj));
         return ok(Map.of("success", store.resolveReport(id)));
+    }
+
+    private static final java.util.Set<String> COSMETIC_SLOTS = java.util.Set.of(
+            "HEAD", "FACE", "BODY", "BACK", "WAIST", "LEGS", "MAIN_HAND", "OFF_HAND");
+
+    private Resp cosmeticEquip(Http.Request req, UUID self) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        String slot = b.get("slot") == null ? null : String.valueOf(b.get("slot"));
+        if (slot == null || !COSMETIC_SLOTS.contains(slot)) {
+            return ok(error("bad_slot"));
+        }
+        Object idObj = b.get("cosmeticId");
+        String id = idObj == null ? null : String.valueOf(idObj);
+        if (id == null || id.isBlank()) {
+            store.clearCosmetic(self, slot);
+        } else {
+            store.setCosmetic(self, slot, id);
+        }
+        return ok(ordered("success", true));
     }
 
     private Resp profileUpdate(Http.Request req, UUID uuid) {

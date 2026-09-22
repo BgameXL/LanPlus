@@ -269,6 +269,9 @@ final class Store {
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS skin_library ("
                         + "uuid TEXT NOT NULL, skin_id TEXT NOT NULL, png BLOB NOT NULL, model TEXT, "
                         + "created_at INTEGER NOT NULL, PRIMARY KEY (uuid, skin_id))");
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS cosmetic_loadout ("
+                        + "uuid TEXT NOT NULL, slot TEXT NOT NULL, cosmetic_id TEXT NOT NULL, "
+                        + "equipped_at INTEGER NOT NULL, PRIMARY KEY (uuid, slot))");
                 st.executeUpdate("CREATE TABLE IF NOT EXISTS sessions ("
                         + "token_hash TEXT PRIMARY KEY, uuid TEXT NOT NULL, verified INTEGER NOT NULL DEFAULT 0, "
                         + "created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)");
@@ -1117,6 +1120,54 @@ final class Store {
                 }
             } catch (SQLException e) {
                 throw fail("friendSuggestions", e);
+            }
+        }
+        return out;
+    }
+
+    void setCosmetic(UUID uuid, String slot, String cosmeticId) {
+        synchronized (lock) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "INSERT INTO cosmetic_loadout (uuid, slot, cosmetic_id, equipped_at) VALUES (?,?,?,?) "
+                            + "ON CONFLICT(uuid, slot) DO UPDATE SET cosmetic_id=excluded.cosmetic_id, "
+                            + "equipped_at=excluded.equipped_at")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, slot);
+                ps.setString(3, cosmeticId);
+                ps.setLong(4, System.currentTimeMillis());
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("setCosmetic", e);
+            }
+        }
+    }
+
+    void clearCosmetic(UUID uuid, String slot) {
+        synchronized (lock) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "DELETE FROM cosmetic_loadout WHERE uuid=? AND slot=?")) {
+                ps.setString(1, uuid.toString());
+                ps.setString(2, slot);
+                ps.executeUpdate();
+            } catch (SQLException e) {
+                throw fail("clearCosmetic", e);
+            }
+        }
+    }
+
+    Map<String, Object> cosmeticLoadout(UUID uuid) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "SELECT slot, cosmetic_id FROM cosmetic_loadout WHERE uuid=?")) {
+                ps.setString(1, uuid.toString());
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.put(rs.getString(1), rs.getString(2));
+                    }
+                }
+            } catch (SQLException e) {
+                throw fail("cosmeticLoadout", e);
             }
         }
         return out;

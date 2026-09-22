@@ -19,6 +19,7 @@ final class BackendConfig {
     final String backgroundsDir;
     final String bannersDir;
     final String announcementImagesDir;
+    final String cosmeticsDir;
     final int workerThreads;
     final int requestTimeoutMs;
     final Set<UUID> adminUuids;
@@ -30,7 +31,7 @@ final class BackendConfig {
     private BackendConfig(InetSocketAddress bind, String baseDomain, String relayHost, int relayPort,
                           int heartbeatTtlMs, String dataFile, String sessionServerUrl, boolean allowOffline,
                           long sessionTtlMs, String backgroundsDir, String bannersDir,
-                          String announcementImagesDir,
+                          String announcementImagesDir, String cosmeticsDir,
                           int workerThreads, int requestTimeoutMs, Set<UUID> adminUuids, String adminKey,
                           String discordWebhook, String latestVersion, String downloadUrl) {
         this.bind = bind;
@@ -45,6 +46,7 @@ final class BackendConfig {
         this.backgroundsDir = backgroundsDir;
         this.bannersDir = bannersDir;
         this.announcementImagesDir = announcementImagesDir;
+        this.cosmeticsDir = cosmeticsDir;
         this.workerThreads = workerThreads;
         this.requestTimeoutMs = requestTimeoutMs;
         this.adminUuids = adminUuids;
@@ -68,6 +70,7 @@ final class BackendConfig {
                 env("LANPLUS_BACKEND_BACKGROUNDS_DIR", "backgrounds"),
                 env("LANPLUS_BACKEND_BANNERS_DIR", "banners"),
                 env("LANPLUS_BACKEND_ANNOUNCEMENT_IMAGES_DIR", "announcement-images"),
+                env("LANPLUS_BACKEND_COSMETICS_DIR", "cosmetics"),
                 intEnv("LANPLUS_BACKEND_WORKER_THREADS", 128),
                 intEnv("LANPLUS_BACKEND_REQUEST_TIMEOUT_MS", 60_000),
                 uuidSet(env("LANPLUS_BACKEND_ADMIN_UUIDS", "")),

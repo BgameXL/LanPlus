@@ -3,7 +3,6 @@ package dev.bgame.lanplus.backend;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -19,10 +18,7 @@ final class AssetCatalog {
 
     private final Path dir;
     private final String urlPrefix;
-    private final Map<String, CachedHash> hashes = new HashMap<>();
-
-    private record CachedHash(String hash, long mtime, long size) {
-    }
+    private final Map<String, AssetHash.Cached> hashes = new HashMap<>();
 
     AssetCatalog(Path dir, String urlPrefix) {
         this.dir = dir;
@@ -68,26 +64,7 @@ final class AssetCatalog {
     }
 
     synchronized String hash(String id) {
-        Path file = fileOf(id);
-        if (file == null) {
-            return null;
-        }
-        try {
-            BasicFileAttributes attrs = Files.readAttributes(file, BasicFileAttributes.class);
-            if (!attrs.isRegularFile() || attrs.size() > MAX_BYTES) {
-                return null;
-            }
-            long mtime = attrs.lastModifiedTime().toMillis();
-            CachedHash cached = hashes.get(id);
-            if (cached != null && cached.mtime == mtime && cached.size == attrs.size()) {
-                return cached.hash;
-            }
-            String hash = Store.sha256Hex(Files.readAllBytes(file));
-            hashes.put(id, new CachedHash(hash, mtime, attrs.size()));
-            return hash;
-        } catch (IOException e) {
-            return null;
-        }
+        return AssetHash.cached(fileOf(id), id, hashes, MAX_BYTES);
     }
 
     synchronized byte[] png(String id) {
