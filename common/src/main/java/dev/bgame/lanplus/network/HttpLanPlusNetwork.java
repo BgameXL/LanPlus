@@ -19,7 +19,9 @@ import dev.bgame.lanplus.api.PresenceUpdate;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
+import dev.bgame.lanplus.api.CosmeticCatalogEntry;
 import dev.bgame.lanplus.api.SkinUploadResult;
+import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.UserProfile;
 import org.slf4j.Logger;
 
@@ -228,6 +230,31 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
+    public CompletableFuture<List<Suggestion>> getSuggestions(UUID uuid) {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get("/friends/suggestions?uuid=" + uuid)
+                .thenApply(resp -> {
+                    Wire.SuggestionDto[] arr = GSON.fromJson(resp.body(), Wire.SuggestionDto[].class);
+                    if (arr == null) {
+                        return List.<Suggestion>of();
+                    }
+                    List<Suggestion> out = new ArrayList<>(arr.length);
+                    for (Wire.SuggestionDto d : arr) {
+                        if (d != null && d.uuid() != null) {
+                            out.add(d.toApi());
+                        }
+                    }
+                    return out;
+                })
+                .exceptionally(err -> {
+                    LOGGER.debug("LAN+ suggestions failed: {}", err.toString());
+                    return List.of();
+                });
+    }
+
+    @Override
     public CompletableFuture<List<ActivityEntry>> getActivity() {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
@@ -320,6 +347,80 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
+    public CompletableFuture<List<ResolvedUser>> searchUsers(String query) {
+        if (!configured() || query == null || query.isBlank()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        String encoded = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8);
+        return get("/users/search?q=" + encoded)
+                .thenApply(resp -> {
+                    Wire.ResolvedUserDto[] arr = GSON.fromJson(resp.body(), Wire.ResolvedUserDto[].class);
+                    if (arr == null) {
+                        return List.<ResolvedUser>of();
+                    }
+                    List<ResolvedUser> out = new ArrayList<>(arr.length);
+                    for (Wire.ResolvedUserDto d : arr) {
+                        if (d != null && d.uuid() != null) {
+                            out.add(d.toApi());
+                        }
+                    }
+                    return out;
+                })
+                .exceptionally(err -> {
+                    LOGGER.debug("LAN+ user search failed: {}", err.toString());
+                    return List.of();
+                });
+    }
+
+    @Override
+    public CompletableFuture<Boolean> equipCosmetic(String slot, String cosmeticId) {
+        return edge("/cosmetics/equip", new Wire.CosmeticEquip(slot, cosmeticId));
+    }
+
+    @Override
+    public CompletableFuture<Map<String, String>> getCosmeticLoadout(UUID uuid) {
+        if (!configured() || uuid == null) {
+            return CompletableFuture.completedFuture(Map.of());
+        }
+        return get("/cosmetics/loadout?uuid=" + uuid)
+                .thenApply(resp -> {
+                    Map<String, String> m = GSON.fromJson(resp.body(),
+                            new com.google.gson.reflect.TypeToken<Map<String, String>>() {
+                            }.getType());
+                    return m == null ? Map.<String, String>of() : m;
+                })
+                .exceptionally(err -> {
+                    LOGGER.debug("LAN+ cosmetic loadout failed: {}", err.toString());
+                    return Map.of();
+                });
+    }
+
+    @Override
+    public CompletableFuture<List<CosmeticCatalogEntry>> getCosmeticCatalog() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get("/cosmetics/catalog")
+                .thenApply(resp -> {
+                    Wire.CosmeticEntryDto[] arr = GSON.fromJson(resp.body(), Wire.CosmeticEntryDto[].class);
+                    if (arr == null) {
+                        return List.<CosmeticCatalogEntry>of();
+                    }
+                    List<CosmeticCatalogEntry> out = new ArrayList<>(arr.length);
+                    for (Wire.CosmeticEntryDto d : arr) {
+                        if (d != null && d.id() != null) {
+                            out.add(d.toApi(base()));
+                        }
+                    }
+                    return out;
+                })
+                .exceptionally(err -> {
+                    LOGGER.debug("LAN+ cosmetic catalog failed: {}", err.toString());
+                    return List.of();
+                });
+    }
+
+    @Override
     public CompletableFuture<UserProfile> fetchProfile(UUID uuid) {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture(null);
@@ -368,12 +469,12 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
                                                    Map<String, String> prompts, Boolean invisible,
                                                    Boolean favoriteVisible, Boolean currentlyPlayingVisible,
-                                                   Boolean recentlyPlayedVisible) {
+                                                   Boolean recentlyPlayedVisible, Boolean discoverable) {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture("offline");
         }
         Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links, prompts, invisible,
-                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible);
+                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible, discoverable);
         return postNulls("/profile/update", body)
                 .thenApply(this::parseUpdateResult)
                 .exceptionally(err -> {

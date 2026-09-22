@@ -9,7 +9,7 @@ public record ProfileBackground(String style, int color, int opacity, CatalogIma
             style = DEFAULT.style;
         }
         color &= 0xFFFFFF;
-        opacity = Math.max(0, Math.min(100, opacity));
+        opacity = Math.clamp(opacity, 0, 100);
     }
 
     public ProfileBackground(String style, int color, int opacity) {

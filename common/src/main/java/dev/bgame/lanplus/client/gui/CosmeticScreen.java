@@ -163,6 +163,9 @@ public final class CosmeticScreen extends LanPlusScreen {
         boolean hover = inside(mouseX, mouseY, x, y, SLOT, SLOT);
         String eq = LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().equipped(uuid, slot);
         LanPlusUI.slot(g, x, y, x + SLOT, y + SLOT);
+        if (eq != null) {
+            LanPlusClient.ensureCosmeticModel(eq);
+        }
         CosmeticModel model = eq == null || LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().model(eq);
         if (model != null) {
             int t = SLOT - 8;
@@ -243,6 +246,7 @@ public final class CosmeticScreen extends LanPlusScreen {
         int tx0 = x + 7;
         int ty0 = y + 3;
         int textX = tx0;
+        LanPlusClient.ensureCosmeticModel(id);
         CosmeticModel model = LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().model(id);
         if (model != null) {
             g.enableScissor(tx0, ty0, tx0 + thumb, ty0 + thumb);
@@ -338,11 +342,17 @@ public final class CosmeticScreen extends LanPlusScreen {
         if (LanPlusClient.cosmetics() != null && uuid != null) {
             LanPlusClient.cosmetics().equip(uuid, selected, id);
         }
+        if (LanPlusClient.network() != null) {
+            LanPlusClient.network().equipCosmetic(selected.name(), id);
+        }
     }
 
     private void unequipSelected() {
         if (LanPlusClient.cosmetics() != null && uuid != null) {
             LanPlusClient.cosmetics().unequip(uuid, selected);
+        }
+        if (LanPlusClient.network() != null) {
+            LanPlusClient.network().equipCosmetic(selected.name(), null);
         }
     }
 

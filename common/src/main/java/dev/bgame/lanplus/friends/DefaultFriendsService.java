@@ -6,6 +6,7 @@ import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.PresenceUpdate;
 import dev.bgame.lanplus.api.ResolvedUser;
+import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.UserProfile;
 import dev.bgame.lanplus.invites.HostAccessControl;
 import dev.bgame.lanplus.network.LanPlusNetwork;
@@ -62,6 +63,15 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
             notifyChanged();
             return list;
         });
+    }
+
+    @Override
+    public CompletableFuture<List<Suggestion>> suggestions() {
+        UUID uuid = localUuid();
+        if (uuid == null) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return network.getSuggestions(uuid);
     }
 
     @Override

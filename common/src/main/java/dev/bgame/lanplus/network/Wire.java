@@ -4,6 +4,7 @@ import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Connectivity;
+import dev.bgame.lanplus.api.CosmeticCatalogEntry;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.PlayedTogether;
@@ -13,6 +14,7 @@ import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinType;
+import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.UserProfile;
 
 import java.util.List;
@@ -36,58 +38,33 @@ final class Wire {
         }
     }
 
-    record PresenceRequest(
-            String uuid,
-            String username,
-            String state,
-            String worldName,
-            String address,
-            String joinCode,
-            String modpackId,
-            String accessMode,
-            List<String> allowedUuids,
-            Skin skin,
-            String gameMode,
-            String difficulty,
-            boolean allowCommands,
-            long timestamp
-    ) {
+    record PresenceRequest(String uuid, String username, String state, String worldName, String address,
+                           String joinCode, String modpackId, String accessMode, List<String> allowedUuids, Skin skin,
+                           String gameMode, String difficulty, boolean allowCommands, long timestamp) {
     }
 
-    record Friend(
-            String uuid,
-            String username,
-            String connectivity,
-            String state,
-            String worldName,
-            String joinCode,
-            Skin skin,
-            boolean muted,
-            boolean blocked,
-            int tier,
-            String gameMode,
-            String difficulty,
-            boolean allowCommands
-    ) {
+    record Friend(String uuid, String username, String connectivity, String state, String worldName, String joinCode,
+                  Skin skin, boolean muted, boolean blocked, int tier, String gameMode, String difficulty,
+                  boolean allowCommands) {
         dev.bgame.lanplus.api.Friend toApi() {
-            return new dev.bgame.lanplus.api.Friend(
-                    UUID.fromString(uuid),
-                    username,
-                    Connectivity.valueOf(connectivity),
-                    state == null ? null : GameplayState.valueOf(state),
-                    worldName,
-                    joinCode,
-                    skin == null ? null : skin.toApi(),
-                    muted,
-                    blocked,
-                    tier,
-                    gameMode,
-                    difficulty,
-                    allowCommands);
+            return new dev.bgame.lanplus.api.Friend(UUID.fromString(uuid), username, Connectivity.valueOf(connectivity), state == null ? null : GameplayState.valueOf(state), worldName, joinCode, skin == null ? null : skin.toApi(), muted, blocked, tier, gameMode, difficulty, allowCommands);
         }
     }
 
     record FriendAdd(String uuid, String friendUuid) {
+    }
+
+    record CosmeticEquip(String slot, String cosmeticId) {
+    }
+
+    record CosmeticEntryDto(String id, String meta, String geoUrl, String geoHash,
+                            String animUrl, String animHash, String texUrl, String texHash) {
+        CosmeticCatalogEntry toApi(String base) {
+            return new CosmeticCatalogEntry(id, meta == null ? "" : meta,
+                    versionedUrl(base, geoUrl, geoHash), geoHash,
+                    animUrl == null ? null : versionedUrl(base, animUrl, animHash), animHash,
+                    versionedUrl(base, texUrl, texHash), texHash);
+        }
     }
 
     record FriendRelation(String uuid, String targetUuid) {
@@ -114,9 +91,16 @@ final class Wire {
         }
     }
 
-    record ResolvedUserDto(String uuid, String username, boolean online) {
+    record ResolvedUserDto(String uuid, String username, boolean online, String friendCode) {
         ResolvedUser toApi() {
-            return new ResolvedUser(UUID.fromString(uuid), username, online);
+            return new ResolvedUser(UUID.fromString(uuid), username, online, friendCode);
+        }
+    }
+
+    record SuggestionDto(String uuid, String username, String friendCode, int mutualCount, List<String> mutualNames) {
+        Suggestion toApi() {
+            return new Suggestion(UUID.fromString(uuid), username, friendCode, mutualCount,
+                    mutualNames == null ? List.of() : mutualNames);
         }
     }
 
@@ -127,37 +111,14 @@ final class Wire {
     }
 
     record ProfileDto(String uuid, String username, String friendCode, Skin skin, String pronouns, String bio,
-                      Map<String, String> links, Map<String, String> prompts,
-                      boolean online, Long lastSeen, Boolean invisible, ModpackDto currentlyPlaying,
-                      ModpackDto lastPlayed, ModpackDto favorite, ModpackDto recentlyPlayed,
-                      BackgroundDto background, CatalogImageDto banner,
-                      SettingsDto settings, ProgressionDto progression,
-                      PlayedTogetherDto playedTogether) {
+                      Map<String, String> links, Map<String, String> prompts, boolean online, Long lastSeen,
+                      Boolean invisible, Boolean discoverable, ModpackDto currentlyPlaying, ModpackDto lastPlayed,
+                      ModpackDto favorite, ModpackDto recentlyPlayed, BackgroundDto background, CatalogImageDto banner,
+                      SettingsDto settings, ProgressionDto progression, PlayedTogetherDto playedTogether) {
         Profile toApi(String base) {
             SettingsDto s = settings == null ? new SettingsDto(true, true, true) : settings;
             ProgressionDto p = progression == null ? new ProgressionDto(0, 0, null, null) : progression;
-            return new Profile(UUID.fromString(uuid), username, friendCode,
-                    skin == null ? null : skin.toApi(), pronouns, bio,
-                    links == null ? Map.of() : links,
-                    prompts == null ? Map.of() : prompts,
-                    online,
-                    lastSeen == null ? 0L : lastSeen,
-                    Boolean.TRUE.equals(invisible),
-                    currentlyPlaying == null ? null : currentlyPlaying.toApi(),
-                    lastPlayed == null ? null : lastPlayed.toApi(),
-                    favorite == null ? null : favorite.toApi(),
-                    recentlyPlayed == null ? null : recentlyPlayed.toApi(),
-                    !Boolean.FALSE.equals(s.favoriteVisible()),
-                    !Boolean.FALSE.equals(s.currentlyPlayingVisible()),
-                    !Boolean.FALSE.equals(s.recentlyPlayedVisible()),
-                    p.tier() == null ? 0 : p.tier(),
-                    p.advancements() == null ? 0 : p.advancements(),
-                    p.xp() == null ? -1 : p.xp(),
-                    p.sources() == null ? Map.of() : p.sources(),
-                    background == null ? ProfileBackground.DEFAULT : background.toApi(base),
-                    banner == null ? null : banner.toApi(base),
-                    playedTogether == null ? null : playedTogether.toApi(),
-                    false);
+            return new Profile(UUID.fromString(uuid), username, friendCode, skin == null ? null : skin.toApi(), pronouns, bio, links == null ? Map.of() : links, prompts == null ? Map.of() : prompts, online, lastSeen == null ? 0L : lastSeen, Boolean.TRUE.equals(invisible), currentlyPlaying == null ? null : currentlyPlaying.toApi(), lastPlayed == null ? null : lastPlayed.toApi(), favorite == null ? null : favorite.toApi(), recentlyPlayed == null ? null : recentlyPlayed.toApi(), !Boolean.FALSE.equals(s.favoriteVisible()), !Boolean.FALSE.equals(s.currentlyPlayingVisible()), !Boolean.FALSE.equals(s.recentlyPlayedVisible()), !Boolean.FALSE.equals(discoverable), p.tier() == null ? 0 : p.tier(), p.advancements() == null ? 0 : p.advancements(), p.xp() == null ? -1 : p.xp(), p.sources() == null ? Map.of() : p.sources(), background == null ? ProfileBackground.DEFAULT : background.toApi(base), banner == null ? null : banner.toApi(base), playedTogether == null ? null : playedTogether.toApi(), false);
         }
 
         public static ProfileDto fromJson(String body) {
@@ -193,8 +154,7 @@ final class Wire {
             } catch (IllegalArgumentException e) {
                 return null;
             }
-            return new ActivityEntry(id, actorName, ActivityEntry.Type.fromWire(type), subject,
-                    at == null ? 0L : at);
+            return new ActivityEntry(id, actorName, ActivityEntry.Type.fromWire(type), subject, at == null ? 0L : at);
         }
     }
 
@@ -211,16 +171,14 @@ final class Wire {
         }
     }
 
-    record AnnouncementDto(Integer id, String type, String title, String body, Long createdAt,
-                           String imageId, String image, String imageHash) {
+    record AnnouncementDto(Integer id, String type, String title, String body, Long createdAt, String imageId,
+                           String image, String imageHash) {
         Announcement toApi(String base) {
             if (title == null || body == null) {
                 return null;
             }
-            CatalogImage img = imageId == null || image == null ? null
-                    : new CatalogImage(imageId, versionedUrl(base, image, imageHash), imageHash);
-            return new Announcement(id == null ? 0 : id, Announcement.Type.fromWire(type), title, body,
-                    createdAt == null ? 0L : createdAt, img);
+            CatalogImage img = imageId == null || image == null ? null : new CatalogImage(imageId, versionedUrl(base, image, imageHash), imageHash);
+            return new Announcement(id == null ? 0 : id, Announcement.Type.fromWire(type), title, body, createdAt == null ? 0L : createdAt, img);
         }
     }
 
@@ -233,23 +191,16 @@ final class Wire {
         }
     }
 
-    record BackgroundDto(String style, Integer color, Integer opacity,
-                         String imageId, String image, String imageHash) {
+    record BackgroundDto(String style, Integer color, Integer opacity, String imageId, String image, String imageHash) {
         ProfileBackground toApi(String base) {
-            CatalogImage img = imageId == null || image == null ? null
-                    : new CatalogImage(imageId, versionedUrl(base, image, imageHash), imageHash);
-            return new ProfileBackground(
-                    style,
-                    color == null ? ProfileBackground.DEFAULT.color() : color,
-                    opacity == null ? ProfileBackground.DEFAULT.opacity() : opacity,
-                    img);
+            CatalogImage img = imageId == null || image == null ? null : new CatalogImage(imageId, versionedUrl(base, image, imageHash), imageHash);
+            return new ProfileBackground(style, color == null ? ProfileBackground.DEFAULT.color() : color, opacity == null ? ProfileBackground.DEFAULT.opacity() : opacity, img);
         }
     }
 
     record CatalogImageDto(String id, String url, String hash) {
         CatalogImage toApi(String base) {
-            return id == null || url == null ? null
-                    : new CatalogImage(id, versionedUrl(base, url, hash), hash);
+            return id == null || url == null ? null : new CatalogImage(id, versionedUrl(base, url, hash), hash);
         }
     }
 
@@ -274,9 +225,8 @@ final class Wire {
     }
 
     record ProfileUpdate(String uuid, String bio, String pronouns, Map<String, String> links,
-                         Map<String, String> prompts, Boolean invisible,
-                         Boolean favoriteVisible,
-                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {
+                         Map<String, String> prompts, Boolean invisible, Boolean favoriteVisible,
+                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable) {
     }
 
     record FavoriteUpdate(String uuid, String favoriteModpackId) {

@@ -90,7 +90,7 @@ public final class Announcements extends LanPlusScreen {
         cardY = Math.max(20, (this.height - cardH) / 2 - 10);
         sidebarX = cardX + PAD;
         sidebarTop = cardY + 34;
-        listX = sidebarX + SIDEBAR_W + 12;
+        listX = sidebarX + SIDEBAR_W + 14;
         listTop = cardY + 34;
         listBottom = cardY + cardH - FOOTER_H;
         contentW = cardX + cardW - PAD - listX;

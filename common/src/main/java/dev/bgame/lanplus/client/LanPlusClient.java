@@ -16,6 +16,7 @@ import dev.bgame.lanplus.client.gui.UpdateScreen;
 import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.core.ProfileCache;
 import dev.bgame.lanplus.cosmetics.CosmeticMeta;
+import dev.bgame.lanplus.cosmetics.CosmeticSlot;
 import dev.bgame.lanplus.discord.DiscordPresence;
 import dev.bgame.lanplus.discord.DiscordRichPresence;
 import dev.bgame.lanplus.friends.DefaultFriendsService;
@@ -44,6 +45,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -63,9 +65,11 @@ public final class LanPlusClient {
     private static SkinService skins;
     private static SkinTextures skinTextures;
     private static CosmeticModels cosmetics;
+    private static CosmeticAssetLoader cosmeticAssets;
     private static DiscordPresence discord;
     private static AnnouncementsService announcements;
     private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
+    private static final Set<UUID> requestedLoadouts = ConcurrentHashMap.newKeySet();
     private static volatile String pendingUpdateVersion;
     private static volatile String pendingUpdateUrl;
 
@@ -86,6 +90,7 @@ public final class LanPlusClient {
         skinTextures = new SkinTextures();
         skins = new DefaultSkinService(skinTextures, network, assetCache);
         cosmetics = new CosmeticModels();
+        cosmeticAssets = new CosmeticAssetLoader(network, cosmetics, assetCache);
         loadDevCosmetics();
         friends.addListener(LanPlusClient::resolveFriendSkins);
         friends.addListener(new SocialToastListener());
@@ -138,6 +143,8 @@ public final class LanPlusClient {
 
         friends.connect();
         announcements.connect();
+        ensureCosmeticLoadout(selfUuid());
+        cosmeticAssets.refreshCatalog();
     }
 
     private static boolean isOutdated(String current, String latest) {
@@ -213,6 +220,31 @@ public final class LanPlusClient {
 
     public static CosmeticModels cosmetics() {
         return cosmetics;
+    }
+
+    public static void ensureCosmeticModel(String cosmeticId) {
+        if (cosmeticAssets != null) {
+            cosmeticAssets.ensureModel(cosmeticId);
+        }
+    }
+
+    public static void ensureCosmeticLoadout(UUID player) {
+        if (player == null || cosmetics == null || network == null || !requestedLoadouts.add(player)) {
+            return;
+        }
+        network.getCosmeticLoadout(player).whenComplete((map, err) -> {
+            if (err != null || map == null) {
+                return;
+            }
+            Map<CosmeticSlot, String> parsed = new EnumMap<>(CosmeticSlot.class);
+            for (Map.Entry<String, String> e : map.entrySet()) {
+                try {
+                    parsed.put(CosmeticSlot.valueOf(e.getKey()), e.getValue());
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            cosmetics.applyLoadout(player, parsed);
+        });
     }
 
     private static void loadDevCosmetics() {

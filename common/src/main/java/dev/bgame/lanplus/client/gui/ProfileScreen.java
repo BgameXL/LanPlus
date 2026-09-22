@@ -87,6 +87,7 @@ public final class ProfileScreen extends LanPlusScreen {
     private Button pronounButton;
     private int pronounIndex;
     private boolean invisibleToggle;
+    private boolean discoverableToggle;
     private Component hoverTip;
 
     private static final class LinkRow {
@@ -118,7 +119,7 @@ public final class ProfileScreen extends LanPlusScreen {
     private int editBodyBottom;
     private int aAboutHdrY, aBioY, aBioToolbarY, aBioPreviewY, aLinksHdrY, aLinksRowsY, aAddLinkY,
             aQHdrY, aQRowsY, aIdentityHdrY, aIdProfileHdrY, aIdPronounY, aIdStatusY,
-            aIdActivityHdrY, aIdInvisibleY, aIdCurrentY, aIdRecentY, aIdFavoriteY, aIdLastSeenY,
+            aIdActivityHdrY, aIdInvisibleY, aIdDiscoverableY, aIdCurrentY, aIdRecentY, aIdFavoriteY, aIdLastSeenY,
             aBgRowY, aBannerRowY, aSkinRowY;
     private int pvX, pvY, pvW, pvH;
 
@@ -263,6 +264,8 @@ public final class ProfileScreen extends LanPlusScreen {
                 aIdActivityHdrY = y;
                 y += 26;
                 aIdInvisibleY = y;
+                y += 26;
+                aIdDiscoverableY = y;
                 y += 26;
                 aIdCurrentY = y;
                 y += 22;
@@ -661,6 +664,7 @@ public final class ProfileScreen extends LanPlusScreen {
         favoriteVisibleToggle = profile.favoriteVisible();
         playingVisibleToggle = profile.currentlyPlayingVisible();
         recentlyPlayedVisibleToggle = profile.recentlyPlayedVisible();
+        discoverableToggle = profile.discoverable();
         if (bgStyle == BG_DARK || bgStyle == BG_MINECRAFT) {
             bgStyle = bgImageId != null ? BG_IMAGE : BG_SOLID;
         }
@@ -836,6 +840,9 @@ public final class ProfileScreen extends LanPlusScreen {
 
         identityRow(g, aIdInvisibleY, "gui.lanplus.profile.id.invisible", "gui.lanplus.profile.id.invisible.desc",
                 invisibleToggle, true, () -> invisibleToggle = !invisibleToggle, mouseX, mouseY);
+
+        identityRow(g, aIdDiscoverableY, "gui.lanplus.profile.id.discoverable", "gui.lanplus.profile.id.discoverable.desc",
+                discoverableToggle, true, () -> discoverableToggle = !discoverableToggle, mouseX, mouseY);
 
         boolean fieldsOn = !invisibleToggle;
         identityRow(g, aIdCurrentY, "gui.lanplus.profile.id.current", "gui.lanplus.profile.id.current.desc",
@@ -1717,7 +1724,7 @@ public final class ProfileScreen extends LanPlusScreen {
         CompletableFuture<String> bgF = svc.setBackground(bgStyleName(), bgColor, bgOpacity, bgImageId);
         CompletableFuture<String> bannerF = svc.setBanner(banner == null ? null : banner.id());
         CompletableFuture<String> saveF = svc.save(bio, pronouns, links, prompts, invisibleToggle,
-                favoriteVisibleToggle, playingVisibleToggle, recentlyPlayedVisibleToggle);
+                favoriteVisibleToggle, playingVisibleToggle, recentlyPlayedVisibleToggle, discoverableToggle);
         CompletableFuture.allOf(bgF, bannerF, saveF).whenComplete((v, ex) -> Minecraft.getInstance().execute(() -> {
             String error = ex != null ? "offline"
                     : saveF.getNow(null) != null ? saveF.getNow(null)

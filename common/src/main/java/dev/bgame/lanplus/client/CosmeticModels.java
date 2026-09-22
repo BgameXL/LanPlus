@@ -14,8 +14,10 @@ import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -55,8 +57,10 @@ public final class CosmeticModels {
     }
 
     public List<String> idsForSlot(CosmeticSlot slot) {
+        Set<String> known = new HashSet<>(meta.keySet());
+        known.addAll(models.keySet());
         List<String> out = new ArrayList<>();
-        for (String id : models.keySet()) {
+        for (String id : known) {
             if (slotOf(id) == slot) {
                 out.add(id);
             }
@@ -92,6 +96,17 @@ public final class CosmeticModels {
         Map<CosmeticSlot, String> equipped = loadout.get(player);
         if (equipped != null) {
             equipped.remove(slot);
+        }
+    }
+
+    public void applyLoadout(UUID player, Map<CosmeticSlot, String> map) {
+        if (player == null) {
+            return;
+        }
+        if (map == null || map.isEmpty()) {
+            loadout.remove(player);
+        } else {
+            loadout.put(player, new ConcurrentHashMap<>(map));
         }
     }
 

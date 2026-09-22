@@ -3,6 +3,7 @@ package dev.bgame.lanplus.network;
 import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
+import dev.bgame.lanplus.api.CosmeticCatalogEntry;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.Invite;
 import dev.bgame.lanplus.api.LibrarySkin;
@@ -12,6 +13,7 @@ import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.SkinUploadResult;
+import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.UserProfile;
 
 import java.util.List;
@@ -43,6 +45,14 @@ public interface LanPlusNetwork {
 
     CompletableFuture<List<ResolvedUser>> getFriendRequests(UUID uuid);
 
+    CompletableFuture<List<Suggestion>> getSuggestions(UUID uuid);
+
+    CompletableFuture<Boolean> equipCosmetic(String slot, String cosmeticId);
+
+    CompletableFuture<Map<String, String>> getCosmeticLoadout(UUID uuid);
+
+    CompletableFuture<List<CosmeticCatalogEntry>> getCosmeticCatalog();
+
     CompletableFuture<List<ActivityEntry>> getActivity();
 
     CompletableFuture<List<Announcement>> getAnnouncements();
@@ -53,6 +63,8 @@ public interface LanPlusNetwork {
 
     CompletableFuture<ResolvedUser> resolveUser(String query);
 
+    CompletableFuture<List<ResolvedUser>> searchUsers(String query);
+
     CompletableFuture<UserProfile> fetchProfile(UUID uuid);
 
     CompletableFuture<Profile> getProfile(UUID uuid, UUID viewer);
@@ -60,7 +72,7 @@ public interface LanPlusNetwork {
     CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
                                             Map<String, String> prompts, Boolean invisible,
                                             Boolean favoriteVisible, Boolean currentlyPlayingVisible,
-                                            Boolean recentlyPlayedVisible);
+                                            Boolean recentlyPlayedVisible, Boolean discoverable);
 
     CompletableFuture<String> setFavoriteModpack(UUID uuid, String modpackId);
 

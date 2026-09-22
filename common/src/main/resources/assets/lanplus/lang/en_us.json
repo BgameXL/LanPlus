@@ -38,6 +38,9 @@
   "gui.lanplus.add.notfound": "User not found: %s",
   "gui.lanplus.add.yourcode": "Your friend code: %s",
   "gui.lanplus.add.yourcode.unknown": "Your friend code: -",
+  "gui.lanplus.suggest.title": "People you may know",
+  "gui.lanplus.suggest.empty": "No suggestions yet",
+  "gui.lanplus.suggest.mutual": "%1$s in common: %2$s",
 
   "gui.lanplus.action.join": "Join",
   "gui.lanplus.action.remove": "Remove",
@@ -185,6 +188,8 @@
   "gui.lanplus.profile.id.status.hint": "Set a status...",
   "gui.lanplus.profile.id.invisible": "Invisible Mode",
   "gui.lanplus.profile.id.invisible.desc": "Appear offline and hide activity.",
+  "gui.lanplus.profile.id.discoverable": "Friend suggestions",
+  "gui.lanplus.profile.id.discoverable.desc": "Let friends of your friends discover and add you.",
   "gui.lanplus.profile.id.current": "Current activity",
   "gui.lanplus.profile.id.current.desc": "Show the modpack you're currently playing on your profile.",
   "gui.lanplus.profile.id.recent": "Recent modpacks",

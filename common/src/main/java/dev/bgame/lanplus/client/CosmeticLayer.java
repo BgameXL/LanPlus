@@ -27,11 +27,13 @@ public final class CosmeticLayer extends RenderLayer<AbstractClientPlayer, Playe
         if (models == null) {
             return;
         }
+        LanPlusClient.ensureCosmeticLoadout(player.getUUID());
         Map<CosmeticSlot, String> equipped = models.loadout(player.getUUID());
         if (equipped == null || equipped.isEmpty()) {
             return;
         }
         for (Map.Entry<CosmeticSlot, String> entry : equipped.entrySet()) {
+            LanPlusClient.ensureCosmeticModel(entry.getValue());
             CosmeticModel model = models.model(entry.getValue());
             if (model == null) {
                 continue;
