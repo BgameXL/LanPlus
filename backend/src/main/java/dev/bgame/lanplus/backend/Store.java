@@ -360,6 +360,9 @@ final class Store {
 
     // users
     User ensureUser(UUID uuid, String username) {
+        if (username != null) {
+            username = safeName(uuid, username);
+        }
         synchronized (lock) {
             try {
                 User u = findUser(uuid);
@@ -430,7 +433,7 @@ final class Store {
         }
         try (Reader r = read()) {
             try (PreparedStatement ps = conn().prepareStatement(
-                    "SELECT uuid, username FROM users WHERE (username LIKE ? COLLATE NOCASE "
+                    "SELECT uuid, username, friend_code FROM users WHERE (username LIKE ? COLLATE NOCASE "
                             + "OR friend_code LIKE ? COLLATE NOCASE) AND banned = 0")) {
                 String like = "%" + q + "%";
                 ps.setString(1, like);
@@ -439,7 +442,7 @@ final class Store {
                     while (rs.next()) {
                         UUID uuid = UUID.fromString(rs.getString(1));
                         out.add(ordered("uuid", rs.getString(1), "username", rs.getString(2),
-                                "online", isOnline(uuid)));
+                                "friendCode", rs.getString(3), "online", isOnline(uuid)));
                     }
                 }
             } catch (SQLException e) {
@@ -1084,15 +1087,17 @@ final class Store {
                 }
                 List<UUID> ids = new ArrayList<>(counts.keySet());
                 Map<UUID, String> candidateNames = new HashMap<>();
+                Map<UUID, String> candidateCodes = new HashMap<>();
                 String idPh = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
                 try (PreparedStatement ps = conn().prepareStatement(
-                        "SELECT uuid, username FROM users WHERE uuid IN (" + idPh + ")")) {
+                        "SELECT uuid, username, friend_code FROM users WHERE uuid IN (" + idPh + ")")) {
                     for (int i = 0; i < ids.size(); i++) {
                         ps.setString(i + 1, ids.get(i).toString());
                     }
                     try (ResultSet rs = ps.executeQuery()) {
                         while (rs.next()) {
                             candidateNames.put(UUID.fromString(rs.getString(1)), rs.getString(2));
+                            candidateCodes.put(UUID.fromString(rs.getString(1)), rs.getString(3));
                         }
                     }
                 }
@@ -1103,6 +1108,7 @@ final class Store {
                         continue;
                     }
                     out.add(ordered("uuid", v.toString(), "username", name,
+                            "friendCode", candidateCodes.get(v),
                             "mutualCount", counts.get(v),
                             "mutualNames", mutualNames.getOrDefault(v, List.of())));
                     if (out.size() >= SUGGESTIONS_LIMIT) {
@@ -2605,6 +2611,13 @@ final class Store {
 
     static UUID offlineUuid(String username) {
         return UUID.nameUUIDFromBytes(("OfflinePlayer:" + username).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String safeName(UUID uuid, String username) {
+        if (uuid.version() == 3 && ContentFilter.isBlocked(username)) {
+            return "Player-" + uuid.toString().substring(0, 4);
+        }
+        return username;
     }
 
     Session validateSession(String token) {

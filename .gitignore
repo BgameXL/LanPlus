@@ -39,3 +39,4 @@ lanplus-web
 next-app
 *.db
 staging
+deploy-backend.sh
