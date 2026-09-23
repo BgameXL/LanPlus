@@ -577,6 +577,15 @@ public final class BackendServer {
         if (m.equals("GET") && path.equals("/admin/banners")) {
             return ok(banners.list());
         }
+        if (m.equals("POST") && path.equals("/admin/cosmetic")) {
+            return adminCosmeticUpload(req);
+        }
+        if (m.equals("POST") && path.equals("/admin/cosmetic/delete")) {
+            return adminCosmeticDelete(req);
+        }
+        if (m.equals("GET") && path.equals("/admin/cosmetics")) {
+            return ok(cosmetics3d.catalog());
+        }
         if (m.equals("POST") && path.equals("/admin/test-notification")) {
             return adminTestNotification(req);
         }
@@ -663,6 +672,55 @@ public final class BackendServer {
         String body = b.get("body") == null ? "" : String.valueOf(b.get("body"));
         hub.sendAll(ordered("type", "TEST_NOTIFICATION", "data", ordered("title", title, "body", body)));
         return OK_EMPTY;
+    }
+
+    private Resp adminCosmeticUpload(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        String id = b.get("id") == null ? null : String.valueOf(b.get("id"));
+        if (!CosmeticAssets.validId(id)) {
+            return ok(error("bad_id"));
+        }
+        if (!(b.get("geo") instanceof String geoStr) || geoStr.isBlank()) {
+            return ok(error("bad_geo"));
+        }
+        if (!(b.get("texture") instanceof String texB64) || texB64.isEmpty()) {
+            return ok(error("bad_texture"));
+        }
+        if (texB64.length() > MAX_IMAGE_B64_CHARS) {
+            return ok(error("too_large"));
+        }
+        byte[] texture;
+        try {
+            texture = Base64.getDecoder().decode(texB64);
+        } catch (IllegalArgumentException e) {
+            return ok(error("bad_texture"));
+        }
+        if (pngDimensions(texture) == null) {
+            return ok(error("bad_texture"));
+        }
+        byte[] geo = geoStr.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] anim = b.get("animation") instanceof String a && !a.isBlank()
+                ? a.getBytes(java.nio.charset.StandardCharsets.UTF_8) : null;
+        byte[] meta = b.get("meta") instanceof String md && !md.isBlank()
+                ? md.getBytes(java.nio.charset.StandardCharsets.UTF_8) : null;
+        if (!cosmetics3d.writeBundle(id, geo, texture, anim, meta)) {
+            return ok(error("write_failed"));
+        }
+        log("admin cosmetic uploaded: " + id);
+        return ok(ordered("id", id));
+    }
+
+    private Resp adminCosmeticDelete(Http.Request req) {
+        Map<String, Object> b = Json.parseObject(req.body());
+        String id = b.get("id") == null ? null : String.valueOf(b.get("id"));
+        if (!CosmeticAssets.validId(id)) {
+            return ok(error("bad_id"));
+        }
+        if (!cosmetics3d.delete(id)) {
+            return ok(error("not_found"));
+        }
+        log("admin cosmetic deleted: " + id);
+        return ok(ordered("success", true));
     }
 
     private Resp adminImageUpload(AssetCatalog catalog, String label, Http.Request req) {

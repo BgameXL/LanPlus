@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,6 +65,56 @@ final class CosmeticAssets {
             out.add(m);
         }
         return out;
+    }
+
+    static boolean validId(String id) {
+        return id != null && ID.matcher(id).matches();
+    }
+
+    synchronized boolean writeBundle(String id, byte[] geo, byte[] texture, byte[] animation, byte[] meta) {
+        if (!validId(id) || geo == null || texture == null
+                || geo.length == 0 || geo.length > MAX_BYTES
+                || texture.length == 0 || texture.length > MAX_BYTES
+                || (animation != null && animation.length > MAX_BYTES)
+                || (meta != null && meta.length > MAX_BYTES)) {
+            return false;
+        }
+        try {
+            Path base = dir.resolve(id);
+            Files.createDirectories(base);
+            Files.write(base.resolve("model.geo.json"), geo);
+            Files.write(base.resolve("texture.png"), texture);
+            if (animation != null && animation.length > 0) {
+                Files.write(base.resolve("animation.json"), animation);
+            }
+            if (meta != null && meta.length > 0) {
+                Files.write(base.resolve("meta.json"), meta);
+            }
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    synchronized boolean delete(String id) {
+        if (!validId(id)) {
+            return false;
+        }
+        Path base = dir.resolve(id);
+        if (!Files.isDirectory(base)) {
+            return false;
+        }
+        try (Stream<Path> tree = Files.walk(base)) {
+            tree.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.delete(p);
+                } catch (IOException ignored) {
+                }
+            });
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     synchronized byte[] file(String id, String name) {

@@ -126,7 +126,28 @@ final class AdminPanel {
                   </div>
                   <div id="bannerList" class="thumbs"></div>
                 </div>
-            
+
+                <div class="card">
+                  <label>3D cosmetics</label>
+                  <div class="grid2">
+                    <input id="cosId" type="text" placeholder="Cosmetic id (a-z0-9_-)">
+                    <div></div>
+                    <label class="muted">Model (.geo.json)</label>
+                    <input id="cosGeo" type="file" accept=".json,application/json">
+                    <label class="muted">Texture (.png)</label>
+                    <input id="cosTex" type="file" accept="image/png">
+                    <label class="muted">Animation (.json, optional)</label>
+                    <input id="cosAnim" type="file" accept=".json,application/json">
+                    <label class="muted">Meta (.json, optional)</label>
+                    <input id="cosMeta" type="file" accept=".json,application/json">
+                  </div>
+                  <div class="actions">
+                    <button class="accent" onclick="uploadCosmetic()">Upload cosmetic</button>
+                    <button class="ghost" onclick="loadCosmetics3d()">Refresh</button>
+                  </div>
+                  <div id="cosList" class="thumbs"></div>
+                </div>
+
                 <div class="card">
                   <label>Test notification</label>
                   <div class="grid2">
@@ -158,7 +179,7 @@ final class AdminPanel {
               const v = document.getElementById('key').value.trim();
               if (!v) return;
               localStorage.setItem(KS, v);
-              show(true); loadReports(); loadAnnouncements(); loadCosmetics();
+              show(true); loadReports(); loadAnnouncements(); loadCosmetics(); loadCosmetics3d();
             }
             function logout() { localStorage.removeItem(KS); show(false); msg(''); }
             
@@ -256,10 +277,7 @@ final class AdminPanel {
               let id = idField ? document.getElementById(idField).value.trim() : '';
               if (!id) { id = f.name.replace(/\\.png$/i, '').toLowerCase().replace(/[^a-z0-9_-]/g, '-').slice(0, 64); }
               try {
-                const bytes = new Uint8Array(await f.arrayBuffer());
-                let bin = '';
-                for (let i = 0; i < bytes.length; i++) { bin += String.fromCharCode(bytes[i]); }
-                const r = await api(path, { id, png: btoa(bin) });
+                const r = await api(path, { id, png: await b64(f) });
                 if (r.status === 401) { msg('Invalid admin key', true); show(false); return; }
                 const data = await r.json().catch(() => ({}));
                 if (!r.ok || data.error) { msg('Upload failed' + (data.error ? ': ' + data.error : ''), true); return; }
@@ -288,6 +306,63 @@ final class AdminPanel {
             }
             
             function loadCosmetics() { loadCatalog('/admin/backgrounds','bgList'); loadCatalog('/admin/banners','bannerList'); }
+
+            async function b64(f) {
+              const bytes = new Uint8Array(await f.arrayBuffer());
+              let bin = '';
+              for (let i = 0; i < bytes.length; i++) { bin += String.fromCharCode(bytes[i]); }
+              return btoa(bin);
+            }
+
+            async function uploadCosmetic() {
+              const id = document.getElementById('cosId').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'-').slice(0,64);
+              if (!id) { msg('Enter a cosmetic id', true); return; }
+              const geoF = document.getElementById('cosGeo').files[0];
+              const texF = document.getElementById('cosTex').files[0];
+              if (!geoF || !texF) { msg('Model and texture are required', true); return; }
+              const animF = document.getElementById('cosAnim').files[0];
+              const metaF = document.getElementById('cosMeta').files[0];
+              try {
+                const body = { id, geo: await geoF.text(), texture: await b64(texF) };
+                if (animF) body.animation = await animF.text();
+                if (metaF) body.meta = await metaF.text();
+                const r = await api('/admin/cosmetic', body);
+                if (r.status === 401) { msg('Invalid admin key', true); show(false); return; }
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || data.error) { msg('Upload failed' + (data.error ? ': ' + data.error : ''), true); return; }
+                for (const f of ['cosId','cosGeo','cosTex','cosAnim','cosMeta']) document.getElementById(f).value = '';
+                msg('Uploaded: ' + data.id);
+                loadCosmetics3d();
+              } catch (e) { msg('Network error', true); }
+            }
+
+            async function loadCosmetics3d() {
+              let r;
+              try { r = await api('/admin/cosmetics'); } catch (e) { return; }
+              if (!r.ok) return;
+              const list = await r.json();
+              const box = document.getElementById('cosList');
+              box.textContent = '';
+              if (!list.length) { box.append(el('div','muted','Nothing uploaded yet.')); return; }
+              for (const c of list) {
+                const cell = el('div','thumb');
+                const img = el('img'); img.src = c.texUrl + '?v=' + (c.texHash||'').slice(0,16); img.alt = c.id;
+                cell.append(img); cell.append(el('div','cap', c.id));
+                const del = el('button','danger','Delete'); del.onclick = () => deleteCosmetic(c.id);
+                cell.append(del);
+                box.append(cell);
+              }
+            }
+
+            async function deleteCosmetic(id) {
+              try {
+                const r = await api('/admin/cosmetic/delete', { id });
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok || data.error) { msg('Delete failed' + (data.error ? ': ' + data.error : ''), true); return; }
+                msg('Deleted: ' + id);
+                loadCosmetics3d();
+              } catch (e) { msg('Network error', true); }
+            }
             
             async function sendTestNotification() {
               const title = document.getElementById('testTitle').value.trim();
