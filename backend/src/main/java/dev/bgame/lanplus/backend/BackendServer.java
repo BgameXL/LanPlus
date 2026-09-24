@@ -49,7 +49,7 @@ public final class BackendServer {
         this.store = new Store(cfg.heartbeatTtlMs, cfg.baseDomain, cfg.dataFile,
                 cfg.sessionServerUrl, cfg.allowOffline, cfg.sessionTtlMs, backgrounds, banners,
                 announcementImages, cfg.discordWebhook);
-        String storedVersion = store.getMeta("latest_version");
+        String storedVersion = store.getMeta();
         this.latestVersion = storedVersion != null && !storedVersion.isBlank() ? storedVersion : cfg.latestVersion;
     }
 
@@ -297,6 +297,10 @@ public final class BackendServer {
             }
             if (m.equals("POST") && path.equals("/skin")) {
                 return skinUpload(req, self);
+            }
+            if (m.equals("GET") && path.equals("/skin")) {
+                Object skin = store.skinByName(req.param("name"));
+                return skin == null ? NOT_FOUND : ok(skin);
             }
             if (m.equals("POST") && path.equals("/skin/delete")) {
                 store.deleteHostedSkin(self);
@@ -660,7 +664,7 @@ public final class BackendServer {
             return ok(error("bad_version"));
         }
         latestVersion = s.trim();
-        store.setMeta("latest_version", latestVersion);
+        store.setMeta(latestVersion);
         hub.sendAll(versionEvent());
         log("latest version set: " + latestVersion);
         return OK_EMPTY;

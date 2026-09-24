@@ -429,6 +429,24 @@ final class Store {
         return null;
     }
 
+    Object skinByName(String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        try (Reader r = read()) {
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "SELECT s.skin_json FROM users u JOIN user_skin s ON s.uuid = u.uuid "
+                            + "WHERE u.username = ? COLLATE NOCASE AND u.banned = 0 LIMIT 1")) {
+                ps.setString(1, name);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? Json.parse(rs.getString(1)) : null;
+                }
+            } catch (SQLException e) {
+                throw fail("skinByName", e);
+            }
+        }
+    }
+
     List<Object> search(String q) {
         List<Object> out = new ArrayList<>();
         if (q == null || q.isBlank()) {
@@ -561,10 +579,10 @@ final class Store {
         return "ONLINE".equals(connectivity(uuid));
     }
 
-    String getMeta(String key) {
+    String getMeta() {
         try (Reader r = read()) {
             try (PreparedStatement ps = conn().prepareStatement("SELECT value FROM meta WHERE key=?")) {
-                ps.setString(1, key);
+                ps.setString(1, "latest_version");
                 try (ResultSet rs = ps.executeQuery()) {
                     return rs.next() ? rs.getString(1) : null;
                 }
@@ -574,12 +592,12 @@ final class Store {
         }
     }
 
-    void setMeta(String key, String value) {
+    void setMeta(String value) {
         synchronized (lock) {
             try (PreparedStatement ps = conn().prepareStatement(
                     "INSERT INTO meta (key, value) VALUES (?,?) "
                             + "ON CONFLICT(key) DO UPDATE SET value=excluded.value")) {
-                ps.setString(1, key);
+                ps.setString(1, "latest_version");
                 ps.setString(2, value);
                 ps.executeUpdate();
             } catch (SQLException e) {
