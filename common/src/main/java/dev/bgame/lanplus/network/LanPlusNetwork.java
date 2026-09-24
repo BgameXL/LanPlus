@@ -12,6 +12,7 @@ import dev.bgame.lanplus.api.PresenceUpdate;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
+import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.UserProfile;
@@ -64,6 +65,8 @@ public interface LanPlusNetwork {
     CompletableFuture<ResolvedUser> resolveUser(String query);
 
     CompletableFuture<List<ResolvedUser>> searchUsers(String query);
+
+    CompletableFuture<SkinRef> getSkinByName(String name);
 
     CompletableFuture<UserProfile> fetchProfile(UUID uuid);
 

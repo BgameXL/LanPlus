@@ -5,6 +5,7 @@ import dev.bgame.lanplus.client.SkinTextures;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.resources.PlayerSkin;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -26,8 +27,17 @@ public abstract class AbstractClientPlayerMixin {
         }
     }
 
+    @Unique
     private SkinTextures.Resolved lanplus$resolved() {
         SkinTextures textures = LanPlusClient.skinTextures();
-        return textures == null ? null : textures.get(((AbstractClientPlayer) (Object) this).getUUID());
+        if (textures == null) {
+            return null;
+        }
+        AbstractClientPlayer player = (AbstractClientPlayer) (Object) this;
+        SkinTextures.Resolved resolved = textures.get(player.getUUID());
+        if (resolved == null) {
+            LanPlusClient.ensureSkin(player.getUUID(), player.getGameProfile().getName());
+        }
+        return resolved;
     }
 }

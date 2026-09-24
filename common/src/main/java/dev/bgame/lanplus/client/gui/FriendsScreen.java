@@ -191,7 +191,7 @@ public final class FriendsScreen extends LanPlusScreen {
                 int jw = Math.min(rightW - 16, 140);
                 int jx = rightX + (rightW - jw) / 2;
                 addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.action.join"), b -> joinFriend(sel))
-                        .bounds(jx, paneTop + 44, jw, 20).primary().build());
+                        .bounds(jx, paneTop + 58, jw, 20).primary().build());
             }
         } else if (tab == Tab.DETAILS) {
             HostInfo info = hostInfo();
@@ -391,7 +391,7 @@ public final class FriendsScreen extends LanPlusScreen {
     }
 
     private void renderFriend(GuiGraphics g, Friend f, int y, int mouseX, int mouseY) {
-        boolean selected = f.uuid().equals(selectedUuid);
+        boolean selected = f.uuid().equals(selectedUuid) || f.uuid().equals(contextUuid);
         boolean hover = mouseX >= leftX && mouseX <= leftX + LEFT_W && mouseY >= y && mouseY < y + ROW_H;
         boolean unread = isInviteUnread(f);
         if (selected || hover) {
@@ -887,24 +887,23 @@ public final class FriendsScreen extends LanPlusScreen {
     }
 
     private void openContextMenu(Friend f, int x, int y) {
-        selectedUuid = f.uuid();
         contextUuid = f.uuid();
         contextX = x;
         contextY = y;
         List<ContextEntry> entries = new ArrayList<>();
-        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.viewprofile"), this::doViewProfile, true));
+        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.viewprofile"), () -> doViewProfile(f), true));
         boolean canJoin = f.state() == GameplayState.HOSTING && f.joinCode() != null;
-        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.join"), this::doJoin, canJoin));
+        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.join"), () -> joinFriend(f), canJoin));
         if (HostAccessControl.isActive() && !f.uuid().equals(LanPlusClient.selfUuid())) {
-            entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.invite"), this::doInvite, true));
+            entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.invite"), () -> doInvite(f), true));
         }
         entries.add(new ContextEntry(
                 Component.translatable(f.muted() ? "gui.lanplus.action.unmute" : "gui.lanplus.action.mute"),
-                this::doToggleMute, true));
+                () -> doToggleMute(f), true));
         entries.add(new ContextEntry(
                 Component.translatable(f.blocked() ? "gui.lanplus.action.unblock" : "gui.lanplus.action.block"),
-                this::doToggleBlock, true));
-        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.remove"), this::doRemove, true));
+                () -> doToggleBlock(f), true));
+        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.remove"), () -> doRemove(f), true));
         contextEntries = entries;
     }
 
@@ -1175,8 +1174,7 @@ public final class FriendsScreen extends LanPlusScreen {
         searchDirty = false;
     }
 
-    private void doInvite() {
-        Friend friend = selectedFriend();
+    private void doInvite(Friend friend) {
         InviteService invites = LanPlusClient.invites();
         if (friend == null || invites == null || !HostAccessControl.isActive()) {
             return;
@@ -1231,21 +1229,21 @@ public final class FriendsScreen extends LanPlusScreen {
         }));
     }
 
-    private void doRemove() {
-        Friend friend = selectedFriend();
+    private void doRemove(Friend friend) {
         FriendsService friends = LanPlusClient.friends();
         if (friend == null || friends == null) {
             return;
         }
         setStatus(Component.translatable("gui.lanplus.removed", friend.username()));
         friends.remove(friend.uuid()).whenComplete((ok, err) -> Minecraft.getInstance().execute(() -> {
-            selectedUuid = null;
+            if (friend.uuid().equals(selectedUuid)) {
+                selectedUuid = null;
+            }
             rebuildWidgets();
         }));
     }
 
-    private void doToggleMute() {
-        Friend friend = selectedFriend();
+    private void doToggleMute(Friend friend) {
         FriendsService friends = LanPlusClient.friends();
         if (friend == null || friends == null) {
             return;
@@ -1259,8 +1257,7 @@ public final class FriendsScreen extends LanPlusScreen {
                 }));
     }
 
-    private void doToggleBlock() {
-        Friend friend = selectedFriend();
+    private void doToggleBlock(Friend friend) {
         FriendsService friends = LanPlusClient.friends();
         if (friend == null || friends == null) {
             return;
@@ -1274,8 +1271,7 @@ public final class FriendsScreen extends LanPlusScreen {
                 }));
     }
 
-    private void doViewProfile() {
-        Friend friend = selectedFriend();
+    private void doViewProfile(Friend friend) {
         if (friend != null) {
             Minecraft.getInstance().setScreen(new ProfileScreen(this, friend.uuid()));
         }

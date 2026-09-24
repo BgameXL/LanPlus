@@ -12,6 +12,8 @@ public interface SkinService {
 
     CompletableFuture<Void> resolve(UUID player, SkinRef ref);
 
+    CompletableFuture<Void> resolveByName(UUID player, String name);
+
     CompletableFuture<List<LibrarySkin>> library();
 
     CompletableFuture<SkinUploadResult> addSkin(byte[] png, boolean slim);

@@ -20,6 +20,7 @@ import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.CosmeticCatalogEntry;
+import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.UserProfile;
@@ -84,9 +85,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         this.baseUrl = baseUrl;
         this.identity = identity;
         this.auth = auth;
-        this.http = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(5))
-                .build();
+        this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
         this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread thread = new Thread(r, "lanplus-ws-reconnect");
             thread.setDaemon(true);
@@ -105,25 +104,9 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured() || id == null) {
             return CompletableFuture.completedFuture(null);
         }
-        Wire.PresenceRequest body = new Wire.PresenceRequest(
-                id.uuid().toString(),
-                id.username(),
-                snapshot.state().name(),
-                snapshot.worldName(),
-                snapshot.address(),
-                snapshot.joinCode(),
-                snapshot.modpackId(),
-                snapshot.accessMode() == null ? null : snapshot.accessMode().name(),
-                snapshot.allowedUuids().stream().map(UUID::toString).toList(),
-                Wire.Skin.from(snapshot.skin()),
-                snapshot.gameMode(),
-                snapshot.difficulty(),
-                snapshot.allowCommands(),
-                System.currentTimeMillis());
-        return post("/presence", body)
-                .thenAccept(resp -> {
-                })
-                .exceptionally(this::onErrorVoid);
+        Wire.PresenceRequest body = new Wire.PresenceRequest(id.uuid().toString(), id.username(), snapshot.state().name(), snapshot.worldName(), snapshot.address(), snapshot.joinCode(), snapshot.modpackId(), snapshot.accessMode() == null ? null : snapshot.accessMode().name(), snapshot.allowedUuids().stream().map(UUID::toString).toList(), Wire.Skin.from(snapshot.skin()), snapshot.gameMode(), snapshot.difficulty(), snapshot.allowCommands(), System.currentTimeMillis());
+        return post("/presence", body).thenAccept(resp -> {
+        }).exceptionally(this::onErrorVoid);
     }
 
     @Override
@@ -131,22 +114,20 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        return get("/friends/" + uuid)
-                .thenApply(resp -> {
-                    Wire.Friend[] arr = GSON.fromJson(resp.body(), Wire.Friend[].class);
-                    if (arr == null) {
-                        return List.<Friend>of();
-                    }
-                    List<Friend> out = new ArrayList<>(arr.length);
-                    for (Wire.Friend f : arr) {
-                        out.add(f.toApi());
-                    }
-                    return out;
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return List.of();
-                });
+        return get("/friends/" + uuid).thenApply(resp -> {
+            Wire.Friend[] arr = GSON.fromJson(resp.body(), Wire.Friend[].class);
+            if (arr == null) {
+                return List.<Friend>of();
+            }
+            List<Friend> out = new ArrayList<>(arr.length);
+            for (Wire.Friend f : arr) {
+                out.add(f.toApi());
+            }
+            return out;
+        }).exceptionally(err -> {
+            onError(err);
+            return List.of();
+        });
     }
 
     @Override
@@ -193,15 +174,13 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(false);
         }
-        return post(path, body)
-                .thenApply(resp -> {
-                    Wire.Success ok = GSON.fromJson(resp.body(), Wire.Success.class);
-                    return ok != null && ok.success();
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return false;
-                });
+        return post(path, body).thenApply(resp -> {
+            Wire.Success ok = GSON.fromJson(resp.body(), Wire.Success.class);
+            return ok != null && ok.success();
+        }).exceptionally(err -> {
+            onError(err);
+            return false;
+        });
     }
 
     @Override
@@ -209,24 +188,22 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        return get("/friends/requests?uuid=" + uuid)
-                .thenApply(resp -> {
-                    Wire.ResolvedUserDto[] arr = GSON.fromJson(resp.body(), Wire.ResolvedUserDto[].class);
-                    if (arr == null) {
-                        return List.<ResolvedUser>of();
-                    }
-                    List<ResolvedUser> out = new ArrayList<>(arr.length);
-                    for (Wire.ResolvedUserDto d : arr) {
-                        if (d != null && d.uuid() != null) {
-                            out.add(d.toApi());
-                        }
-                    }
-                    return out;
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return List.of();
-                });
+        return get("/friends/requests?uuid=" + uuid).thenApply(resp -> {
+            Wire.ResolvedUserDto[] arr = GSON.fromJson(resp.body(), Wire.ResolvedUserDto[].class);
+            if (arr == null) {
+                return List.<ResolvedUser>of();
+            }
+            List<ResolvedUser> out = new ArrayList<>(arr.length);
+            for (Wire.ResolvedUserDto d : arr) {
+                if (d != null && d.uuid() != null) {
+                    out.add(d.toApi());
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            onError(err);
+            return List.of();
+        });
     }
 
     @Override
@@ -234,24 +211,22 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        return get("/friends/suggestions?uuid=" + uuid)
-                .thenApply(resp -> {
-                    Wire.SuggestionDto[] arr = GSON.fromJson(resp.body(), Wire.SuggestionDto[].class);
-                    if (arr == null) {
-                        return List.<Suggestion>of();
-                    }
-                    List<Suggestion> out = new ArrayList<>(arr.length);
-                    for (Wire.SuggestionDto d : arr) {
-                        if (d != null && d.uuid() != null) {
-                            out.add(d.toApi());
-                        }
-                    }
-                    return out;
-                })
-                .exceptionally(err -> {
-                    LOGGER.debug("LAN+ suggestions failed: {}", err.toString());
-                    return List.of();
-                });
+        return get("/friends/suggestions?uuid=" + uuid).thenApply(resp -> {
+            Wire.SuggestionDto[] arr = GSON.fromJson(resp.body(), Wire.SuggestionDto[].class);
+            if (arr == null) {
+                return List.<Suggestion>of();
+            }
+            List<Suggestion> out = new ArrayList<>(arr.length);
+            for (Wire.SuggestionDto d : arr) {
+                if (d != null && d.uuid() != null) {
+                    out.add(d.toApi());
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ suggestions failed: {}", err.toString());
+            return List.of();
+        });
     }
 
     @Override
@@ -259,28 +234,26 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        return get("/activity")
-                .thenApply(resp -> {
-                    Wire.ActivityFeedDto feed = Wire.ActivityFeedDto.fromJson(resp.body());
-                    if (feed == null || feed.activity() == null) {
-                        return List.<ActivityEntry>of();
-                    }
-                    List<ActivityEntry> out = new ArrayList<>(feed.activity().size());
-                    for (Wire.ActivityDto d : feed.activity()) {
-                        if (d == null) {
-                            continue;
-                        }
-                        ActivityEntry entry = d.toApi();
-                        if (entry != null) {
-                            out.add(entry);
-                        }
-                    }
-                    return out;
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return List.of();
-                });
+        return get("/activity").thenApply(resp -> {
+            Wire.ActivityFeedDto feed = Wire.ActivityFeedDto.fromJson(resp.body());
+            if (feed == null || feed.activity() == null) {
+                return List.<ActivityEntry>of();
+            }
+            List<ActivityEntry> out = new ArrayList<>(feed.activity().size());
+            for (Wire.ActivityDto d : feed.activity()) {
+                if (d == null) {
+                    continue;
+                }
+                ActivityEntry entry = d.toApi();
+                if (entry != null) {
+                    out.add(entry);
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            onError(err);
+            return List.of();
+        });
     }
 
     @Override
@@ -297,28 +270,26 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        return get(path)
-                .thenApply(resp -> {
-                    Wire.AnnouncementDto[] arr = GSON.fromJson(resp.body(), Wire.AnnouncementDto[].class);
-                    if (arr == null) {
-                        return List.<Announcement>of();
-                    }
-                    List<Announcement> out = new ArrayList<>(arr.length);
-                    for (Wire.AnnouncementDto d : arr) {
-                        if (d == null) {
-                            continue;
-                        }
-                        Announcement a = d.toApi(base());
-                        if (a != null) {
-                            out.add(a);
-                        }
-                    }
-                    return out;
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return List.of();
-                });
+        return get(path).thenApply(resp -> {
+            Wire.AnnouncementDto[] arr = GSON.fromJson(resp.body(), Wire.AnnouncementDto[].class);
+            if (arr == null) {
+                return List.<Announcement>of();
+            }
+            List<Announcement> out = new ArrayList<>(arr.length);
+            for (Wire.AnnouncementDto d : arr) {
+                if (d == null) {
+                    continue;
+                }
+                Announcement a = d.toApi(base());
+                if (a != null) {
+                    out.add(a);
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            onError(err);
+            return List.of();
+        });
     }
 
     @Override
@@ -335,15 +306,13 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return CompletableFuture.completedFuture(null);
         }
         String encoded = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8);
-        return get("/users/resolve?query=" + encoded)
-                .thenApply(resp -> {
-                    Wire.ResolvedUserDto user = GSON.fromJson(resp.body(), Wire.ResolvedUserDto.class);
-                    return user == null || user.uuid() == null ? null : user.toApi();
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return null;
-                });
+        return get("/users/resolve?query=" + encoded).thenApply(resp -> {
+            Wire.ResolvedUserDto user = GSON.fromJson(resp.body(), Wire.ResolvedUserDto.class);
+            return user == null || user.uuid() == null ? null : user.toApi();
+        }).exceptionally(err -> {
+            onError(err);
+            return null;
+        });
     }
 
     @Override
@@ -352,24 +321,22 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return CompletableFuture.completedFuture(List.of());
         }
         String encoded = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8);
-        return get("/users/search?q=" + encoded)
-                .thenApply(resp -> {
-                    Wire.ResolvedUserDto[] arr = GSON.fromJson(resp.body(), Wire.ResolvedUserDto[].class);
-                    if (arr == null) {
-                        return List.<ResolvedUser>of();
-                    }
-                    List<ResolvedUser> out = new ArrayList<>(arr.length);
-                    for (Wire.ResolvedUserDto d : arr) {
-                        if (d != null && d.uuid() != null) {
-                            out.add(d.toApi());
-                        }
-                    }
-                    return out;
-                })
-                .exceptionally(err -> {
-                    LOGGER.debug("LAN+ user search failed: {}", err.toString());
-                    return List.of();
-                });
+        return get("/users/search?q=" + encoded).thenApply(resp -> {
+            Wire.ResolvedUserDto[] arr = GSON.fromJson(resp.body(), Wire.ResolvedUserDto[].class);
+            if (arr == null) {
+                return List.<ResolvedUser>of();
+            }
+            List<ResolvedUser> out = new ArrayList<>(arr.length);
+            for (Wire.ResolvedUserDto d : arr) {
+                if (d != null && d.uuid() != null) {
+                    out.add(d.toApi());
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ user search failed: {}", err.toString());
+            return List.of();
+        });
     }
 
     @Override
@@ -382,17 +349,14 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture(Map.of());
         }
-        return get("/cosmetics/loadout?uuid=" + uuid)
-                .thenApply(resp -> {
-                    Map<String, String> m = GSON.fromJson(resp.body(),
-                            new com.google.gson.reflect.TypeToken<Map<String, String>>() {
-                            }.getType());
-                    return m == null ? Map.<String, String>of() : m;
-                })
-                .exceptionally(err -> {
-                    LOGGER.debug("LAN+ cosmetic loadout failed: {}", err.toString());
-                    return Map.of();
-                });
+        return get("/cosmetics/loadout?uuid=" + uuid).thenApply(resp -> {
+            Map<String, String> m = GSON.fromJson(resp.body(), new com.google.gson.reflect.TypeToken<Map<String, String>>() {
+            }.getType());
+            return m == null ? Map.<String, String>of() : m;
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ cosmetic loadout failed: {}", err.toString());
+            return Map.of();
+        });
     }
 
     @Override
@@ -400,24 +364,37 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        return get("/cosmetics/catalog")
-                .thenApply(resp -> {
-                    Wire.CosmeticEntryDto[] arr = GSON.fromJson(resp.body(), Wire.CosmeticEntryDto[].class);
-                    if (arr == null) {
-                        return List.<CosmeticCatalogEntry>of();
-                    }
-                    List<CosmeticCatalogEntry> out = new ArrayList<>(arr.length);
-                    for (Wire.CosmeticEntryDto d : arr) {
-                        if (d != null && d.id() != null) {
-                            out.add(d.toApi(base()));
-                        }
-                    }
-                    return out;
-                })
-                .exceptionally(err -> {
-                    LOGGER.debug("LAN+ cosmetic catalog failed: {}", err.toString());
-                    return List.of();
-                });
+        return get("/cosmetics/catalog").thenApply(resp -> {
+            Wire.CosmeticEntryDto[] arr = GSON.fromJson(resp.body(), Wire.CosmeticEntryDto[].class);
+            if (arr == null) {
+                return List.<CosmeticCatalogEntry>of();
+            }
+            List<CosmeticCatalogEntry> out = new ArrayList<>(arr.length);
+            for (Wire.CosmeticEntryDto d : arr) {
+                if (d != null && d.id() != null) {
+                    out.add(d.toApi(base()));
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ cosmetic catalog failed: {}", err.toString());
+            return List.of();
+        });
+    }
+
+    @Override
+    public CompletableFuture<SkinRef> getSkinByName(String name) {
+        if (!configured() || name == null || name.isBlank()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8);
+        return get("/skin?name=" + encoded).thenApply(resp -> {
+            Wire.Skin skin = GSON.fromJson(resp.body(), Wire.Skin.class);
+            return skin == null || skin.type() == null ? null : skin.toApi();
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ skin-by-name failed: {}", err.toString());
+            return null;
+        });
     }
 
     @Override
@@ -425,15 +402,13 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture(null);
         }
-        return get("/users/me?uuid=" + uuid)
-                .thenApply(resp -> {
-                    Wire.UserProfileDto profile = GSON.fromJson(resp.body(), Wire.UserProfileDto.class);
-                    return profile == null || profile.uuid() == null ? null : profile.toApi();
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return null;
-                });
+        return get("/users/me?uuid=" + uuid).thenApply(resp -> {
+            Wire.UserProfileDto profile = GSON.fromJson(resp.body(), Wire.UserProfileDto.class);
+            return profile == null || profile.uuid() == null ? null : profile.toApi();
+        }).exceptionally(err -> {
+            onError(err);
+            return null;
+        });
     }
 
     @Override
@@ -442,22 +417,20 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return CompletableFuture.completedFuture(null);
         }
         String path = "/profile?uuid=" + uuid + (viewer != null ? "&viewer=" + viewer : "");
-        return get(path)
-                .thenApply(resp -> {
-                    String body = resp.body();
-                    java.util.function.BiConsumer<UUID, String> sink = profileBodySink;
-                    if (sink != null && body != null && !body.isBlank()) {
-                        try {
-                            sink.accept(uuid, body);
-                        } catch (RuntimeException ignored) {
-                        }
-                    }
-                    return parseProfileJson(body);
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return null;
-                });
+        return get(path).thenApply(resp -> {
+            String body = resp.body();
+            java.util.function.BiConsumer<UUID, String> sink = profileBodySink;
+            if (sink != null && body != null && !body.isBlank()) {
+                try {
+                    sink.accept(uuid, body);
+                } catch (RuntimeException ignored) {
+                }
+            }
+            return parseProfileJson(body);
+        }).exceptionally(err -> {
+            onError(err);
+            return null;
+        });
     }
 
     @Override
@@ -466,21 +439,15 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
-    public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
-                                                   Map<String, String> prompts, Boolean invisible,
-                                                   Boolean favoriteVisible, Boolean currentlyPlayingVisible,
-                                                   Boolean recentlyPlayedVisible, Boolean discoverable) {
+    public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links, Map<String, String> prompts, Boolean invisible, Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable) {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture("offline");
         }
-        Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links, prompts, invisible,
-                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible, discoverable);
-        return postNulls("/profile/update", body)
-                .thenApply(this::parseUpdateResult)
-                .exceptionally(err -> {
-                    onError(err);
-                    return "offline";
-                });
+        Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links, prompts, invisible, favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible, discoverable);
+        return postNulls("/profile/update", body).thenApply(this::parseUpdateResult).exceptionally(err -> {
+            onError(err);
+            return "offline";
+        });
     }
 
     @Override
@@ -489,12 +456,10 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return CompletableFuture.completedFuture("offline");
         }
         String value = (modpackId == null || modpackId.isBlank()) ? null : modpackId;
-        return postNulls("/profile/update", new Wire.FavoriteUpdate(uuid.toString(), value))
-                .thenApply(this::parseUpdateResult)
-                .exceptionally(err -> {
-                    onError(err);
-                    return "offline";
-                });
+        return postNulls("/profile/update", new Wire.FavoriteUpdate(uuid.toString(), value)).thenApply(this::parseUpdateResult).exceptionally(err -> {
+            onError(err);
+            return "offline";
+        });
     }
 
     @Override
@@ -503,12 +468,10 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return CompletableFuture.completedFuture("offline");
         }
         Wire.BackgroundUpdateDto bg = new Wire.BackgroundUpdateDto(style, color, opacity, imageId);
-        return postNulls("/profile/update", new Wire.BackgroundUpdate(uuid.toString(), bg))
-                .thenApply(this::parseUpdateResult)
-                .exceptionally(err -> {
-                    onError(err);
-                    return "offline";
-                });
+        return postNulls("/profile/update", new Wire.BackgroundUpdate(uuid.toString(), bg)).thenApply(this::parseUpdateResult).exceptionally(err -> {
+            onError(err);
+            return "offline";
+        });
     }
 
     @Override
@@ -516,12 +479,10 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture("offline");
         }
-        return postNulls("/profile/update", new Wire.BannerUpdate(uuid.toString(), bannerId))
-                .thenApply(this::parseUpdateResult)
-                .exceptionally(err -> {
-                    onError(err);
-                    return "offline";
-                });
+        return postNulls("/profile/update", new Wire.BannerUpdate(uuid.toString(), bannerId)).thenApply(this::parseUpdateResult).exceptionally(err -> {
+            onError(err);
+            return "offline";
+        });
     }
 
     @Override
@@ -538,25 +499,23 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        return get(path)
-                .thenApply(resp -> {
-                    Wire.CatalogImageDto[] arr = GSON.fromJson(resp.body(), Wire.CatalogImageDto[].class);
-                    if (arr == null) {
-                        return List.<CatalogImage>of();
-                    }
-                    List<CatalogImage> out = new ArrayList<>(arr.length);
-                    for (Wire.CatalogImageDto dto : arr) {
-                        CatalogImage img = dto == null ? null : dto.toApi(base());
-                        if (img != null) {
-                            out.add(img);
-                        }
-                    }
-                    return out;
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return List.of();
-                });
+        return get(path).thenApply(resp -> {
+            Wire.CatalogImageDto[] arr = GSON.fromJson(resp.body(), Wire.CatalogImageDto[].class);
+            if (arr == null) {
+                return List.<CatalogImage>of();
+            }
+            List<CatalogImage> out = new ArrayList<>(arr.length);
+            for (Wire.CatalogImageDto dto : arr) {
+                CatalogImage img = dto == null ? null : dto.toApi(base());
+                if (img != null) {
+                    out.add(img);
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            onError(err);
+            return List.of();
+        });
     }
 
     @Override
@@ -564,26 +523,24 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        return get("/skins")
-                .thenApply(resp -> {
-                    Wire.SkinLibraryResponse r = GSON.fromJson(resp.body(), Wire.SkinLibraryResponse.class);
-                    if (r == null || r.skins() == null) {
-                        return List.<LibrarySkin>of();
-                    }
-                    List<LibrarySkin> out = new ArrayList<>();
-                    for (Wire.SkinLibraryEntry e : r.skins()) {
-                        if (e == null || e.skinId() == null || e.url() == null) {
-                            continue;
-                        }
-                        boolean active = e.skinId().equals(r.active());
-                        out.add(new LibrarySkin(e.skinId(), base() + e.url(), e.model(), active));
-                    }
-                    return out;
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return List.of();
-                });
+        return get("/skins").thenApply(resp -> {
+            Wire.SkinLibraryResponse r = GSON.fromJson(resp.body(), Wire.SkinLibraryResponse.class);
+            if (r == null || r.skins() == null) {
+                return List.<LibrarySkin>of();
+            }
+            List<LibrarySkin> out = new ArrayList<>();
+            for (Wire.SkinLibraryEntry e : r.skins()) {
+                if (e == null || e.skinId() == null || e.url() == null) {
+                    continue;
+                }
+                boolean active = e.skinId().equals(r.active());
+                out.add(new LibrarySkin(e.skinId(), base() + e.url(), e.model(), active));
+            }
+            return out;
+        }).exceptionally(err -> {
+            onError(err);
+            return List.of();
+        });
     }
 
     @Override
@@ -592,12 +549,10 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"));
         }
         String b64 = Base64.getEncoder().encodeToString(png);
-        return post("/skins", new Wire.SkinUpload(b64, model))
-                .thenApply(this::parseSkinActive)
-                .exceptionally(err -> {
-                    onError(err);
-                    return new SkinUploadResult(null, null, "offline");
-                });
+        return post("/skins", new Wire.SkinUpload(b64, model)).thenApply(this::parseSkinActive).exceptionally(err -> {
+            onError(err);
+            return new SkinUploadResult(null, null, "offline");
+        });
     }
 
     @Override
@@ -605,12 +560,10 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured() || skinId == null || skinId.isBlank()) {
             return CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"));
         }
-        return post("/skins/" + skinId + "/select", Map.of())
-                .thenApply(this::parseSkinActive)
-                .exceptionally(err -> {
-                    onError(err);
-                    return new SkinUploadResult(null, null, "offline");
-                });
+        return post("/skins/" + skinId + "/select", Map.of()).thenApply(this::parseSkinActive).exceptionally(err -> {
+            onError(err);
+            return new SkinUploadResult(null, null, "offline");
+        });
     }
 
     @Override
@@ -618,15 +571,13 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured() || skinId == null || skinId.isBlank()) {
             return CompletableFuture.completedFuture(false);
         }
-        return post("/skins/" + skinId + "/delete", Map.of())
-                .thenApply(resp -> {
-                    Wire.Success s = GSON.fromJson(resp.body(), Wire.Success.class);
-                    return s != null && s.success();
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return false;
-                });
+        return post("/skins/" + skinId + "/delete", Map.of()).thenApply(resp -> {
+            Wire.Success s = GSON.fromJson(resp.body(), Wire.Success.class);
+            return s != null && s.success();
+        }).exceptionally(err -> {
+            onError(err);
+            return false;
+        });
     }
 
     private SkinUploadResult parseSkinActive(HttpResponse<String> resp) {
@@ -653,10 +604,8 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured() || uuid == null || advancementId == null) {
             return CompletableFuture.completedFuture(null);
         }
-        return post("/profile/advancement", new Wire.AdvancementReport(uuid.toString(), advancementId))
-                .thenAccept(resp -> {
-                })
-                .exceptionally(this::onErrorVoid);
+        return post("/profile/advancement", new Wire.AdvancementReport(uuid.toString(), advancementId)).thenAccept(resp -> {
+        }).exceptionally(this::onErrorVoid);
     }
 
     @Override
@@ -664,12 +613,11 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured() || targetUuid == null || reason == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("Reporting is unavailable"));
         }
-        return post("/report", new Wire.ReportUser(targetUuid.toString(), reason))
-                .thenAccept(resp -> {
-                    if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
-                        throw new IllegalStateException("Report request failed with HTTP " + resp.statusCode());
-                    }
-                });
+        return post("/report", new Wire.ReportUser(targetUuid.toString(), reason)).thenAccept(resp -> {
+            if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
+                throw new IllegalStateException("Report request failed with HTTP " + resp.statusCode());
+            }
+        });
     }
 
     @Override
@@ -677,19 +625,17 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured()) {
             return CompletableFuture.completedFuture(null);
         }
-        return post("/invite/create", new Wire.InviteCreate(hostUuid.toString(), address, worldName, gated))
-                .thenApply(resp -> {
-                    Wire.InviteCreated c = GSON.fromJson(resp.body(), Wire.InviteCreated.class);
-                    if (c == null) {
-                        return null;
-                    }
-                    String guestAddress = c.address() != null ? c.address() : address;
-                    return new Invite(c.code(), guestAddress, worldName, c.expiresIn());
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return null;
-                });
+        return post("/invite/create", new Wire.InviteCreate(hostUuid.toString(), address, worldName, gated)).thenApply(resp -> {
+            Wire.InviteCreated c = GSON.fromJson(resp.body(), Wire.InviteCreated.class);
+            if (c == null) {
+                return null;
+            }
+            String guestAddress = c.address() != null ? c.address() : address;
+            return new Invite(c.code(), guestAddress, worldName, c.expiresIn());
+        }).exceptionally(err -> {
+            onError(err);
+            return null;
+        });
     }
 
     @Override
@@ -699,15 +645,13 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         }
         PlayerIdentity id = identity.get();
         String query = id != null ? "?uuid=" + id.uuid() : "";
-        return get("/invite/" + code + query)
-                .thenApply(resp -> {
-                    Wire.InviteResolved r = GSON.fromJson(resp.body(), Wire.InviteResolved.class);
-                    return r == null ? null : new Invite(code, r.address(), r.worldName(), 0);
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return null;
-                });
+        return get("/invite/" + code + query).thenApply(resp -> {
+            Wire.InviteResolved r = GSON.fromJson(resp.body(), Wire.InviteResolved.class);
+            return r == null ? null : new Invite(code, r.address(), r.worldName(), 0);
+        }).exceptionally(err -> {
+            onError(err);
+            return null;
+        });
     }
 
     @Override
@@ -716,15 +660,13 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         if (!configured() || id == null) {
             return CompletableFuture.completedFuture(null);
         }
-        return post("/relay/ticket", new Wire.RelayTicketRequest(id.uuid().toString(), gated))
-                .thenApply(resp -> {
-                    Wire.RelayTicketDto dto = GSON.fromJson(resp.body(), Wire.RelayTicketDto.class);
-                    return dto == null || dto.ticket() == null ? null : dto.toApi();
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return null;
-                });
+        return post("/relay/ticket", new Wire.RelayTicketRequest(id.uuid().toString(), gated)).thenApply(resp -> {
+            Wire.RelayTicketDto dto = GSON.fromJson(resp.body(), Wire.RelayTicketDto.class);
+            return dto == null || dto.ticket() == null ? null : dto.toApi();
+        }).exceptionally(err -> {
+            onError(err);
+            return null;
+        });
     }
 
     @Override
@@ -798,24 +740,15 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     private CompletableFuture<HttpResponse<String>> get(String path) {
-        return authorizedSend(HttpRequest.newBuilder(URI.create(base() + path))
-                .timeout(REQUEST_TIMEOUT)
-                .header("Accept", "application/json")
-                .GET());
+        return authorizedSend(HttpRequest.newBuilder(URI.create(base() + path)).timeout(REQUEST_TIMEOUT).header("Accept", "application/json").GET());
     }
 
     private CompletableFuture<HttpResponse<String>> post(String path, Object body) {
-        return authorizedSend(HttpRequest.newBuilder(URI.create(base() + path))
-                .timeout(REQUEST_TIMEOUT)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(body), StandardCharsets.UTF_8)));
+        return authorizedSend(HttpRequest.newBuilder(URI.create(base() + path)).timeout(REQUEST_TIMEOUT).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(GSON.toJson(body), StandardCharsets.UTF_8)));
     }
 
     private CompletableFuture<HttpResponse<String>> postNulls(String path, Object body) {
-        return authorizedSend(HttpRequest.newBuilder(URI.create(base() + path))
-                .timeout(REQUEST_TIMEOUT)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(GSON_NULLS.toJson(body), StandardCharsets.UTF_8)));
+        return authorizedSend(HttpRequest.newBuilder(URI.create(base() + path)).timeout(REQUEST_TIMEOUT).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(GSON_NULLS.toJson(body), StandardCharsets.UTF_8)));
     }
 
     private CompletableFuture<HttpResponse<String>> authorizedSend(HttpRequest.Builder builder) {
@@ -830,8 +763,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
 
     private CompletableFuture<HttpResponse<String>> dispatch(HttpRequest.Builder builder, String token) {
         HttpRequest req = builder.copy().header("Authorization", "Bearer " + token).build();
-        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-                .whenComplete((resp, err) -> reachable = err == null && resp != null);
+        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString()).whenComplete((resp, err) -> reachable = err == null && resp != null);
     }
 
     private CompletableFuture<String> ensureAuth() {
@@ -884,8 +816,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             throw new IllegalStateException("no serverId in challenge");
         }
         auth.joinServer(c.serverId());
-        String body = postSync("/auth/verify",
-                GSON.toJson(Map.of("username", username, "serverId", c.serverId())));
+        String body = postSync("/auth/verify", GSON.toJson(Map.of("username", username, "serverId", c.serverId())));
         Wire.AuthResponse r = GSON.fromJson(body, Wire.AuthResponse.class);
         if (r == null || r.token() == null) {
             throw new IllegalStateException("verify rejected");
@@ -896,8 +827,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     private String authenticateOffline(String username) throws Exception {
-        Wire.AuthResponse r = GSON.fromJson(
-                postSync("/auth/offline", GSON.toJson(Map.of("username", username))), Wire.AuthResponse.class);
+        Wire.AuthResponse r = GSON.fromJson(postSync("/auth/offline", GSON.toJson(Map.of("username", username))), Wire.AuthResponse.class);
         if (r == null || r.token() == null) {
             throw new IllegalStateException("offline auth rejected");
         }
@@ -920,11 +850,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     private String postSync(String path, String json) throws Exception {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(base() + path))
-                .timeout(REQUEST_TIMEOUT)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8))
-                .build();
+        HttpRequest req = HttpRequest.newBuilder(URI.create(base() + path)).timeout(REQUEST_TIMEOUT).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8)).build();
         HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() != 200) {
             throw new IllegalStateException("auth " + path + " -> " + resp.statusCode());
@@ -961,21 +887,18 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 return;
             }
             URI uri = URI.create(toWebSocketUrl(base()) + "/events");
-            http.newWebSocketBuilder()
-                    .connectTimeout(Duration.ofSeconds(5))
-                    .buildAsync(uri, new EventSocketListener(token))
-                    .whenComplete((ws, err) -> {
-                        connecting.set(false);
-                        if (err != null) {
-                            LOGGER.warn("LAN+ WebSocket connect failed: {}", err.toString());
-                            scheduleReconnect();
-                        } else if (!eventsEnabled) {
-                            ws.sendClose(WebSocket.NORMAL_CLOSURE, "client disabled");
-                        } else {
-                            this.webSocket = ws;
-                            reconnectAttempts.set(0);
-                        }
-                    });
+            http.newWebSocketBuilder().connectTimeout(Duration.ofSeconds(5)).buildAsync(uri, new EventSocketListener(token)).whenComplete((ws, err) -> {
+                connecting.set(false);
+                if (err != null) {
+                    LOGGER.warn("LAN+ WebSocket connect failed: {}", err.toString());
+                    scheduleReconnect();
+                } else if (!eventsEnabled) {
+                    ws.sendClose(WebSocket.NORMAL_CLOSURE, "client disabled");
+                } else {
+                    this.webSocket = ws;
+                    reconnectAttempts.set(0);
+                }
+            });
         });
     }
 
@@ -1061,15 +984,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 switch (type) {
                     case "PRESENCE_UPDATE" -> {
                         JsonObject d = obj.getAsJsonObject("data");
-                        PresenceUpdate update = new PresenceUpdate(
-                                UUID.fromString(d.get("uuid").getAsString()),
-                                Connectivity.valueOf(d.get("connectivity").getAsString()),
-                                optionalEnum(d, "state"),
-                                optionalString(d, "worldName"),
-                                optionalString(d, "joinCode"),
-                                optionalString(d, "gameMode"),
-                                optionalString(d, "difficulty"),
-                                optionalBool(d, "allowCommands"));
+                        PresenceUpdate update = new PresenceUpdate(UUID.fromString(d.get("uuid").getAsString()), Connectivity.valueOf(d.get("connectivity").getAsString()), optionalEnum(d, "state"), optionalString(d, "worldName"), optionalString(d, "joinCode"), optionalString(d, "gameMode"), optionalString(d, "difficulty"), optionalBool(d, "allowCommands"));
                         fanout(l -> l.onPresenceUpdate(update));
                     }
                     case "FRIEND_STARTED_HOSTING" -> {
@@ -1091,16 +1006,8 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                         String imgId = optionalString(d, "imageId");
                         String imgPath = optionalString(d, "image");
                         String imgHash = optionalString(d, "imageHash");
-                        CatalogImage img = imgId == null || imgPath == null ? null
-                                : new CatalogImage(imgId, Wire.versionedUrl(base(), imgPath, imgHash), imgHash);
-                        Announcement a = new Announcement(
-                                d.has("id") && !d.get("id").isJsonNull() ? d.get("id").getAsInt() : 0,
-                                Announcement.Type.fromWire(optionalString(d, "type")),
-                                optionalString(d, "title"),
-                                optionalString(d, "body"),
-                                d.has("createdAt") && !d.get("createdAt").isJsonNull()
-                                        ? d.get("createdAt").getAsLong() : 0L,
-                                img);
+                        CatalogImage img = imgId == null || imgPath == null ? null : new CatalogImage(imgId, Wire.versionedUrl(base(), imgPath, imgHash), imgHash);
+                        Announcement a = new Announcement(d.has("id") && !d.get("id").isJsonNull() ? d.get("id").getAsInt() : 0, Announcement.Type.fromWire(optionalString(d, "type")), optionalString(d, "title"), optionalString(d, "body"), d.has("createdAt") && !d.get("createdAt").isJsonNull() ? d.get("createdAt").getAsLong() : 0L, img);
                         fanout(l -> l.onAnnouncement(a));
                     }
                     case "ANNOUNCEMENT_DELETE" -> {
@@ -1130,9 +1037,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         }
 
         private GameplayState optionalEnum(JsonObject obj, String key) {
-            return obj.has(key) && !obj.get(key).isJsonNull()
-                    ? GameplayState.valueOf(obj.get(key).getAsString())
-                    : null;
+            return obj.has(key) && !obj.get(key).isJsonNull() ? GameplayState.valueOf(obj.get(key).getAsString()) : null;
         }
 
         private String optionalString(JsonObject obj, String key) {

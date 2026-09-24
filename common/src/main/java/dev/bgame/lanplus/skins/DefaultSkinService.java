@@ -6,16 +6,21 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.bgame.lanplus.api.LibrarySkin;
 import dev.bgame.lanplus.api.SkinRef;
+import dev.bgame.lanplus.api.SkinType;
 import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.network.LanPlusNetwork;
 
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -24,7 +29,9 @@ import java.net.http.HttpClient;
 public final class DefaultSkinService implements SkinService {
 
     private static final String PROFILE_API = "https://sessionserver.mojang.com/session/minecraft/profile/";
+    private static final String MOJANG_NAME_API = "https://api.mojang.com/users/profiles/minecraft/";
 
+    private final Map<String, Optional<UUID>> nameCache = new ConcurrentHashMap<>();
     private final SkinTextureSink sink;
     private final LanPlusNetwork network;
     private final AssetCache cache;
@@ -72,6 +79,55 @@ public final class DefaultSkinService implements SkinService {
                 sink.accept(player, loaded.key, loaded.png, loaded.model);
             }
         }, executor).exceptionally(e -> null);
+    }
+
+    @Override
+    public CompletableFuture<Void> resolveByName(UUID player, String name) {
+        if (player == null || name == null || name.isBlank()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return CompletableFuture.runAsync(() -> {
+            UUID mojang = mojangUuid(name);
+            if (mojang == null) {
+                return;
+            }
+            Loaded loaded = load(new SkinRef(SkinType.MOJANG, mojang.toString(), null, null));
+            if (loaded != null) {
+                sink.accept(player, loaded.key, loaded.png, loaded.model);
+            }
+        }, executor).exceptionally(e -> null);
+    }
+
+    private UUID mojangUuid(String name) {
+        Optional<UUID> cached = nameCache.get(name);
+        if (cached != null) {
+            return cached.orElse(null);
+        }
+        UUID uuid = fetchMojangUuid(name);
+        nameCache.put(name, Optional.ofNullable(uuid));
+        return uuid;
+    }
+
+    private UUID fetchMojangUuid(String name) {
+        byte[] body = SkinUrlGuard.fetch(http,
+                MOJANG_NAME_API + URLEncoder.encode(name, StandardCharsets.UTF_8));
+        if (body == null) {
+            return null;
+        }
+        try {
+            JsonObject o = JsonParser.parseString(new String(body, StandardCharsets.UTF_8)).getAsJsonObject();
+            if (!o.has("id")) {
+                return null;
+            }
+            String id = o.get("id").getAsString();
+            if (id.length() != 32) {
+                return null;
+            }
+            return UUID.fromString(id.replaceFirst(
+                    "(.{8})(.{4})(.{4})(.{4})(.{12})", "$1-$2-$3-$4-$5"));
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private Loaded load(SkinRef ref) {

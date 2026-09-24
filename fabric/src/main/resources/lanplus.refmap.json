@@ -2,7 +2,8 @@
   "mappings": {
     "dev/bgame/lanplus/mixin/PlayerListMixin": {
       "canPlayerLogin": "Lnet/minecraft/class_3324;method_14586(Ljava/net/SocketAddress;Lcom/mojang/authlib/GameProfile;)Lnet/minecraft/class_2561;",
-      "getMaxPlayers": "Lnet/minecraft/class_3324;method_14592()I"
+      "getMaxPlayers": "Lnet/minecraft/class_3324;method_14592()I",
+      "Lnet/minecraft/server/players/PlayerList;maxPlayers:I": "Lnet/minecraft/class_3324;field_14347:I"
     },
     "dev/bgame/lanplus/mixin/client/AbstractClientPlayerMixin": {
       "getSkin": "Lnet/minecraft/class_742;method_52814()Lnet/minecraft/class_8685;"

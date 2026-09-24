@@ -70,6 +70,7 @@ public final class LanPlusClient {
     private static AnnouncementsService announcements;
     private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
     private static final Set<UUID> requestedLoadouts = ConcurrentHashMap.newKeySet();
+    private static final Set<UUID> requestedSkins = ConcurrentHashMap.newKeySet();
     private static volatile String pendingUpdateVersion;
     private static volatile String pendingUpdateUrl;
 
@@ -317,8 +318,23 @@ public final class LanPlusClient {
             SkinRef ref = f.skin();
             if (ref != null && !ref.equals(resolvedSkinRefs.put(f.uuid(), ref))) {
                 skins.resolve(f.uuid(), ref);
+                skins.resolve(HostController.offlineUuid(f.username()), ref);
             }
         }
+    }
+
+    public static void ensureSkin(UUID uuid, String name) {
+        if (uuid == null || name == null || name.isBlank() || skins == null || network == null
+                || skinTextures == null || skinTextures.get(uuid) != null || !requestedSkins.add(uuid)) {
+            return;
+        }
+        network.getSkinByName(name).whenComplete((ref, err) -> {
+            if (err == null && ref != null) {
+                skins.resolve(uuid, ref);
+            } else {
+                skins.resolveByName(uuid, name);
+            }
+        });
     }
 
     public static LanPlusNetwork network() {
