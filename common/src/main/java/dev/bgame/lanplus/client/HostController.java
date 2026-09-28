@@ -34,7 +34,8 @@ public final class HostController {
     }
 
     public record HostSettings(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium,
-                               GameType gameType, Difficulty difficulty, boolean allowCommands, int maxPlayers) {
+                               GameType gameType, Difficulty difficulty, boolean allowCommands, int maxPlayers,
+                               boolean allowVanillaJoin) {
     }
 
     public static boolean isOfflineHosting() {
@@ -78,7 +79,7 @@ public final class HostController {
         Set<UUID> initial = allowlistFor(s.mode(), s.preInvited(), s.allowNonPremium());
         offlineHosting = s.allowNonPremium();
         server.execute(() -> {
-            HostAccessControl.set(s.mode(), host, initial, s.maxPlayers());
+            HostAccessControl.set(s.mode(), host, initial, s.maxPlayers(), s.allowVanillaJoin());
             if (s.allowNonPremium()) {
                 server.setUsesAuthentication(false);
             }

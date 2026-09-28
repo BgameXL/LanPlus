@@ -29,7 +29,9 @@ public final class CosmeticModels {
     private final Map<UUID, Map<CosmeticSlot, String>> loadout = new ConcurrentHashMap<>();
     private final Map<String, CosmeticMeta> meta = new ConcurrentHashMap<>();
     private final Map<String, float[]> boundsCache = new ConcurrentHashMap<>();
+    private final Set<String> owned = ConcurrentHashMap.newKeySet();
     private final AtomicInteger seq = new AtomicInteger();
+    private volatile int wallet;
 
     public CosmeticModel model(String id) {
         return id == null ? null : models.get(id);
@@ -67,6 +69,50 @@ public final class CosmeticModels {
         }
         out.sort(null);
         return out;
+    }
+
+    public List<String> allIds() {
+        Set<String> known = new HashSet<>(meta.keySet());
+        known.addAll(models.keySet());
+        List<String> out = new ArrayList<>(known);
+        out.sort(null);
+        return out;
+    }
+
+    public int wallet() {
+        return wallet;
+    }
+
+    public void setWallet(int balance) {
+        wallet = Math.max(0, balance);
+    }
+
+    public boolean owns(String id) {
+        return id != null && owned.contains(id);
+    }
+
+    public void setOwned(Set<String> ids) {
+        owned.clear();
+        if (ids != null) {
+            owned.addAll(ids);
+        }
+    }
+
+    public void markOwned(String id) {
+        if (id != null) {
+            owned.add(id);
+        }
+    }
+
+    public boolean spend(int amount) {
+        if (amount <= 0) {
+            return true;
+        }
+        if (wallet < amount) {
+            return false;
+        }
+        wallet -= amount;
+        return true;
     }
 
     public float[] bounds(String id) {

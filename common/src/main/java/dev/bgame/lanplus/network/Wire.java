@@ -57,6 +57,16 @@ final class Wire {
     record CosmeticEquip(String slot, String cosmeticId) {
     }
 
+    record CosmeticPurchase(String cosmeticId) {
+    }
+
+    record CosmeticShopDto(Boolean success, Long balance, java.util.List<String> owned) {
+        dev.bgame.lanplus.api.CosmeticShop toApi() {
+            return new dev.bgame.lanplus.api.CosmeticShop(balance == null ? 0 : balance.intValue(),
+                    owned == null ? java.util.List.of() : owned);
+        }
+    }
+
     record CosmeticEntryDto(String id, String meta, String geoUrl, String geoHash,
                             String animUrl, String animHash, String texUrl, String texHash) {
         CosmeticCatalogEntry toApi(String base) {

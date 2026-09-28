@@ -21,6 +21,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
 import org.joml.Matrix4f;
 
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -48,6 +49,11 @@ final class PlayerPreview {
 
     static void render(GuiGraphics g, int cx, int feetY, float scale, float yaw, float pitch,
                        ResourceLocation skin, boolean slim, UUID uuid) {
+        render(g, cx, feetY, scale, yaw, pitch, skin, slim, uuid, null);
+    }
+
+    static void render(GuiGraphics g, int cx, int feetY, float scale, float yaw, float pitch,
+                       ResourceLocation skin, boolean slim, UUID uuid, Map<CosmeticSlot, String> preview) {
         PlayerModel<LivingEntity> model = model(slim);
         model.setAllVisible(true);
         model.young = false;
@@ -74,20 +80,27 @@ final class PlayerPreview {
         VertexConsumer vc = buffers.getBuffer(RenderType.entityTranslucent(skin));
         model.renderToBuffer(ps, vc, 0xF000F0, OverlayTexture.NO_OVERLAY, 0xFFFFFFFF);
 
-        renderCosmetics(ps, buffers, model, uuid);
+        renderCosmetics(ps, buffers, model, uuid, preview);
         buffers.endBatch();
         Lighting.setupFor3DItems();
         ps.popPose();
     }
 
     private static void renderCosmetics(PoseStack ps, MultiBufferSource.BufferSource buffers,
-                                        PlayerModel<LivingEntity> model, UUID uuid) {
+                                        PlayerModel<LivingEntity> model, UUID uuid, Map<CosmeticSlot, String> preview) {
         CosmeticModels cm = LanPlusClient.cosmetics();
         if (cm == null || uuid == null) {
             return;
         }
-        Map<CosmeticSlot, String> loadout = cm.loadout(uuid);
-        if (loadout == null || loadout.isEmpty()) {
+        Map<CosmeticSlot, String> equipped = cm.loadout(uuid);
+        Map<CosmeticSlot, String> loadout = new EnumMap<>(CosmeticSlot.class);
+        if (equipped != null) {
+            loadout.putAll(equipped);
+        }
+        if (preview != null) {
+            loadout.putAll(preview);
+        }
+        if (loadout.isEmpty()) {
             return;
         }
         for (Map.Entry<CosmeticSlot, String> e : loadout.entrySet()) {

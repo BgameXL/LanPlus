@@ -5,6 +5,7 @@ import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.announcements.AnnouncementsService;
 import dev.bgame.lanplus.announcements.DefaultAnnouncementsService;
 import dev.bgame.lanplus.api.Announcement;
+import dev.bgame.lanplus.api.CosmeticShop;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.PlayerIdentity;
@@ -248,6 +249,45 @@ public final class LanPlusClient {
         });
     }
 
+    public static void ensureCosmeticShop() {
+        if (cosmetics == null || network == null) {
+            return;
+        }
+        network.getCosmeticShop().whenComplete((shop, err) -> {
+            if (err == null && shop != null) {
+                applyShop(shop);
+            }
+        });
+    }
+
+    public static void completePurchase(UUID player, String id) {
+        if (cosmetics == null || network == null || id == null) {
+            return;
+        }
+        CosmeticSlot slot = cosmetics.slotOf(id);
+        network.purchaseCosmetic(id).whenComplete((shop, err) -> {
+            if (shop != null) {
+                applyShop(shop);
+                network.equipCosmetic(slot.name(), id);
+                return;
+            }
+            network.getCosmeticShop().whenComplete((auth, e2) -> {
+                if (auth == null) {
+                    return;
+                }
+                applyShop(auth);
+                if (player != null && !auth.owned().contains(id)) {
+                    cosmetics.unequip(player, slot);
+                }
+            });
+        });
+    }
+
+    private static void applyShop(CosmeticShop shop) {
+        cosmetics.setWallet(shop.balance());
+        cosmetics.setOwned(new HashSet<>(shop.owned()));
+    }
+
     private static void loadDevCosmetics() {
         try {
             Path dir = PlatformHolder.get().getConfigDir().resolve("lanplus-cosmetics");
@@ -267,10 +307,14 @@ public final class LanPlusClient {
                 cosmetics.register(id, Files.readAllBytes(geo), Files.isRegularFile(anim) ? Files.readAllBytes(anim) : null, Files.isRegularFile(png) ? Files.readAllBytes(png) : null);
                 CosmeticMeta meta = CosmeticMeta.parse(id, Files.isRegularFile(metaFile) ? Files.readString(metaFile) : null);
                 cosmetics.putMeta(meta);
-                if (self != null) {
-                    cosmetics.equip(self, meta.slot(), id);
+                if (meta.price() <= 0) {
+                    cosmetics.markOwned(id);
+                    if (self != null) {
+                        cosmetics.equip(self, meta.slot(), id);
+                    }
                 }
             }
+            cosmetics.setWallet(5000);
         } catch (Exception e) {
             LOGGER.warn("cosmetic failed", e);
         }

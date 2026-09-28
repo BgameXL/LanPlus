@@ -171,6 +171,9 @@ public final class ClientPresenceDetector {
                 if (launcher != null && !launcher.equals(self)) {
                     skins.resolve(launcher, ref);
                 }
+                if (user != null && user.getName() != null) {
+                    skins.resolve(HostController.offlineUuid(user.getName()), ref);
+                }
             }
         }
         presence.updateSkin(ref);

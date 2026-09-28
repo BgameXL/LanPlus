@@ -44,7 +44,7 @@ public final class DefaultInviteService implements InviteService, PresenceManage
         if (id == null || address == null) {
             return CompletableFuture.completedFuture(null);
         }
-        boolean gated = offlineHosting.getAsBoolean() && relayEnabled.getAsBoolean();
+        boolean gated = HostAccessControl.gated(offlineHosting.getAsBoolean()) && relayEnabled.getAsBoolean();
         return network.createInvite(id.uuid(), address, worldName, gated);
     }
 

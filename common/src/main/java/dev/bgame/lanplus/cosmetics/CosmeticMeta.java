@@ -9,10 +9,11 @@ import java.util.Locale;
 import java.util.Map;
 
 public record CosmeticMeta(String id, String name, String artist, CosmeticSlot slot, String rarity,
-                           String description, String unlock, String defaultClip, Map<String, String> stateClipMap) {
+                           String description, String unlock, int price, String defaultClip,
+                           Map<String, String> stateClipMap) {
 
     public static CosmeticMeta def(String id) {
-        return new CosmeticMeta(id, id, "", CosmeticSlot.HEAD, "common", "", "", "", Map.of());
+        return new CosmeticMeta(id, id, "", CosmeticSlot.HEAD, "common", "", "", 0, "", Map.of());
     }
 
     public static CosmeticMeta parse(String id, String json) {
@@ -22,11 +23,15 @@ public record CosmeticMeta(String id, String name, String artist, CosmeticSlot s
         try {
             JsonObject o = JsonParser.parseString(json).getAsJsonObject();
             return new CosmeticMeta(id, str(o, "name", id), str(o, "artist", ""), slot(str(o, "slot", "head")),
-                    str(o, "rarity", "common"), str(o, "description", ""), unlock(o), str(o, "defaultClip", ""),
-                    stateClip(o));
+                    str(o, "rarity", "common"), str(o, "description", ""), unlock(o), intVal(o, "price", 0),
+                    str(o, "defaultClip", ""), stateClip(o));
         } catch (RuntimeException e) {
             return def(id);
         }
+    }
+
+    private static int intVal(JsonObject o, String key, int fallback) {
+        return o.has(key) && o.get(key).isJsonPrimitive() ? o.get(key).getAsInt() : fallback;
     }
 
     private static String str(JsonObject o, String key, String fallback) {

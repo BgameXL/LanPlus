@@ -15,14 +15,16 @@ public final class ProfilePrompt {
     }
 
     public static final List<Prompt> PROMPTS = List.of(
-            new Prompt("delete_block", Type.FREE, List.of()),
-            new Prompt("first_night", Type.FREE, List.of()),
-            new Prompt("build_first", Type.FREE, List.of()),
-            new Prompt("useless_item", Type.FREE, List.of()),
-            new Prompt("difficulty", Type.CHOICE, List.of("peaceful", "easy", "normal", "hard", "hardcore")),
-            new Prompt("travel", Type.CHOICE, List.of("boats", "horses", "elytra", "nether_highway", "minecart", "walking")),
-            new Prompt("armor", Type.CHOICE, List.of("diamond", "netherite", "iron", "none")),
-            new Prompt("playstyle", Type.CHOICE, List.of("builder", "redstoner", "explorer", "farmer", "fighter", "hoarder")));
+            new Prompt("dumb_death", Type.FREE, List.of()),
+            new Prompt("join_world", Type.FREE, List.of()),
+            new Prompt("armor", Type.CHOICE, List.of("diamond", "netherite", "iron", "leather", "none")),
+            new Prompt("vanilla_mod", Type.FREE, List.of()),
+            new Prompt("fav_version", Type.FREE, List.of()),
+            new Prompt("solo_or_friends", Type.CHOICE, List.of("solo", "friends", "depends")),
+            new Prompt("gamemode", Type.CHOICE, List.of("survival", "creative", "hardcore")),
+            new Prompt("too_many_mods", Type.FREE, List.of()),
+            new Prompt("three_mods", Type.FREE, List.of()),
+            new Prompt("unused_mechanic", Type.FREE, List.of()));
 
     public static Prompt byId(String id) {
         if (id == null) {

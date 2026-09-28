@@ -102,8 +102,12 @@ public final class ProfileScreen extends LanPlusScreen {
 
     private final List<LinkRow> linkRows = new ArrayList<>();
     private static final int LINK_PICK_W = 76;
-    private int linkPickerOpen = -1;
-    private final List<int[]> linkPickerCells = new ArrayList<>();
+    private final Dropdown linkPicker = new Dropdown();
+    private List<Integer> linkPickerOptions = new ArrayList<>();
+    private final Dropdown promptPicker = new Dropdown();
+    private List<String> promptPickerOptions = new ArrayList<>();
+    private final Dropdown choicePicker = new Dropdown();
+    private List<String> choicePickerOptions = new ArrayList<>();
     private static final int EDIT_SECTION_GAP = 18;
     private static final int EDIT_W = 440;
     private static final int EDIT_W_WIDE = 660;
@@ -434,7 +438,8 @@ public final class ProfileScreen extends LanPlusScreen {
     }
 
     private void buildLinkWidgets() {
-        linkPickerOpen = -1;
+        linkPicker.close();
+        choicePicker.close();
         if (linkRows.isEmpty()) {
             linkRows.add(new LinkRow(firstUnusedPlatform()));
         }
@@ -473,13 +478,14 @@ public final class ProfileScreen extends LanPlusScreen {
     private void openLinkPicker(int idx) {
         captureLinkValues();
         captureFreeValues();
-        linkPickerOpen = idx;
+        promptPicker.close();
+        linkPicker.open(idx);
     }
 
     private void pickLinkPlatform(int idx, int platform) {
         captureLinkValues();
         captureFreeValues();
-        linkPickerOpen = -1;
+        linkPicker.close();
         if (idx >= 0 && idx < linkRows.size()) {
             linkRows.get(idx).platform = platform;
         }
@@ -534,15 +540,25 @@ public final class ProfileScreen extends LanPlusScreen {
         return true;
     }
 
+    private int answerX() {
+        return colLX + pickerWidth() + 6;
+    }
+
+    private int answerW() {
+        return colW - pickerWidth() - 6;
+    }
+
     private void buildSlotWidgets() {
+        promptPicker.close();
+        choicePicker.close();
         int pickerW = pickerWidth();
-        int answerX = colLX + pickerW + 6;
-        int answerW = colW - pickerW - 6;
+        int ax = answerX();
+        int aw = answerW();
         for (int i = 0; i < MAX_SLOTS; i++) {
             slotFreeBox[i] = null;
             int y = aQRowsY + i * 24;
             final int slot = i;
-            addRenderableWidget(LanplusButton.create(pickerLabel(slot), b -> changeSlotPrompt(slot))
+            addRenderableWidget(LanplusButton.create(pickerLabel(slot), b -> openPromptPicker(slot))
                     .bounds(colLX, y, pickerW, 20).build());
 
             Prompt p = ProfilePrompt.byId(slotPromptId[i]);
@@ -550,24 +566,35 @@ public final class ProfileScreen extends LanPlusScreen {
                 continue;
             }
             if (p.type() == ProfilePrompt.Type.FREE) {
-                EditBox box = new EditBox(this.font, answerX, y + 1, answerW, 18, Component.empty());
+                EditBox box = new EditBox(this.font, ax, y + 1, aw, 18, Component.empty());
                 box.setMaxLength(140);
                 box.setHint(Component.translatable("gui.lanplus.profile.questions.hint"));
                 box.setValue(slotFreeValue[i] == null ? "" : slotFreeValue[i]);
                 slotFreeBox[i] = box;
                 addRenderableWidget(box);
             } else {
-                addRenderableWidget(LanplusButton.create(choiceLabel(slot), b -> cycleChoice(slot))
-                        .bounds(answerX, y, answerW, 20).build());
+                addRenderableWidget(LanplusButton.create(choiceLabel(slot), b -> openChoicePicker(slot))
+                        .bounds(ax, y, aw, 20).build());
             }
         }
     }
 
-    private void changeSlotPrompt(int slot) {
+    private void openPromptPicker(int slot) {
+        captureLinkValues();
         captureFreeValues();
-        String next = nextPrompt(slot);
-        slotPromptId[slot] = next;
-        Prompt p = ProfilePrompt.byId(next);
+        linkPicker.close();
+        promptPicker.open(slot);
+    }
+
+    private void pickPrompt(int slot, String id) {
+        captureLinkValues();
+        captureFreeValues();
+        promptPicker.close();
+        if (java.util.Objects.equals(id, slotPromptId[slot])) {
+            return;
+        }
+        slotPromptId[slot] = id;
+        Prompt p = ProfilePrompt.byId(id);
         if (p == null) {
             slotFreeValue[slot] = null;
             slotChoiceToken[slot] = null;
@@ -579,26 +606,37 @@ public final class ProfileScreen extends LanPlusScreen {
         rebuildWidgets();
     }
 
-    private void cycleChoice(int slot) {
-        Prompt p = ProfilePrompt.byId(slotPromptId[slot]);
-        if (p == null || p.choices().isEmpty()) {
-            return;
-        }
-        int cur = p.choices().indexOf(slotChoiceToken[slot]);
-        slotChoiceToken[slot] = p.choices().get((cur + 1) % p.choices().size());
-        rebuildWidgets();
-    }
-
-    private String nextPrompt(int slot) {
-        List<String> options = new ArrayList<>();
-        options.add(null);
+    private List<String> promptOptions(int slot) {
+        List<String> out = new ArrayList<>();
+        out.add(null);
         for (Prompt p : ProfilePrompt.PROMPTS) {
             if (!usedInOtherSlot(p.id(), slot)) {
-                options.add(p.id());
+                out.add(p.id());
             }
         }
-        int cur = Math.max(0, options.indexOf(slotPromptId[slot]));
-        return options.get((cur + 1) % options.size());
+        return out;
+    }
+
+    private Component promptOptionLabel(String id) {
+        if (id == null) {
+            return Component.translatable("gui.lanplus.profile.questions.pick");
+        }
+        Prompt p = ProfilePrompt.byId(id);
+        return p == null ? Component.empty() : p.question();
+    }
+
+    private void openChoicePicker(int slot) {
+        captureLinkValues();
+        captureFreeValues();
+        linkPicker.close();
+        promptPicker.close();
+        choicePicker.open(slot);
+    }
+
+    private void pickChoice(int slot, String token) {
+        choicePicker.close();
+        slotChoiceToken[slot] = token;
+        rebuildWidgets();
     }
 
     private boolean usedInOtherSlot(String id, int slot) {
@@ -621,7 +659,9 @@ public final class ProfileScreen extends LanPlusScreen {
     private void primeEdit() {
         pronounIndex = 0;
         invisibleToggle = profile.invisible();
-        linkPickerOpen = -1;
+        linkPicker.close();
+        promptPicker.close();
+        choicePicker.close();
         linkRows.clear();
         for (int p = 0; p < PLATFORMS.length; p++) {
             String v = profile.link(PLATFORMS[p]);
@@ -708,49 +748,84 @@ public final class ProfileScreen extends LanPlusScreen {
                 status = null;
             }
         }
-        boolean pickerOpen = editing && editTab == 0 && linkPickerOpen >= 0;
+        boolean linkOpen = editing && editTab == 0 && linkPicker.isOpen();
+        boolean promptOpen = editing && editTab == 0 && promptPicker.isOpen();
+        boolean choiceOpen = editing && editTab == 0 && choicePicker.isOpen();
+        boolean pickerOpen = linkOpen || promptOpen || choiceOpen;
         super.render(g, pickerOpen ? -1 : mouseX, pickerOpen ? -1 : mouseY, partialTick);
-        if (pickerOpen) {
+        if (linkOpen) {
             renderLinkPicker(g, mouseX, mouseY);
+        } else if (promptOpen) {
+            renderPromptPicker(g, mouseX, mouseY);
+        } else if (choiceOpen) {
+            renderChoicePicker(g, mouseX, mouseY);
         } else if (hoverTip != null) {
             g.renderTooltip(this.font, hoverTip, mouseX, mouseY);
         }
     }
 
     private void renderLinkPicker(GuiGraphics g, int mouseX, int mouseY) {
-        linkPickerCells.clear();
-        if (linkPickerOpen < 0 || linkPickerOpen >= linkRows.size()) {
+        int idx = linkPicker.owner();
+        if (idx < 0 || idx >= linkRows.size()) {
             return;
         }
-        List<Integer> opts = linkOptions(linkPickerOpen);
-        int cur = linkRows.get(linkPickerOpen).platform;
-        int itemH = 15;
-        int w = LINK_PICK_W;
-        for (int p : opts) {
-            w = Math.max(w, this.font.width(platformLabel(PLATFORMS[p])) + 12);
-        }
-        int x = colLX;
-        int top = aLinksRowsY + linkPickerOpen * 24 + 21;
-        int h = opts.size() * itemH;
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 300);
-        LanPlusUI.panel(g, x, top, x + w, top + h);
-        for (int i = 0; i < opts.size(); i++) {
-            int p = opts.get(i);
-            int iy = top + i * itemH;
-            boolean hover = mouseX >= x && mouseX < x + w && mouseY >= iy && mouseY < iy + itemH;
-            boolean sel = p == cur;
-            if (hover) {
-                g.fill(x + 1, iy, x + w - 1, iy + itemH, LanPlusUI.ACCENT_TINT);
+        linkPickerOptions = linkOptions(idx);
+        int cur = linkRows.get(idx).platform;
+        List<Component> labels = new ArrayList<>();
+        int selected = -1;
+        for (int i = 0; i < linkPickerOptions.size(); i++) {
+            int p = linkPickerOptions.get(i);
+            labels.add(Component.literal(platformLabel(PLATFORMS[p])));
+            if (p == cur) {
+                selected = i;
             }
-            if (sel) {
-                g.fill(x + 1, iy, x + 2, iy + itemH, LanPlusUI.ACCENT);
-            }
-            g.drawString(this.font, platformLabel(PLATFORMS[p]), x + 6, iy + 3,
-                    sel ? LanPlusUI.ACCENT : (hover ? LanPlusUI.TEXT : LanPlusUI.MUTED), false);
-            linkPickerCells.add(new int[]{x, iy, w, itemH, p});
         }
-        g.pose().popPose();
+        int top = aLinksRowsY + idx * 24 + 21;
+        linkPicker.render(g, this.font, colLX, top, LINK_PICK_W, colW, this.height - 4, labels, selected, mouseX, mouseY);
+    }
+
+    private void renderPromptPicker(GuiGraphics g, int mouseX, int mouseY) {
+        int slot = promptPicker.owner();
+        if (slot < 0 || slot >= MAX_SLOTS) {
+            return;
+        }
+        promptPickerOptions = promptOptions(slot);
+        String cur = slotPromptId[slot];
+        List<Component> labels = new ArrayList<>();
+        int selected = -1;
+        for (int i = 0; i < promptPickerOptions.size(); i++) {
+            String id = promptPickerOptions.get(i);
+            labels.add(promptOptionLabel(id));
+            if (java.util.Objects.equals(id, cur)) {
+                selected = i;
+            }
+        }
+        int top = aQRowsY + slot * 24 + 21;
+        promptPicker.render(g, this.font, colLX, top, pickerWidth(), colW, this.height - 4, labels, selected, mouseX, mouseY);
+    }
+
+    private void renderChoicePicker(GuiGraphics g, int mouseX, int mouseY) {
+        int slot = choicePicker.owner();
+        if (slot < 0 || slot >= MAX_SLOTS) {
+            return;
+        }
+        Prompt p = ProfilePrompt.byId(slotPromptId[slot]);
+        if (p == null || p.type() != ProfilePrompt.Type.CHOICE) {
+            return;
+        }
+        choicePickerOptions = p.choices();
+        String cur = slotChoiceToken[slot];
+        List<Component> labels = new ArrayList<>();
+        int selected = -1;
+        for (int i = 0; i < choicePickerOptions.size(); i++) {
+            String token = choicePickerOptions.get(i);
+            labels.add(ProfilePrompt.choiceLabel(p, token));
+            if (token.equals(cur)) {
+                selected = i;
+            }
+        }
+        int top = aQRowsY + slot * 24 + 21;
+        choicePicker.render(g, this.font, answerX(), top, answerW(), answerW(), this.height - 4, labels, selected, mouseX, mouseY);
     }
 
     private int linkPickerButtonAt(double mx, double my) {
@@ -760,6 +835,39 @@ public final class ProfileScreen extends LanPlusScreen {
         for (int i = 0; i < linkRows.size(); i++) {
             int y = aLinksRowsY + i * 24;
             if (mx >= colLX && mx < colLX + LINK_PICK_W && my >= y && my < y + 20) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int promptPickerButtonAt(double mx, double my) {
+        if (editTab != 0) {
+            return -1;
+        }
+        int pw = pickerWidth();
+        for (int i = 0; i < MAX_SLOTS; i++) {
+            int y = aQRowsY + i * 24;
+            if (mx >= colLX && mx < colLX + pw && my >= y && my < y + 20) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int choicePickerButtonAt(double mx, double my) {
+        if (editTab != 0) {
+            return -1;
+        }
+        int ax = answerX();
+        int aw = answerW();
+        for (int i = 0; i < MAX_SLOTS; i++) {
+            Prompt p = ProfilePrompt.byId(slotPromptId[i]);
+            if (p == null || p.type() != ProfilePrompt.Type.CHOICE) {
+                continue;
+            }
+            int y = aQRowsY + i * 24;
+            if (mx >= ax && mx < ax + aw && my >= y && my < y + 20) {
                 return i;
             }
         }
@@ -1619,15 +1727,46 @@ public final class ProfileScreen extends LanPlusScreen {
                 return true;
             }
         }
-        if (editing && button == 0 && linkPickerOpen >= 0) {
-            for (int[] c : linkPickerCells) {
-                if (mouseX >= c[0] && mouseX < c[0] + c[2] && mouseY >= c[1] && mouseY < c[1] + c[3]) {
-                    pickLinkPlatform(linkPickerOpen, c[4]);
-                    return true;
-                }
+        if (editing && button == 0 && linkPicker.isOpen()) {
+            int ci = linkPicker.clicked(mouseX, mouseY);
+            if (ci >= 0) {
+                pickLinkPlatform(linkPicker.owner(), linkPickerOptions.get(ci));
+                return true;
             }
             int pb = linkPickerButtonAt(mouseX, mouseY);
-            linkPickerOpen = (pb >= 0 && pb != linkPickerOpen) ? pb : -1;
+            if (pb >= 0 && pb != linkPicker.owner()) {
+                linkPicker.open(pb);
+            } else {
+                linkPicker.close();
+            }
+            return true;
+        }
+        if (editing && button == 0 && promptPicker.isOpen()) {
+            int ci = promptPicker.clicked(mouseX, mouseY);
+            if (ci >= 0) {
+                pickPrompt(promptPicker.owner(), promptPickerOptions.get(ci));
+                return true;
+            }
+            int pb = promptPickerButtonAt(mouseX, mouseY);
+            if (pb >= 0 && pb != promptPicker.owner()) {
+                promptPicker.open(pb);
+            } else {
+                promptPicker.close();
+            }
+            return true;
+        }
+        if (editing && button == 0 && choicePicker.isOpen()) {
+            int ci = choicePicker.clicked(mouseX, mouseY);
+            if (ci >= 0) {
+                pickChoice(choicePicker.owner(), choicePickerOptions.get(ci));
+                return true;
+            }
+            int pb = choicePickerButtonAt(mouseX, mouseY);
+            if (pb >= 0 && pb != choicePicker.owner()) {
+                choicePicker.open(pb);
+            } else {
+                choicePicker.close();
+            }
             return true;
         }
         if (super.mouseClicked(mouseX, mouseY, button)) {

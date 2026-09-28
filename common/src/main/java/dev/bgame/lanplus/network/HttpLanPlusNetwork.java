@@ -20,6 +20,7 @@ import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.CosmeticCatalogEntry;
+import dev.bgame.lanplus.api.CosmeticShop;
 import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.api.Suggestion;
@@ -356,6 +357,34 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         }).exceptionally(err -> {
             LOGGER.debug("LAN+ cosmetic loadout failed: {}", err.toString());
             return Map.of();
+        });
+    }
+
+    @Override
+    public CompletableFuture<CosmeticShop> getCosmeticShop() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return get("/cosmetics/wallet").thenApply(resp -> {
+            Wire.CosmeticShopDto dto = GSON.fromJson(resp.body(), Wire.CosmeticShopDto.class);
+            return dto == null ? null : dto.toApi();
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ cosmetic wallet failed: {}", err.toString());
+            return null;
+        });
+    }
+
+    @Override
+    public CompletableFuture<CosmeticShop> purchaseCosmetic(String cosmeticId) {
+        if (!configured() || cosmeticId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return post("/cosmetics/purchase", new Wire.CosmeticPurchase(cosmeticId)).thenApply(resp -> {
+            Wire.CosmeticShopDto dto = GSON.fromJson(resp.body(), Wire.CosmeticShopDto.class);
+            return dto == null || Boolean.FALSE.equals(dto.success()) ? null : dto.toApi();
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ cosmetic purchase failed: {}", err.toString());
+            return null;
         });
     }
 

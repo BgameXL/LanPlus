@@ -15,15 +15,18 @@ public final class HostAccessControl {
     private static volatile UUID hostUuid;
     private static volatile boolean active = false;
     private static volatile int maxPlayers = DEFAULT_MAX_PLAYERS;
+    private static volatile boolean allowVanillaJoin = false;
     private static final Set<UUID> allowed = ConcurrentHashMap.newKeySet();
 
     private HostAccessControl() {
     }
 
-    public static void set(HostAccessMode newMode, UUID host, Collection<UUID> initialAllowed, int slots) {
+    public static void set(HostAccessMode newMode, UUID host, Collection<UUID> initialAllowed, int slots,
+                           boolean vanillaJoin) {
         mode = newMode == null ? HostAccessMode.EVERYONE : newMode;
         hostUuid = host;
         maxPlayers = slots;
+        allowVanillaJoin = vanillaJoin;
         allowed.clear();
         if (initialAllowed != null) {
             allowed.addAll(initialAllowed);
@@ -42,7 +45,15 @@ public final class HostAccessControl {
         mode = HostAccessMode.EVERYONE;
         hostUuid = null;
         maxPlayers = DEFAULT_MAX_PLAYERS;
+        allowVanillaJoin = false;
         allowed.clear();
+    }
+
+    public static boolean gated(boolean offlineHosting) {
+        if (!offlineHosting) {
+            return false;
+        }
+        return !(allowVanillaJoin && mode == HostAccessMode.EVERYONE);
     }
 
     public static boolean isActive() {
