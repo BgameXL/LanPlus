@@ -16,7 +16,6 @@ public final class ReportScreen extends LanPlusScreen {
 
     private static final String[] REASONS =
             {"hate_speech", "harassment", "spam", "inappropriate", "other"};
-    private static final int MARGIN = 20;
     private static final int MAX_W = 220;
     private static final int PAD = 10;
     private final Screen parent;
@@ -32,10 +31,10 @@ public final class ReportScreen extends LanPlusScreen {
     }
 
     private void layout() {
-        cardW = Math.min(this.width - 2 * MARGIN, MAX_W);
+        cardW = fitWidth(MAX_W);
         cardH = state == State.CHOOSING ? 34 + REASONS.length * 26 + 4 + 20 + PAD : 78;
-        cardX = (this.width - cardW) / 2;
-        cardY = Math.max(20, (this.height - cardH) / 2 - 10);
+        cardX = centerX(cardW);
+        cardY = centerY(cardH);
     }
 
     @Override

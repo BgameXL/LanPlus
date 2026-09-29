@@ -73,10 +73,10 @@ public final class SkinScreen extends LanPlusScreen {
     }
 
     private void layout() {
-        cardW = Math.min(this.width - 60, 520);
-        cardH = Math.min(this.height - 60, 300);
-        cardX = (this.width - cardW) / 2;
-        cardY = Math.max(20, (this.height - cardH) / 2);
+        cardW = fitWidth(520);
+        cardH = fitHeight(300);
+        cardX = centerX(cardW);
+        cardY = centerY(cardH);
         mx0 = cardX + PAD;
         my0 = cardY + 30;
         mx1 = mx0 + LEFT_W;

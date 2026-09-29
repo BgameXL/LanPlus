@@ -44,7 +44,6 @@ public final class FriendsScreen extends LanPlusScreen {
     private enum Tab {FRIENDS, JOIN, ADD, DETAILS}
 
     private static final Tab[] TABS = Tab.values();
-    private static final int MARGIN = 20;
     private static final int MAX_W = 540;
     private static final int LEFT_W = 160;
     private static final int GAP = 1;
@@ -149,14 +148,14 @@ public final class FriendsScreen extends LanPlusScreen {
     }
 
     private void layout() {
-        int contentW = Math.min(this.width - 2 * MARGIN, MAX_W);
-        leftX = (this.width - contentW) / 2;
+        int contentW = fitWidth(MAX_W);
+        leftX = centerX(contentW);
         contentRight = leftX + contentW;
         rightX = leftX + LEFT_W + GAP;
         rightW = contentRight - rightX;
-        int paneH = Math.clamp(this.height - 2 * MARGIN - HEADER_H - FOOTER_H, 120, PANE_H);
+        int paneH = Math.clamp(this.height - 2 * EDGE - HEADER_H - FOOTER_H, 120, PANE_H);
         int blockH = HEADER_H + paneH + FOOTER_H;
-        headerTop = Math.max(MARGIN, (this.height - blockH) / 2);
+        headerTop = centerY(blockH);
         tabsTop = headerTop + 28;
         paneTop = headerTop + HEADER_H;
         paneBottom = paneTop + paneH;

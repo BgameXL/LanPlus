@@ -71,10 +71,10 @@ public final class CosmeticScreen extends LanPlusScreen {
     }
 
     private void layout() {
-        cardW = Math.min(this.width - 48, 660);
-        cardH = Math.min(this.height - 48, 432);
-        cardX = (this.width - cardW) / 2;
-        cardY = Math.max(16, (this.height - cardH) / 2);
+        cardW = fitWidth(660);
+        cardH = fitHeight(432);
+        cardX = centerX(cardW);
+        cardY = centerY(cardH);
         tabsY = cardY + 32;
         contentTop = tabsY + TAB_H + 8;
         doneY = cardY + cardH - PAD - 20;

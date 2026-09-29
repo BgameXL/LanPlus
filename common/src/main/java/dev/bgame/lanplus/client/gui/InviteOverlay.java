@@ -44,8 +44,8 @@ public final class InviteOverlay extends LanPlusScreen {
 
     @Override
     protected void init() {
-        panelX = (this.width - PANEL_W) / 2;
-        panelY = (this.height - PANEL_H) / 2;
+        panelX = centerX(PANEL_W);
+        panelY = centerY(PANEL_H);
         addRenderableWidget(LanplusButton.create(Component.literal("X"), b -> hostNow())
                 .bounds(panelX + PANEL_W - 18, panelY + 4, 14, 14).build());
         addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.invite.hostnow"), b -> hostNow())

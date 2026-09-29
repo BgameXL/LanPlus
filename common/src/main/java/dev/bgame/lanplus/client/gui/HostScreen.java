@@ -88,7 +88,7 @@ public final class HostScreen extends LanPlusScreen {
     }
 
     private void layout() {
-        cardW = Math.min(this.width - 40, CARD_W);
+        cardW = fitWidth(CARD_W);
         int y = PAD + HEADER_H;
 
         if (!inWorld) {
@@ -126,8 +126,8 @@ public final class HostScreen extends LanPlusScreen {
         y += 10;
         buttonsY = y;
         cardH = buttonsY + 20 + PAD;
-        cardY = Math.max(16, (this.height - cardH) / 2);
-        cardX = (this.width - cardW) / 2;
+        cardY = centerY(cardH);
+        cardX = centerX(cardW);
 
         listTop += cardY;
         listBottom += cardY;

@@ -67,10 +67,10 @@ public final class SettingsScreen extends LanPlusScreen {
     }
 
     private void layout() {
-        pw = Math.min(this.width - 60, 700);
-        ph = Math.min(this.height - 60, 360);
-        px = (this.width - pw) / 2;
-        py = (this.height - ph) / 2;
+        pw = fitWidth(700);
+        ph = fitHeight(360);
+        px = centerX(pw);
+        py = centerY(ph);
         headerBottom = py + 30;
         sidebarX = px + 14;
         dividerX = sidebarX + CATEGORY_W + 12;

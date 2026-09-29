@@ -12,7 +12,6 @@ import java.util.function.Consumer;
 
 public final class ImagePicker extends LanPlusScreen {
 
-    private static final int MARGIN = 20;
     private static final int MAX_W = 460;
     private static final int GRID_PAD = 10;
     private static final int CELL_GAP = 8;
@@ -56,8 +55,8 @@ public final class ImagePicker extends LanPlusScreen {
 
     @Override
     protected void init() {
-        contentW = Math.min(this.width - 2 * MARGIN, MAX_W);
-        boxX = (this.width - contentW) / 2;
+        contentW = fitWidth(MAX_W);
+        boxX = centerX(contentW);
         int panelTop = 36;
         int panelBottom = this.height - 40;
         gridTop = panelTop + 26;

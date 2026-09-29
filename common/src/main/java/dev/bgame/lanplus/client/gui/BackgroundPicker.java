@@ -20,7 +20,6 @@ public final class BackgroundPicker extends LanPlusScreen {
         void none();
     }
 
-    private static final int MARGIN = 20;
     private static final int MAX_W = 460;
     private static final int PAD = 12;
     private static final int SWATCH = 24;
@@ -64,8 +63,8 @@ public final class BackgroundPicker extends LanPlusScreen {
 
     @Override
     protected void init() {
-        contentW = Math.min(this.width - 2 * MARGIN, MAX_W);
-        boxX = (this.width - contentW) / 2;
+        contentW = fitWidth(MAX_W);
+        boxX = centerX(contentW);
         panelTop = 30;
         panelBottom = this.height - 40;
         bodyTop = panelTop + 46;

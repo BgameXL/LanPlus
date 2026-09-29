@@ -40,7 +40,6 @@ import java.util.UUID;
 public final class ProfileScreen extends LanPlusScreen {
 
     private static final int SECTION_GAP = 12;
-    private static final int MARGIN = 10;
     private static final int MAX_LAYOUT_W = 620;
     private static final int SIDEBAR_W = 250;
     private static final int CONTENT_TOP = 32;
@@ -172,7 +171,7 @@ public final class ProfileScreen extends LanPlusScreen {
     }
 
     private int layoutWidth() {
-        return Math.min(this.width - 2 * MARGIN, MAX_LAYOUT_W);
+        return fitWidth(MAX_LAYOUT_W);
     }
 
     private int layoutLeft() {
@@ -211,8 +210,8 @@ public final class ProfileScreen extends LanPlusScreen {
 
     private void layoutEditAnchors() {
         boolean wide = editTab == 2;
-        eW = Math.min(this.width - 2 * MARGIN, wide ? EDIT_W_WIDE : EDIT_W);
-        eL = (this.width - eW) / 2;
+        eW = fitWidth(wide ? EDIT_W_WIDE : EDIT_W);
+        eL = centerX(eW);
         eR = eL + eW;
         colLX = eL + 12;
         colW = wide ? APP_FORM_W : eW - 24;

@@ -28,7 +28,6 @@ public final class Announcements extends LanPlusScreen {
     private enum Filter {ALL, UPDATE, MAINTENANCE, GENERAL, FREE}
 
     private static final Filter[] FILTERS = Filter.values();
-    private static final int MARGIN = 20;
     private static final int MAX_W = 580;
     private static final int MAX_H = 380;
     private static final int PAD = 10;
@@ -84,10 +83,10 @@ public final class Announcements extends LanPlusScreen {
     }
 
     private void layout() {
-        cardW = Math.min(this.width - 2 * MARGIN, MAX_W);
-        cardH = Math.min(this.height - 70, MAX_H);
-        cardX = (this.width - cardW) / 2;
-        cardY = Math.max(20, (this.height - cardH) / 2 - 10);
+        cardW = fitWidth(MAX_W);
+        cardH = fitHeight(MAX_H);
+        cardX = centerX(cardW);
+        cardY = centerY(cardH);
         sidebarX = cardX + PAD;
         sidebarTop = cardY + 34;
         listX = sidebarX + SIDEBAR_W + 14;
