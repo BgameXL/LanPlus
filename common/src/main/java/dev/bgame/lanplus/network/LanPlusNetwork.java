@@ -3,6 +3,8 @@ package dev.bgame.lanplus.network;
 import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
+import dev.bgame.lanplus.api.CosmeticCatalogEntry;
+import dev.bgame.lanplus.api.CosmeticShop;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.Invite;
 import dev.bgame.lanplus.api.PresenceSnapshot;
@@ -66,6 +68,17 @@ public interface LanPlusNetwork {
     void setProfileBodySink(java.util.function.BiConsumer<UUID, String> sink);
 
     UUID sessionUuid();
+
+    CompletableFuture<Boolean> equipCosmetic(String slot, String cosmeticId);
+
+    CompletableFuture<Map<String, String>> getCosmeticLoadout(UUID uuid);
+
+    CompletableFuture<CosmeticShop> getCosmeticShop();
+
+    CompletableFuture<CosmeticShop> purchaseCosmetic(String cosmeticId);
+
+    CompletableFuture<List<CosmeticCatalogEntry>> getCosmeticCatalog();
+
     interface BackendEventListener {
 
         default void onPresenceUpdate(PresenceUpdate update) {

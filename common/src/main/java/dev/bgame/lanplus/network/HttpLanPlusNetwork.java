@@ -9,6 +9,8 @@ import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Connectivity;
+import dev.bgame.lanplus.api.CosmeticCatalogEntry;
+import dev.bgame.lanplus.api.CosmeticShop;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.Invite;
@@ -765,6 +767,77 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     @Override
     public UUID sessionUuid() {
         return sessionUuid.get();
+    }
+
+    @Override
+    public CompletableFuture<Boolean> equipCosmetic(String slot, String cosmeticId) {
+        return edge("/cosmetics/equip", new Wire.CosmeticEquip(slot, cosmeticId));
+    }
+
+    @Override
+    public CompletableFuture<Map<String, String>> getCosmeticLoadout(UUID uuid) {
+        if (!configured() || uuid == null) {
+            return CompletableFuture.completedFuture(Map.of());
+        }
+        return get("/cosmetics/loadout?uuid=" + uuid).thenApply(resp -> {
+            Map<String, String> m = GSON.fromJson(resp.body(), new com.google.gson.reflect.TypeToken<Map<String, String>>() {
+            }.getType());
+            return m == null ? Map.<String, String>of() : m;
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ cosmetic loadout failed: {}", err.toString());
+            return Map.of();
+        });
+    }
+
+    @Override
+    public CompletableFuture<CosmeticShop> getCosmeticShop() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return get("/cosmetics/wallet").thenApply(resp -> {
+            Wire.CosmeticShopDto dto = GSON.fromJson(resp.body(), Wire.CosmeticShopDto.class);
+            return dto == null ? null : dto.toApi();
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ cosmetic wallet failed: {}", err.toString());
+            return null;
+        });
+    }
+
+    @Override
+    public CompletableFuture<CosmeticShop> purchaseCosmetic(String cosmeticId) {
+        if (!configured() || cosmeticId == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return post("/cosmetics/purchase", new Wire.CosmeticPurchase(cosmeticId)).thenApply(resp -> {
+            Wire.CosmeticShopDto dto = GSON.fromJson(resp.body(), Wire.CosmeticShopDto.class);
+            return dto == null || Boolean.FALSE.equals(dto.success()) ? null : dto.toApi();
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ cosmetic purchase failed: {}", err.toString());
+            return null;
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<CosmeticCatalogEntry>> getCosmeticCatalog() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get("/cosmetics/catalog").thenApply(resp -> {
+            Wire.CosmeticEntryDto[] arr = GSON.fromJson(resp.body(), Wire.CosmeticEntryDto[].class);
+            if (arr == null) {
+                return List.<CosmeticCatalogEntry>of();
+            }
+            List<CosmeticCatalogEntry> out = new ArrayList<>(arr.length);
+            for (Wire.CosmeticEntryDto d : arr) {
+                if (d != null && d.id() != null) {
+                    out.add(d.toApi(base()));
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ cosmetic catalog failed: {}", err.toString());
+            return List.of();
+        });
     }
 
     private String postSync(String path, String json) throws Exception {

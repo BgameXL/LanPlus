@@ -5,11 +5,14 @@ import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.announcements.AnnouncementsService;
 import dev.bgame.lanplus.announcements.DefaultAnnouncementsService;
 import dev.bgame.lanplus.api.Announcement;
+import dev.bgame.lanplus.api.CosmeticShop;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.PlayerIdentity;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.SkinRef;
+import dev.bgame.lanplus.cosmetics.CosmeticMeta;
+import dev.bgame.lanplus.cosmetics.CosmeticSlot;
 import dev.bgame.lanplus.client.gui.FriendsScreen;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.core.AssetCache;
@@ -38,12 +41,16 @@ import net.minecraft.client.server.IntegratedServer;
 import dev.bgame.lanplus.platform.PlatformHolder;
 import org.slf4j.Logger;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Stream;
 
 public final class LanPlusClient {
 
@@ -57,9 +64,12 @@ public final class LanPlusClient {
     private static RelayTunnel relayTunnel;
     private static SkinService skins;
     private static SkinTextures skinTextures;
+    private static CosmeticModels cosmetics;
+    private static CosmeticAssetLoader cosmeticAssets;
     private static DiscordPresence discord;
     private static AnnouncementsService announcements;
     private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
+    private static final Set<UUID> requestedLoadouts = ConcurrentHashMap.newKeySet();
 
     private LanPlusClient() {
     }
@@ -78,6 +88,9 @@ public final class LanPlusClient {
 
         skinTextures = new SkinTextures();
         skins = new DefaultSkinService(skinTextures, network, assetCache);
+        cosmetics = new CosmeticModels();
+        cosmeticAssets = new CosmeticAssetLoader(network, cosmetics, assetCache);
+        loadDevCosmetics();
         friends.addListener(LanPlusClient::resolveFriendSkins);
         friends.addListener(new SocialToastListener());
 
@@ -116,6 +129,8 @@ public final class LanPlusClient {
 
         friends.connect();
         announcements.connect();
+        ensureCosmeticLoadout(selfUuid());
+        cosmeticAssets.refreshCatalog();
     }
 
     public static PresenceManager presence() {
@@ -140,6 +155,106 @@ public final class LanPlusClient {
 
     public static SkinTextures skinTextures() {
         return skinTextures;
+    }
+
+    public static CosmeticModels cosmetics() {
+        return cosmetics;
+    }
+
+    public static void ensureCosmeticModel(String cosmeticId) {
+        if (cosmeticAssets != null) {
+            cosmeticAssets.ensureModel(cosmeticId);
+        }
+    }
+
+    public static void ensureCosmeticLoadout(UUID player) {
+        if (player == null || cosmetics == null || network == null || !requestedLoadouts.add(player)) {
+            return;
+        }
+        network.getCosmeticLoadout(player).whenComplete((map, err) -> {
+            if (err != null || map == null) {
+                return;
+            }
+            Map<CosmeticSlot, String> parsed = new EnumMap<>(CosmeticSlot.class);
+            for (Map.Entry<String, String> e : map.entrySet()) {
+                try {
+                    parsed.put(CosmeticSlot.valueOf(e.getKey()), e.getValue());
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            cosmetics.applyLoadout(player, parsed);
+        });
+    }
+
+    public static void ensureCosmeticShop() {
+        if (cosmetics == null || network == null) {
+            return;
+        }
+        network.getCosmeticShop().whenComplete((shop, err) -> {
+            if (err == null && shop != null) {
+                applyShop(shop);
+            }
+        });
+    }
+
+    public static void completePurchase(UUID player, String id) {
+        if (cosmetics == null || network == null || id == null) {
+            return;
+        }
+        CosmeticSlot slot = cosmetics.slotOf(id);
+        network.purchaseCosmetic(id).whenComplete((shop, err) -> {
+            if (shop != null) {
+                applyShop(shop);
+                network.equipCosmetic(slot.name(), id);
+                return;
+            }
+            network.getCosmeticShop().whenComplete((auth, e2) -> {
+                if (auth == null) {
+                    return;
+                }
+                applyShop(auth);
+                if (player != null && !auth.owned().contains(id)) {
+                    cosmetics.unequip(player, slot);
+                }
+            });
+        });
+    }
+
+    private static void applyShop(CosmeticShop shop) {
+        cosmetics.setWallet(shop.balance());
+        cosmetics.setOwned(new HashSet<>(shop.owned()));
+    }
+
+    private static void loadDevCosmetics() {
+        try {
+            Path dir = PlatformHolder.get().getConfigDir().resolve("lanplus-cosmetics");
+            if (!Files.isDirectory(dir)) {
+                return;
+            }
+            List<Path> geoFiles;
+            try (Stream<Path> files = Files.list(dir)) {
+                geoFiles = files.filter(p -> p.getFileName().toString().endsWith(".geo.json")).toList();
+            }
+            UUID self = selfUuid();
+            for (Path geo : geoFiles) {
+                String id = geo.getFileName().toString().replace(".geo.json", "");
+                Path anim = dir.resolve(id + ".animation.json");
+                Path png = dir.resolve(id + ".png");
+                Path metaFile = dir.resolve(id + ".cosmetic.json");
+                cosmetics.register(id, Files.readAllBytes(geo), Files.isRegularFile(anim) ? Files.readAllBytes(anim) : null, Files.isRegularFile(png) ? Files.readAllBytes(png) : null);
+                CosmeticMeta meta = CosmeticMeta.parse(id, Files.isRegularFile(metaFile) ? Files.readString(metaFile) : null);
+                cosmetics.putMeta(meta);
+                if (meta.price() <= 0) {
+                    cosmetics.markOwned(id);
+                    if (self != null) {
+                        cosmetics.equip(self, meta.slot(), id);
+                    }
+                }
+            }
+            cosmetics.setWallet(5000);
+        } catch (Exception e) {
+            LOGGER.warn("cosmetic failed", e);
+        }
     }
 
     public static DiscordPresence discord() {

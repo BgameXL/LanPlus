@@ -4,6 +4,7 @@ import dev.bgame.lanplus.Config;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 
 final class LanPlusUI {
 
@@ -110,6 +111,47 @@ final class LanPlusUI {
         x += font.width("LAN");
         g.drawString(font, "+", x, y, LIME, false);
         return x + font.width("+");
+    }
+
+    static void background(GuiGraphics g, int width, int height) {
+        int base = 0xFF000000 | (SURFACE & 0xFFFFFF);
+        g.fillGradient(0, 0, width, height, base, shade(base, 0.32f));
+    }
+
+    static void outline(GuiGraphics g, int x0, int y0, int x1, int y1, int color) {
+        outline1(g, x0, y0, x1, y1, color);
+    }
+
+    static void outline1(GuiGraphics g, int x0, int y0, int x1, int y1, int color) {
+        g.fill(x0, y0, x1, y0 + 1, color);
+        g.fill(x0, y1 - 1, x1, y1, color);
+        g.fill(x0, y0, x0 + 1, y1, color);
+        g.fill(x1 - 1, y0, x1, y1, color);
+    }
+
+    static int shade(int argb, float f) {
+        int a = argb >>> 24;
+        int r = clampByte(Math.round(((argb >> 16) & 0xFF) * f));
+        int g = clampByte(Math.round(((argb >> 8) & 0xFF) * f));
+        int b = clampByte(Math.round((argb & 0xFF) * f));
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    private static int clampByte(int v) {
+        return Mth.clamp(v, 0, 255);
+    }
+
+    static void button3d(GuiGraphics g, int x0, int y0, int x1, int y1, int fill) {
+        outline1(g, x0, y0, x1, y1, EDGE_DARK);
+        g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill);
+        outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, shade(fill, 1.4f));
+    }
+
+    static void sectionHeader(GuiGraphics g, Font font, Component label, int x, int y, int right) {
+        g.drawString(font, "+", x, y, LIME, false);
+        int labelX = x + font.width("+") + 4;
+        g.drawString(font, label, labelX, y, TEXT, false);
+        g.fill(x, y + 11, right, y + 12, BORDER);
     }
 
     static void chip(GuiGraphics g, Font font, Component label, int x, int y, int w, int h,

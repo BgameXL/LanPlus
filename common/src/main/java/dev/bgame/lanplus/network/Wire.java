@@ -4,6 +4,7 @@ import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Connectivity;
+import dev.bgame.lanplus.api.CosmeticCatalogEntry;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.PlayedTogether;
@@ -91,6 +92,29 @@ final class Wire {
     }
 
     record FriendRelation(String uuid, String targetUuid) {
+    }
+
+    record CosmeticEquip(String slot, String cosmeticId) {
+    }
+
+    record CosmeticPurchase(String cosmeticId) {
+    }
+
+    record CosmeticShopDto(Boolean success, Long balance, java.util.List<String> owned) {
+        dev.bgame.lanplus.api.CosmeticShop toApi() {
+            return new dev.bgame.lanplus.api.CosmeticShop(balance == null ? 0 : balance.intValue(),
+                    owned == null ? java.util.List.of() : owned);
+        }
+    }
+
+    record CosmeticEntryDto(String id, String meta, String geoUrl, String geoHash,
+                            String animUrl, String animHash, String texUrl, String texHash) {
+        CosmeticCatalogEntry toApi(String base) {
+            return new CosmeticCatalogEntry(id, meta == null ? "" : meta,
+                    versionedUrl(base, geoUrl, geoHash), geoHash,
+                    animUrl == null ? null : versionedUrl(base, animUrl, animHash), animHash,
+                    versionedUrl(base, texUrl, texHash), texHash);
+        }
     }
 
     record Success(boolean success) {
