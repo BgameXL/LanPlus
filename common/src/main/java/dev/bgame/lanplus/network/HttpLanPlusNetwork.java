@@ -12,6 +12,7 @@ import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.CosmeticCatalogEntry;
 import dev.bgame.lanplus.api.CosmeticShop;
 import dev.bgame.lanplus.api.Friend;
+import dev.bgame.lanplus.api.LibrarySkin;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.Invite;
 import dev.bgame.lanplus.api.PlayerIdentity;
@@ -498,6 +499,79 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                     onError(err);
                     return false;
                 });
+    }
+
+    @Override
+    public CompletableFuture<List<LibrarySkin>> listSkins() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get("/skins").thenApply(resp -> {
+            Wire.SkinLibraryResponse r = GSON.fromJson(resp.body(), Wire.SkinLibraryResponse.class);
+            if (r == null || r.skins() == null) {
+                return List.<LibrarySkin>of();
+            }
+            List<LibrarySkin> out = new ArrayList<>();
+            for (Wire.SkinLibraryEntry e : r.skins()) {
+                if (e == null || e.skinId() == null || e.url() == null) {
+                    continue;
+                }
+                boolean active = e.skinId().equals(r.active());
+                out.add(new LibrarySkin(e.skinId(), base() + e.url(), e.model(), active));
+            }
+            return out;
+        }).exceptionally(err -> {
+            onError(err);
+            return List.of();
+        });
+    }
+
+    @Override
+    public CompletableFuture<SkinUploadResult> addSkin(byte[] png, String model) {
+        if (!configured() || png == null || png.length == 0) {
+            return CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"));
+        }
+        String b64 = Base64.getEncoder().encodeToString(png);
+        return post("/skins", new Wire.SkinUpload(b64, model)).thenApply(this::parseSkinActive).exceptionally(err -> {
+            onError(err);
+            return new SkinUploadResult(null, null, "offline");
+        });
+    }
+
+    @Override
+    public CompletableFuture<SkinUploadResult> selectSkin(String skinId) {
+        if (!configured() || skinId == null || skinId.isBlank()) {
+            return CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"));
+        }
+        return post("/skins/" + skinId + "/select", Map.of()).thenApply(this::parseSkinActive).exceptionally(err -> {
+            onError(err);
+            return new SkinUploadResult(null, null, "offline");
+        });
+    }
+
+    @Override
+    public CompletableFuture<Boolean> deleteLibrarySkin(String skinId) {
+        if (!configured() || skinId == null || skinId.isBlank()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        return post("/skins/" + skinId + "/delete", Map.of()).thenApply(resp -> {
+            Wire.Success s = GSON.fromJson(resp.body(), Wire.Success.class);
+            return s != null && s.success();
+        }).exceptionally(err -> {
+            onError(err);
+            return false;
+        });
+    }
+
+    private SkinUploadResult parseSkinActive(HttpResponse<String> resp) {
+        Wire.SkinUploadResponse r = GSON.fromJson(resp.body(), Wire.SkinUploadResponse.class);
+        if (r != null && r.url() != null) {
+            String hash = r.hash() == null ? "" : r.hash();
+            String version = hash.isEmpty() ? "" : "?v=" + hash.substring(0, Math.min(16, hash.length()));
+            return new SkinUploadResult(base() + r.url() + version, r.hash(), null);
+        }
+        String error = r != null && r.error() != null ? r.error() : "error";
+        return new SkinUploadResult(null, null, error);
     }
 
     private String parseUpdateResult(HttpResponse<String> resp) {

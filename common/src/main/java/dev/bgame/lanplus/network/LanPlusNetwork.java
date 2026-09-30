@@ -6,6 +6,7 @@ import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.CosmeticCatalogEntry;
 import dev.bgame.lanplus.api.CosmeticShop;
 import dev.bgame.lanplus.api.Friend;
+import dev.bgame.lanplus.api.LibrarySkin;
 import dev.bgame.lanplus.api.Invite;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.PresenceUpdate;
@@ -53,6 +54,14 @@ public interface LanPlusNetwork {
     CompletableFuture<Void> reportUser(UUID targetUuid, String reason);
     CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, String model);
     CompletableFuture<Boolean> deleteSkin();
+
+    CompletableFuture<List<LibrarySkin>> listSkins();
+
+    CompletableFuture<SkinUploadResult> addSkin(byte[] png, String model);
+
+    CompletableFuture<SkinUploadResult> selectSkin(String skinId);
+
+    CompletableFuture<Boolean> deleteLibrarySkin(String skinId);
     CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated);
     CompletableFuture<Invite> resolveInvite(String code);
     CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);

@@ -2,11 +2,13 @@ package dev.bgame.lanplus.client;
 
 import dev.bgame.lanplus.LanplusCommon;
 import dev.bgame.lanplus.client.gui.Announcements;
+import dev.bgame.lanplus.client.gui.CosmeticScreen;
 import dev.bgame.lanplus.client.gui.FriendsScreen;
 import dev.bgame.lanplus.client.gui.HostScreen;
 import dev.bgame.lanplus.client.gui.LanPlusIconButton;
 import dev.bgame.lanplus.client.gui.ProfileScreen;
 import dev.bgame.lanplus.client.gui.SettingsScreen;
+import dev.bgame.lanplus.client.gui.SkinScreen;
 import dev.bgame.lanplus.mixin.client.ScreenAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -24,6 +26,8 @@ public final class TitleScreenButtons {
     private static final ResourceLocation PROFILE_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/profile.png");
     private static final ResourceLocation SETTINGS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/settings.png");
     private static final ResourceLocation ANNOUNCEMENTS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/announcements.png");
+    private static final ResourceLocation COSMETICS_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/settings.png");
+    private static final ResourceLocation SKIN_ICON = new ResourceLocation(LanplusCommon.MODID, "textures/gui/profile.png");
 
     private TitleScreenButtons() {
     }
@@ -55,6 +59,10 @@ public final class TitleScreenButtons {
         accessor.lanplus$invokeAddRenderableWidget(new LanPlusIconButton(x + 88, y, ANNOUNCEMENTS_ICON, "gui.lanplus.announcements.tooltip",
                 b -> Minecraft.getInstance().setScreen(new Announcements(title)),
                 () -> LanPlusClient.announcements() == null ? 0 : LanPlusClient.announcements().unseenCount()));
+        accessor.lanplus$invokeAddRenderableWidget(new LanPlusIconButton(x + 110, y, COSMETICS_ICON, "gui.lanplus.cosmetics.tooltip",
+                b -> Minecraft.getInstance().setScreen(new CosmeticScreen(title))));
+        accessor.lanplus$invokeAddRenderableWidget(new LanPlusIconButton(x + 132, y, SKIN_ICON, "gui.lanplus.skin.tooltip",
+                b -> Minecraft.getInstance().setScreen(new SkinScreen(title))));
     }
 
     private static AbstractWidget findSingleplayer(Screen screen) {

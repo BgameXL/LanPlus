@@ -149,6 +149,8 @@
   "gui.lanplus.toast.announcement": "New announcement",
   "gui.lanplus.announcements.title": "Announcements",
   "gui.lanplus.announcements.tooltip": "Announcements",
+  "gui.lanplus.cosmetics.tooltip": "Cosmetics",
+  "gui.lanplus.skin.tooltip": "Skins",
   "gui.lanplus.announcements.empty": "No announcements yet",
   "gui.lanplus.announcements.filter.empty": "Nothing in this section",
   "gui.lanplus.announcements.filter.all": "All",

@@ -154,6 +154,19 @@ final class LanPlusUI {
         g.fill(x, y + 11, right, y + 12, BORDER);
     }
 
+    static void slot(GuiGraphics g, int x0, int y0, int x1, int y1) {
+        outline1(g, x0, y0, x1, y1, EDGE_DARK);
+        int a = x0 + 1;
+        int b = y0 + 1;
+        int c = x1 - 1;
+        int d = y1 - 1;
+        g.fill(a, b, c, d, SLOT);
+        g.fill(a, b, c, b + 1, shade(SLOT, 0.4f));
+        g.fill(a, b, a + 1, d, shade(SLOT, 0.4f));
+        g.fill(a, d - 1, c, d, shade(SLOT, 2.2f));
+        g.fill(c - 1, b, c, d, shade(SLOT, 2.2f));
+    }
+
     static void chip(GuiGraphics g, Font font, Component label, int x, int y, int w, int h,
                      boolean selected, boolean enabled, boolean hover) {
         int bg = !enabled ? SURFACE_DISABLED : selected ? ACCENT_STRONG : (hover ? SURFACE_HOVER : SURFACE_RAISED);
