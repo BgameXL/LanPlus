@@ -36,7 +36,7 @@ final class LanPlusUI {
     private static Theme current;
 
     static {
-        apply(Themes.byId(Config.theme));
+        apply(Themes.resolve(Config.theme));
     }
 
     private LanPlusUI() {
@@ -145,6 +145,30 @@ final class LanPlusUI {
         outline1(g, x0, y0, x1, y1, EDGE_DARK);
         g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill);
         outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, shade(fill, 1.4f));
+    }
+
+    static void primaryButton(GuiGraphics g, int x0, int y0, int x1, int y1, boolean hover, boolean active) {
+        int fill = !active ? SURFACE_DISABLED : hover ? shade(ACCENT_STRONG, 0.4f) : SURFACE_RAISED;
+        outline1(g, x0, y0, x1, y1, EDGE_DARK);
+        g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill);
+        int accent = !active ? BORDER : hover ? ACCENT_HOVER : ACCENT;
+        outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, accent);
+        g.fill(x0 + 2, y0 + 1, x1 - 2, y0 + 2, accent);
+        g.fill(x0 + 2, y1 - 2, x1 - 2, y1 - 1, accent);
+        if (hover && active) {
+            int glow = 0x55000000 | (ACCENT & 0xFFFFFF);
+            g.fill(x0 - 1, y0 - 1, x1 + 1, y0, glow);
+            g.fill(x0 - 1, y1, x1 + 1, y1 + 1, glow);
+            g.fill(x0 - 1, y0, x0, y1, glow);
+            g.fill(x1, y0, x1 + 1, y1, glow);
+        }
+    }
+
+    static void rivets(GuiGraphics g, int x0, int y0, int x1, int y1, int color) {
+        g.fill(x0 + 3, y0 + 3, x0 + 5, y0 + 5, color);
+        g.fill(x1 - 5, y0 + 3, x1 - 3, y0 + 5, color);
+        g.fill(x0 + 3, y1 - 5, x0 + 5, y1 - 3, color);
+        g.fill(x1 - 5, y1 - 5, x1 - 3, y1 - 3, color);
     }
 
     static void sectionHeader(GuiGraphics g, Font font, Component label, int x, int y, int right) {

@@ -29,6 +29,9 @@ public final class Config {
     public static boolean discordEnabled = true;
     public static String discordAppId = "1516914761626030170";
     public static String theme = "amethyst";
+    public static int customAccent = 0x7B3FC4;
+    public static int customBackground = 0x1E1926;
+    public static int customText = 0xECEEF2;
     public static boolean voiceEnabled = true;
     public static String voiceHost = "";
 
@@ -52,6 +55,9 @@ public final class Config {
                 discordEnabled = getBool(json, "discordEnabled", discordEnabled);
                 discordAppId = getString(json, "discordAppId", discordAppId);
                 theme = getString(json, "theme", theme);
+                customAccent = getInt(json, "customAccent", customAccent);
+                customBackground = getInt(json, "customBackground", customBackground);
+                customText = getInt(json, "customText", customText);
                 voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
                 voiceHost = getString(json, "voiceHost", voiceHost);
             } catch (Exception e) {
@@ -60,7 +66,7 @@ public final class Config {
         save();
     }
 
-    public static void save() {
+    public static boolean save() {
         Path file = PlatformHolder.get().getConfigDir().resolve(FILE_NAME);
         JsonObject json = new JsonObject();
         json.addProperty("enabled", enabled);
@@ -75,6 +81,9 @@ public final class Config {
         json.addProperty("discordEnabled", discordEnabled);
         json.addProperty("discordAppId", discordAppId);
         json.addProperty("theme", theme);
+        json.addProperty("customAccent", customAccent);
+        json.addProperty("customBackground", customBackground);
+        json.addProperty("customText", customText);
         json.addProperty("voiceEnabled", voiceEnabled);
         json.addProperty("voiceHost", voiceHost);
 
@@ -83,7 +92,9 @@ public final class Config {
             try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
                 GSON.toJson(json, writer);
             }
+            return true;
         } catch (IOException e) {
+            return false;
         }
     }
 
@@ -102,6 +113,14 @@ public final class Config {
     public static void setTheme(String id) {
         theme = id;
         save();
+    }
+
+    public static boolean setCustomTheme(int accent, int background, int text) {
+        customAccent = accent & 0xFFFFFF;
+        customBackground = background & 0xFFFFFF;
+        customText = text & 0xFFFFFF;
+        theme = "custom";
+        return save();
     }
 
     private static boolean getBool(JsonObject json, String key, boolean fallback) {

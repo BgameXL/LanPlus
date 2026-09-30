@@ -25,20 +25,16 @@ public final class LanplusButton extends Button {
         int y = getY();
         int w = getWidth();
         int h = getHeight();
-        int bg;
         int color;
-        if (!isActive()) {
-            bg = LanPlusUI.SURFACE_DISABLED;
-            color = LanPlusUI.FAINT;
-        } else if (primary) {
-            bg = isHovered() ? LanPlusUI.ACCENT_HOVER : LanPlusUI.ACCENT_STRONG;
-            color = LanPlusUI.TEXT;
+        if (primary) {
+            LanPlusUI.primaryButton(g, x, y, x + w, y + h, isHovered(), isActive());
+            color = isActive() ? LanPlusUI.TEXT : LanPlusUI.FAINT;
         } else {
-            bg = isHovered() ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
-            color = isHovered() ? LanPlusUI.TEXT : LanPlusUI.MUTED;
+            int bg = !isActive() ? LanPlusUI.SURFACE_DISABLED
+                    : isHovered() ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
+            LanPlusUI.button3d(g, x, y, x + w, y + h, bg);
+            color = !isActive() ? LanPlusUI.FAINT : isHovered() ? LanPlusUI.TEXT : LanPlusUI.MUTED;
         }
-        g.fill(x, y, x + w, y + h, bg);
-        LanPlusUI.bevelR(g, x, y, x + w, y + h);
         int tx = x + (w - Minecraft.getInstance().font.width(getMessage())) / 2;
         g.drawString(Minecraft.getInstance().font, getMessage(), tx, y + (h - 8) / 2, color, false);
     }
