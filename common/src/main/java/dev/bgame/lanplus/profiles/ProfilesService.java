@@ -15,7 +15,7 @@ public interface ProfilesService {
     CompletableFuture<String> save(String bio, String pronouns, Map<String, String> links,
                                    Map<String, String> prompts, boolean invisible,
                                    boolean favoriteVisible, boolean currentlyPlayingVisible,
-                                   boolean recentlyPlayedVisible, boolean discoverable);
+                                   boolean recentlyPlayedVisible, boolean discoverable, boolean profilePublic);
 
     CompletableFuture<String> setFavoriteModpack(String modpackId);
 

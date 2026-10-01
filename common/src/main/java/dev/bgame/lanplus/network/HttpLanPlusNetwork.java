@@ -468,11 +468,11 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
-    public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links, Map<String, String> prompts, Boolean invisible, Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable) {
+    public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links, Map<String, String> prompts, Boolean invisible, Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable, Boolean profilePublic) {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture("offline");
         }
-        Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links, prompts, invisible, favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible, discoverable);
+        Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links, prompts, invisible, favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible, discoverable, profilePublic);
         return postNulls("/profile/update", body).thenApply(this::parseUpdateResult).exceptionally(err -> {
             onError(err);
             return "offline";

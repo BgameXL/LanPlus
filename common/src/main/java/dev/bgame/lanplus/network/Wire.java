@@ -122,13 +122,13 @@ final class Wire {
 
     record ProfileDto(String uuid, String username, String friendCode, Skin skin, String pronouns, String bio,
                       Map<String, String> links, Map<String, String> prompts, boolean online, Long lastSeen,
-                      Boolean invisible, Boolean discoverable, ModpackDto currentlyPlaying, ModpackDto lastPlayed,
+                      Boolean invisible, Boolean discoverable, Boolean profilePublic, ModpackDto currentlyPlaying, ModpackDto lastPlayed,
                       ModpackDto favorite, ModpackDto recentlyPlayed, BackgroundDto background, CatalogImageDto banner,
                       SettingsDto settings, ProgressionDto progression, PlayedTogetherDto playedTogether) {
         Profile toApi(String base) {
             SettingsDto s = settings == null ? new SettingsDto(true, true, true) : settings;
             ProgressionDto p = progression == null ? new ProgressionDto(0, 0, null, null) : progression;
-            return new Profile(UUID.fromString(uuid), username, friendCode, skin == null ? null : skin.toApi(), pronouns, bio, links == null ? Map.of() : links, prompts == null ? Map.of() : prompts, online, lastSeen == null ? 0L : lastSeen, Boolean.TRUE.equals(invisible), currentlyPlaying == null ? null : currentlyPlaying.toApi(), lastPlayed == null ? null : lastPlayed.toApi(), favorite == null ? null : favorite.toApi(), recentlyPlayed == null ? null : recentlyPlayed.toApi(), !Boolean.FALSE.equals(s.favoriteVisible()), !Boolean.FALSE.equals(s.currentlyPlayingVisible()), !Boolean.FALSE.equals(s.recentlyPlayedVisible()), !Boolean.FALSE.equals(discoverable), p.tier() == null ? 0 : p.tier(), p.advancements() == null ? 0 : p.advancements(), p.xp() == null ? -1 : p.xp(), p.sources() == null ? Map.of() : p.sources(), background == null ? ProfileBackground.DEFAULT : background.toApi(base), banner == null ? null : banner.toApi(base), playedTogether == null ? null : playedTogether.toApi(), false);
+            return new Profile(UUID.fromString(uuid), username, friendCode, skin == null ? null : skin.toApi(), pronouns, bio, links == null ? Map.of() : links, prompts == null ? Map.of() : prompts, online, lastSeen == null ? 0L : lastSeen, Boolean.TRUE.equals(invisible), currentlyPlaying == null ? null : currentlyPlaying.toApi(), lastPlayed == null ? null : lastPlayed.toApi(), favorite == null ? null : favorite.toApi(), recentlyPlayed == null ? null : recentlyPlayed.toApi(), !Boolean.FALSE.equals(s.favoriteVisible()), !Boolean.FALSE.equals(s.currentlyPlayingVisible()), !Boolean.FALSE.equals(s.recentlyPlayedVisible()), !Boolean.FALSE.equals(discoverable), Boolean.TRUE.equals(profilePublic), p.tier() == null ? 0 : p.tier(), p.advancements() == null ? 0 : p.advancements(), p.xp() == null ? -1 : p.xp(), p.sources() == null ? Map.of() : p.sources(), background == null ? ProfileBackground.DEFAULT : background.toApi(base), banner == null ? null : banner.toApi(base), playedTogether == null ? null : playedTogether.toApi(), false);
         }
 
         public static ProfileDto fromJson(String body) {
@@ -236,7 +236,8 @@ final class Wire {
 
     record ProfileUpdate(String uuid, String bio, String pronouns, Map<String, String> links,
                          Map<String, String> prompts, Boolean invisible, Boolean favoriteVisible,
-                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable) {
+                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable,
+                         Boolean profilePublic) {
     }
 
     record FavoriteUpdate(String uuid, String favoriteModpackId) {

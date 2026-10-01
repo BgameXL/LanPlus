@@ -83,13 +83,13 @@ public final class DefaultProfilesService implements ProfilesService {
     public CompletableFuture<String> save(String bio, String pronouns, Map<String, String> links,
                                           Map<String, String> prompts, boolean invisible,
                                           boolean favoriteVisible, boolean currentlyPlayingVisible,
-                                          boolean recentlyPlayedVisible, boolean discoverable) {
+                                          boolean recentlyPlayedVisible, boolean discoverable, boolean profilePublic) {
         PlayerIdentity id = identity.get();
         if (id == null) {
             return CompletableFuture.completedFuture("offline");
         }
         return network.updateProfile(id.uuid(), bio, pronouns, links, prompts, invisible,
-                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible, discoverable);
+                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible, discoverable, profilePublic);
     }
 
     @Override

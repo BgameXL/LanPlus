@@ -194,6 +194,8 @@
   "gui.lanplus.profile.id.invisible.desc": "Appear offline and hide activity.",
   "gui.lanplus.profile.id.discoverable": "Friend suggestions",
   "gui.lanplus.profile.id.discoverable.desc": "Let friends of your friends discover and add you.",
+  "gui.lanplus.profile.id.public": "Public web profile",
+  "gui.lanplus.profile.id.public.desc": "Let anyone view your profile on the LAN+ website.",
   "gui.lanplus.profile.id.current": "Current activity",
   "gui.lanplus.profile.id.current.desc": "Show the modpack you're currently playing on your profile.",
   "gui.lanplus.profile.id.recent": "Recent modpacks",

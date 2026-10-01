@@ -80,7 +80,7 @@ public interface LanPlusNetwork {
     CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
                                             Map<String, String> prompts, Boolean invisible,
                                             Boolean favoriteVisible, Boolean currentlyPlayingVisible,
-                                            Boolean recentlyPlayedVisible, Boolean discoverable);
+                                            Boolean recentlyPlayedVisible, Boolean discoverable, Boolean profilePublic);
 
     CompletableFuture<String> setFavoriteModpack(UUID uuid, String modpackId);
 
