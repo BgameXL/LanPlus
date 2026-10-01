@@ -33,16 +33,14 @@ public final class CosmeticScreen extends LanPlusScreen {
     private static final int CARD_MIN_W = 148;
     private static final int CARD_H = 152;
     private static final int CARD_GAP = 12;
-    private static final int CTRL_W = 52;
-    private static final int CTRL_H = 18;
-    private static final int CTRL_GAP = 6;
+    private static final int PREVIEW_LIFT = 4;
     private static final CosmeticSlot[] SLOTS = CosmeticSlot.values();
 
     private final Screen parent;
     private final UUID uuid;
     private CosmeticSlot filter;
     private String selectedId;
-    private final ModelView view = new ModelView(40f, 0.5f, 3f);
+    private final ModelView view = new ModelView(40f, 0.5f, 3f, 330f);
     private int gridScroll;
     private final List<Row> rows = new ArrayList<>();
 
@@ -111,7 +109,7 @@ public final class CosmeticScreen extends LanPlusScreen {
         renderWallet(g);
         renderTabs(g, mouseX, mouseY);
         renderGrid(g, mouseX, mouseY);
-        renderPreview(g, mouseX, mouseY);
+        renderPreview(g);
         renderDetail(g, mouseX, mouseY);
 
         super.render(g, mouseX, mouseY, partialTick);
@@ -246,16 +244,17 @@ public final class CosmeticScreen extends LanPlusScreen {
         g.drawString(this.font, label, tx, y + 3, color, false);
     }
 
-    private void renderPreview(GuiGraphics g, int mouseX, int mouseY) {
+    private void renderPreview(GuiGraphics g) {
         int clipL = rightX + 4;
         int clipR = rightX + RIGHT_W - 4;
         int clipTop = rightTop + 4;
-        int controlsY = previewBottom - CTRL_H - 4;
-        int clipBottom = controlsY - 2;
+        int clipBottom = previewBottom - 6;
         int cx = (rightX + rightX + RIGHT_W) / 2;
 
         g.fill(rightX, rightTop, rightX + RIGHT_W, previewBottom, 0x33101018);
         LanPlusUI.outline1(g, rightX, rightTop, rightX + RIGHT_W, previewBottom, LanPlusUI.EDGE_DARK);
+
+        view.advance();
 
         SkinTextures st = LanPlusClient.skinTextures();
         SkinTextures.Resolved res = st == null || uuid == null ? null : st.get(uuid);
@@ -263,28 +262,13 @@ public final class CosmeticScreen extends LanPlusScreen {
                 : DefaultPlayerSkin.get(uuid == null ? UUID.randomUUID() : uuid).texture();
         boolean slim = res != null && res.slim();
 
-        float base = Math.min(80f, (clipBottom - clipTop) * 0.32f);
+        float base = Math.min(84f, (clipBottom - clipTop) * 0.34f);
         float scale = base * view.zoom();
-        int bodyCenterY = (clipBottom - 10) - Math.round(base * 0.92f);
-        int feetY = bodyCenterY + Math.round(scale * 0.92f);
+        int feetY = (clipTop + clipBottom) / 2 + Math.round(scale * 0.92f) - PREVIEW_LIFT;
         g.enableScissor(clipL, clipTop, clipR, clipBottom);
         g.fill(cx - 28, feetY - 1, cx + 28, feetY, 0x44000000);
         PlayerPreview.render(g, cx, feetY, scale, view.yaw(), view.pitch(), skin, slim, uuid, previewOverride());
         g.disableScissor();
-
-        int total = CTRL_W * 2 + CTRL_GAP;
-        int bx = cx - total / 2;
-        drawControl(g, mouseX, mouseY, bx, controlsY, Component.translatable("gui.lanplus.cosmetics.rotate"), this::rotate);
-        drawControl(g, mouseX, mouseY, bx + CTRL_W + CTRL_GAP, controlsY,
-                Component.translatable("gui.lanplus.cosmetics.reset"), this::resetView);
-    }
-
-    private void drawControl(GuiGraphics g, int mouseX, int mouseY, int x, int y, Component label, Runnable action) {
-        boolean hover = inside(mouseX, mouseY, x, y, CTRL_W, CTRL_H);
-        LanPlusUI.button3d(g, x, y, x + CTRL_W, y + CTRL_H, hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
-        int tx = x + (CTRL_W - this.font.width(label)) / 2;
-        g.drawString(this.font, label, tx, y + (CTRL_H - 8) / 2, hover ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
-        rows.add(new Row(x, y, CTRL_W, CTRL_H, action));
     }
 
     private void renderDetail(GuiGraphics g, int mouseX, int mouseY) {
@@ -498,14 +482,6 @@ public final class CosmeticScreen extends LanPlusScreen {
 
     private static String capitalize(String s) {
         return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
-    }
-
-    private void rotate() {
-        view.rotateBy(90f);
-    }
-
-    private void resetView() {
-        view.reset();
     }
 
     private static boolean inside(int mx, int my, int x, int y, int w, int h) {
