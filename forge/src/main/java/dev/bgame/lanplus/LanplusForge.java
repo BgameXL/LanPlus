@@ -7,7 +7,7 @@ import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.LanPlusKeybinds;
 import dev.bgame.lanplus.client.PauseMenuButtons;
-import dev.bgame.lanplus.client.TitleScreenButtons;
+import dev.bgame.lanplus.client.gui.TitleScreenPanel;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.platform.LanplusPlatform;
 import dev.bgame.lanplus.platform.PlatformHolder;
@@ -69,19 +69,20 @@ public class LanplusForge {
 
         @SubscribeEvent
         public static void onScreenRender(ScreenEvent.Render.Post event) {
+            TitleScreenPanel.onScreenRender(event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
             LanPlusNotifications.onScreenRender(event.getGuiGraphics(), event.getMouseX(), event.getMouseY());
         }
 
         @SubscribeEvent
         public static void onScreenClick(ScreenEvent.MouseButtonPressed.Pre event) {
-            if (LanPlusNotifications.onMouseClick(event.getMouseX(), event.getMouseY(), event.getButton())) {
+            if (TitleScreenPanel.onMouseClick(event.getMouseX(), event.getMouseY(), event.getButton())
+                    || LanPlusNotifications.onMouseClick(event.getMouseX(), event.getMouseY(), event.getButton())) {
                 event.setCanceled(true);
             }
         }
 
         @SubscribeEvent
         public static void onScreenInit(ScreenEvent.Init.Post event) {
-            TitleScreenButtons.tryAddButtons(event.getScreen());
             PauseMenuButtons.tryAddHostButton(event.getScreen());
         }
 

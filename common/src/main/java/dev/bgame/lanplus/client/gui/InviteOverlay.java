@@ -1,11 +1,11 @@
 package dev.bgame.lanplus.client.gui;
 
 import dev.bgame.lanplus.api.Friend;
-import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.PauseMenuButtons;
 import dev.bgame.lanplus.friends.FriendsService;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-public final class InviteOverlay extends Screen {
+public final class InviteOverlay extends LanPlusScreen {
 
     private static final int PANEL_W = 240;
     private static final int PANEL_H = 200;
@@ -24,37 +24,28 @@ public final class InviteOverlay extends Screen {
 
     private final Screen parent;
     private final LevelSummary world;
-    private final HostAccessMode mode;
-    private final boolean allowNonPremium;
-    private final HostController.HostSettings inWorldBase;
+    private final HostController.HostSettings base;
     private final Set<UUID> picked = new HashSet<>();
     private boolean launched;
 
     private int panelX;
     private int panelY;
 
-    public InviteOverlay(Screen parent, LevelSummary world, HostAccessMode mode, boolean allowNonPremium) {
-        this(parent, world, mode, allowNonPremium, null);
-    }
-
-    public InviteOverlay(Screen parent, HostController.HostSettings inWorldBase) {
-        this(parent, null, inWorldBase.mode(), inWorldBase.allowNonPremium(), inWorldBase);
-    }
-
-    private InviteOverlay(Screen parent, LevelSummary world, HostAccessMode mode,
-                          boolean allowNonPremium, HostController.HostSettings inWorldBase) {
+    public InviteOverlay(Screen parent, LevelSummary world, HostController.HostSettings base) {
         super(Component.translatable("gui.lanplus.invite.title"));
         this.parent = parent;
         this.world = world;
-        this.mode = mode;
-        this.allowNonPremium = allowNonPremium;
-        this.inWorldBase = inWorldBase;
+        this.base = base;
+    }
+
+    public InviteOverlay(Screen parent, HostController.HostSettings base) {
+        this(parent, null, base);
     }
 
     @Override
     protected void init() {
-        panelX = (this.width - PANEL_W) / 2;
-        panelY = (this.height - PANEL_H) / 2;
+        panelX = centerX(PANEL_W);
+        panelY = centerY(PANEL_H);
         addRenderableWidget(LanplusButton.create(Component.literal("X"), b -> hostNow())
                 .bounds(panelX + PANEL_W - 18, panelY + 4, 14, 14).build());
         addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.invite.hostnow"), b -> hostNow())
@@ -63,10 +54,9 @@ public final class InviteOverlay extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        drawBackdrop(g);
         LanPlusUI.panel(g, panelX, panelY, panelX + PANEL_W, panelY + PANEL_H);
-        LanPlusUI.header(g, this.font, this.title, panelX + 8, panelY + 8, PANEL_W - 32);
+        LanPlusUI.sectionHeader(g, this.font, this.title, panelX + 8, panelY + 8, panelX + PANEL_W - 24);
 
         List<Friend> friends = friends();
         int listTop = panelY + 28;
@@ -88,7 +78,7 @@ public final class InviteOverlay extends Screen {
                 int bx = panelX + 10;
                 int by = y + 5;
                 g.fill(bx, by, bx + 9, by + 9, on ? LanPlusUI.ACCENT : LanPlusUI.SURFACE_RAISED);
-                LanPlusUI.border(g, bx, by, bx + 9, by + 9);
+                LanPlusUI.outline1(g, bx, by, bx + 9, by + 9, LanPlusUI.EDGE_DARK);
                 g.drawString(this.font, f.username(), panelX + 26, y + 5,
                         on ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
                 y += ROW_H;
@@ -128,18 +118,20 @@ public final class InviteOverlay extends Screen {
             return;
         }
         launched = true;
-        if (inWorldBase != null) {
+        Minecraft mc = Minecraft.getInstance();
+        HostController.HostSettings settings = new HostController.HostSettings(
+                base.mode(), picked, base.allowNonPremium(), base.gameType(), base.difficulty(),
+                base.allowCommands(), base.maxPlayers(), base.allowVanillaJoin());
+        if (world == null) {
             PauseMenuButtons.markHostedInWorld();
-            HostController.requestHost(new HostController.HostSettings(
-                    mode, picked, inWorldBase.allowNonPremium(), inWorldBase.gameType(),
-                    inWorldBase.difficulty(), inWorldBase.allowCommands()));
+            HostController.requestHost(settings);
             notifyInvited();
-            this.minecraft.setScreen(null);
+            mc.setScreen(null);
             return;
         }
-        HostController.requestHost(mode, picked, allowNonPremium);
+        HostController.requestHost(settings);
         notifyInvited();
-        this.minecraft.createWorldOpenFlows().loadLevel(parent, world.getLevelId());
+        mc.createWorldOpenFlows().loadLevel(parent, world.getLevelId());
     }
 
     private void notifyInvited() {

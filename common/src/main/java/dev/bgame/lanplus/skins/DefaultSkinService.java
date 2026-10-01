@@ -45,19 +45,6 @@ public final class DefaultSkinService implements SkinService {
     }
 
     @Override
-    public CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, boolean slim) {
-        if (network == null) {
-            return CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"));
-        }
-        return network.uploadSkin(png, slim ? "slim" : null);
-    }
-
-    @Override
-    public CompletableFuture<Boolean> deleteSkin() {
-        return network == null ? CompletableFuture.completedFuture(false) : network.deleteSkin();
-    }
-
-    @Override
     public CompletableFuture<Void> resolve(UUID player, SkinRef ref) {
         if (player == null || ref == null) {
             return CompletableFuture.completedFuture(null);

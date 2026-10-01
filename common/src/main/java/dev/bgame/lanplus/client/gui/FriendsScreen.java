@@ -7,6 +7,9 @@ import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.ResolvedUser;
+import dev.bgame.lanplus.api.SkinRef;
+import dev.bgame.lanplus.api.SkinType;
+import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.UserProfile;
 import dev.bgame.lanplus.client.FriendNotifications;
 import dev.bgame.lanplus.client.HostController;
@@ -17,6 +20,7 @@ import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.invites.HostAccessControl;
 import dev.bgame.lanplus.invites.InviteService;
 import dev.bgame.lanplus.presence.PresenceManager;
+import net.minecraft.util.Mth;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -30,26 +34,32 @@ import net.minecraft.network.chat.MutableComponent;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
-public final class FriendsScreen extends Screen {
+public final class FriendsScreen extends LanPlusScreen {
 
     private enum Tab {FRIENDS, JOIN, ADD, DETAILS}
 
     private static final Tab[] TABS = Tab.values();
-    private static final int MARGIN = 20;
     private static final int MAX_W = 540;
     private static final int LEFT_W = 160;
     private static final int GAP = 1;
     private static final int PANE_H = 320;
-    private static final int HEADER_H = 34;
+    private static final int HEADER_H = 42;
     private static final int FOOTER_H = 28;
     private static final int ROW_H = 24;
     private static final int MENU_ROW_H = 14;
     private static final int OFFLINE_HDR_H = 16;
     private static final int TAB_GAP = 26;
+    private static final int SUGGEST_ROW_H = 26;
+    private static final int SEARCH_ROW_H = 18;
+    private static final int SEARCH_MAX_ROWS = 6;
+    private static final int SEARCH_MIN_CHARS = 2;
+    private static final long SEARCH_DEBOUNCE_MS = 250;
 
     private int leftX;
     private int rightX;
@@ -72,6 +82,12 @@ public final class FriendsScreen extends Screen {
     private boolean showAddress;
     private boolean showCode;
     private boolean offlineCollapsed = true;
+    private List<Suggestion> suggestions = List.of();
+    private List<ResolvedUser> searchMatches = List.of();
+    private String searchQuery = "";
+    private long searchAt;
+    private boolean searchDirty;
+    private final Set<UUID> requestedAvatars = new HashSet<>();
 
     private final FriendsService.FriendsListener changeListener = new FriendsService.FriendsListener() {
         @Override
@@ -133,15 +149,15 @@ public final class FriendsScreen extends Screen {
     }
 
     private void layout() {
-        int contentW = Math.min(this.width - 2 * MARGIN, MAX_W);
-        leftX = (this.width - contentW) / 2;
+        int contentW = fitWidth(MAX_W);
+        leftX = centerX(contentW);
         contentRight = leftX + contentW;
         rightX = leftX + LEFT_W + GAP;
         rightW = contentRight - rightX;
-        int paneH = Math.min(PANE_H, Math.max(120, this.height - 2 * MARGIN - HEADER_H - FOOTER_H));
+        int paneH = Mth.clamp(this.height - 2 * EDGE - HEADER_H - FOOTER_H, 120, PANE_H);
         int blockH = HEADER_H + paneH + FOOTER_H;
-        headerTop = Math.max(MARGIN, (this.height - blockH) / 2);
-        tabsTop = headerTop + 14;
+        headerTop = centerY(blockH);
+        tabsTop = headerTop + 28;
         paneTop = headerTop + HEADER_H;
         paneBottom = paneTop + paneH;
     }
@@ -157,9 +173,11 @@ public final class FriendsScreen extends Screen {
             addBox = new EditBox(this.font, rightX + 6, paneTop + 22, rightW - 84, 20,
                     Component.translatable("gui.lanplus.add.hint"));
             addBox.setHint(Component.translatable("gui.lanplus.add.hint"));
+            addBox.setResponder(this::onAddTextChanged);
             addRenderableWidget(addBox);
             addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.add.button"), b -> doAdd())
                     .bounds(rightX + rightW - 72, paneTop + 22, 66, 20).primary().build());
+            loadSuggestions();
         } else if (tab == Tab.JOIN) {
             int joinRowY = paneBottom - 40;
             joinBox = new EditBox(this.font, rightX + 6, joinRowY, rightW - 84, 20,
@@ -173,7 +191,7 @@ public final class FriendsScreen extends Screen {
                 int jw = Math.min(rightW - 16, 140);
                 int jx = rightX + (rightW - jw) / 2;
                 addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.action.join"), b -> joinFriend(sel))
-                        .bounds(jx, paneTop + 44, jw, 20).primary().build());
+                        .bounds(jx, paneTop + 58, jw, 20).primary().build());
             }
         } else if (tab == Tab.DETAILS) {
             HostInfo info = hostInfo();
@@ -225,24 +243,26 @@ public final class FriendsScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        drawBackdrop(g);
         layout();
 
-        int wx = LanPlusUI.wordmark(g, this.font, leftX, headerTop);
-        g.drawString(this.font, Component.translatable("gui.lanplus.friends.word"), wx + 6, headerTop, LanPlusUI.MUTED, false);
+        int footerBottom = paneBottom + FOOTER_H;
+        int dividerX = leftX + LEFT_W;
+        LanPlusUI.panel(g, leftX, headerTop, contentRight, footerBottom);
+        g.fill(leftX + 1, paneTop, contentRight - 1, paneTop + 1, LanPlusUI.DIVIDER);
+        g.fill(dividerX, paneTop + 1, dividerX + 1, paneBottom, LanPlusUI.DIVIDER);
+        g.fill(leftX + 1, paneBottom, contentRight - 1, paneBottom + 1, LanPlusUI.DIVIDER);
+
+        int wx = LanPlusUI.wordmark(g, this.font, leftX + 8, headerTop + 10);
+        g.drawString(this.font, Component.translatable("gui.lanplus.friends.word"), wx + 6, headerTop + 10, LanPlusUI.MUTED, false);
         boolean online = isOnline();
         Component conn = online ? Component.translatable("gui.lanplus.status.connected")
                 : Component.translatable("gui.lanplus.status.local");
-        g.drawString(this.font, conn, contentRight - 2 - this.font.width(conn), paneTop - 10,
+        g.drawString(this.font, conn, contentRight - 12 - this.font.width(conn),
+                headerTop + (HEADER_H - this.font.lineHeight) - 4,
                 online ? LanPlusUI.LIME : LanPlusUI.FAINT);
 
         renderTabs(g, mouseX, mouseY);
-        int footerBottom = paneBottom + FOOTER_H;
-        int dividerX = leftX + LEFT_W;
-        LanPlusUI.panel(g, leftX, paneTop, contentRight, footerBottom);
-        g.fill(dividerX, paneTop + 1, dividerX + 1, paneBottom, LanPlusUI.DIVIDER);
-        g.fill(leftX + 1, paneBottom, contentRight - 1, paneBottom + 1, LanPlusUI.DIVIDER);
         int listmouseX = contextUuid != null ? -1 : mouseX;
         int listmouseY = contextUuid != null ? -1 : mouseY;
 
@@ -264,6 +284,8 @@ public final class FriendsScreen extends Screen {
         }
         super.render(g, mouseX, mouseY, partialTick);
         renderContextMenu(g, mouseX, mouseY);
+        pumpSearch();
+        renderSearchDropdown(g, mouseX, mouseY);
     }
 
     private Component tabLabel(Tab t) {
@@ -271,7 +293,7 @@ public final class FriendsScreen extends Screen {
     }
 
     private int tabX(int index) {
-        int x = leftX;
+        int x = leftX + 8;
         for (int i = 0; i < index; i++) {
             x += this.font.width(tabLabel(TABS[i])) + TAB_GAP;
         }
@@ -369,7 +391,7 @@ public final class FriendsScreen extends Screen {
     }
 
     private void renderFriend(GuiGraphics g, Friend f, int y, int mouseX, int mouseY) {
-        boolean selected = f.uuid().equals(selectedUuid);
+        boolean selected = f.uuid().equals(selectedUuid) || f.uuid().equals(contextUuid);
         boolean hover = mouseX >= leftX && mouseX <= leftX + LEFT_W && mouseY >= y && mouseY < y + ROW_H;
         boolean unread = isInviteUnread(f);
         if (selected || hover) {
@@ -407,6 +429,16 @@ public final class FriendsScreen extends Screen {
         PlayerFaceRenderer.draw(g, tex, x, y, size);
     }
 
+    private void ensureAvatar(UUID uuid) {
+        SkinTextures textures = LanPlusClient.skinTextures();
+        if (textures == null || textures.get(uuid) != null || !requestedAvatars.add(uuid)) {
+            return;
+        }
+        if (LanPlusClient.skins() != null) {
+            LanPlusClient.skins().resolve(uuid, new SkinRef(SkinType.MOJANG, uuid.toString(), null, null));
+        }
+    }
+
     private void renderRequests(GuiGraphics g, int paneBottom) {
         g.drawString(this.font, Component.translatable("gui.lanplus.requests.title"),
                 leftX + 6, paneTop + 4, LanPlusUI.TEXT, false);
@@ -430,6 +462,48 @@ public final class FriendsScreen extends Screen {
             g.drawString(this.font, "x", dx + 6, y + 5, LanPlusUI.TEXT, false);
             y += 20;
         }
+    }
+
+    private int suggestRowsTop() {
+        return paneTop + 98;
+    }
+
+    private void renderSuggestions(GuiGraphics g, int x, int w) {
+        int headerY = paneTop + 82;
+        g.fill(x + 6, headerY - 6, x + w - 6, headerY - 5, LanPlusUI.DIVIDER);
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.suggest.title"), x + 6, headerY, x + w - 6);
+        if (suggestions.isEmpty()) {
+            g.drawString(this.font, Component.translatable("gui.lanplus.suggest.empty"),
+                    x + 6, suggestRowsTop(), LanPlusUI.FAINT, false);
+            return;
+        }
+        int y = suggestRowsTop();
+        for (Suggestion s : suggestions) {
+            if (y + SUGGEST_ROW_H > paneBottom) {
+                break;
+            }
+            int bx = x + w - 22;
+            ensureAvatar(s.uuid());
+            drawAvatar(g, s.uuid(), x + 6, y + 4, 18);
+            g.drawString(this.font, s.username(), x + 30, y + 3, LanPlusUI.TEXT, false);
+            if (s.friendCode() != null) {
+                g.drawString(this.font, s.friendCode(), bx - 14 - this.font.width(s.friendCode()),
+                        y + 8, LanPlusUI.FAINT, false);
+            }
+            g.drawString(this.font, mutualLine(s), x + 30, y + 14, LanPlusUI.MUTED, false);
+            g.fill(bx, y + 4, bx + 15, y + 18, LanPlusUI.ONLINE);
+            g.drawString(this.font, "+", bx + 5, y + 7, LanPlusUI.TEXT, false);
+            y += SUGGEST_ROW_H;
+        }
+    }
+
+    private Component mutualLine(Suggestion s) {
+        String names = String.join(", ", s.mutualNames());
+        int extra = s.mutualCount() - s.mutualNames().size();
+        if (extra > 0) {
+            names = names.isEmpty() ? "+" + extra : names + " +" + extra;
+        }
+        return Component.translatable("gui.lanplus.suggest.mutual", s.mutualCount(), names);
     }
 
     private void renderJoinList(GuiGraphics g, int mouseX, int mouseY, int paneBottom) {
@@ -470,13 +544,14 @@ public final class FriendsScreen extends Screen {
 
     private void renderDetail(GuiGraphics g, int x, int w) {
         if (tab == Tab.ADD) {
-            LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.add.title"), x + 6, paneTop + 6, w - 12);
+            LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.add.title"), x + 6, paneTop + 6, x + w - 6);
             g.drawString(this.font, Component.translatable("gui.lanplus.add.note"), x + 6, paneTop + 48, LanPlusUI.FAINT, false);
             UserProfile self = localProfile();
             Component code = self != null && self.friendCode() != null
                     ? Component.translatable("gui.lanplus.add.yourcode", self.friendCode())
                     : Component.translatable("gui.lanplus.add.yourcode.unknown");
             g.drawString(this.font, code, x + 6, paneTop + 64, LanPlusUI.ONLINE, false);
+            renderSuggestions(g, x, w);
             return;
         }
         if (tab == Tab.JOIN) {
@@ -522,7 +597,7 @@ public final class FriendsScreen extends Screen {
         }
         int headerY = paneBottom - 70;
         g.fill(x + 8, headerY - 8, x + w - 8, headerY - 7, LanPlusUI.DIVIDER);
-        LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.join.title"), x + 6, headerY, w - 12);
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.join.title"), x + 6, headerY, x + w - 6);
         g.drawString(this.font, Component.translatable("gui.lanplus.join.note"), x + 6, headerY + 16, LanPlusUI.FAINT, false);
     }
 
@@ -553,7 +628,7 @@ public final class FriendsScreen extends Screen {
     }
 
     private void renderDetails(GuiGraphics g, int x, int w) {
-        LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.details.title"), x + 6, paneTop + 6, w - 12);
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.details.title"), x + 6, paneTop + 6, x + w - 6);
         HostInfo info = hostInfo();
         if (info == null) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.details.nothosting"),
@@ -574,9 +649,9 @@ public final class FriendsScreen extends Screen {
         HostInfo self = hostInfo();
         Friend hosting = hubFriendHosting();
         if (self != null) {
-            LanPlusUI.header(g, this.font,
+            LanPlusUI.sectionHeader(g, this.font,
                     Component.translatable("gui.lanplus.hub.youhosting", safe(self.world())),
-                    x + 8, paneTop + 8, w - 16);
+                    x + 8, paneTop + 8, x + w - 8);
             g.drawString(this.font, Component.translatable("gui.lanplus.hub.youhosting.hint"),
                     x + 8, paneTop + 26, LanPlusUI.FAINT, false);
             g.drawString(this.font, Component.translatable("gui.lanplus.details.code"),
@@ -599,7 +674,7 @@ public final class FriendsScreen extends Screen {
     }
 
     private void renderFeed(GuiGraphics g, int x, int w, int y) {
-        LanPlusUI.header(g, this.font, Component.translatable("gui.lanplus.hub.recent"), x + 8, y, w - 16);
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.hub.recent"), x + 8, y, x + w - 8);
         y += 16;
         List<ActivityEntry> feed = activity();
         if (feed.isEmpty()) {
@@ -707,9 +782,25 @@ public final class FriendsScreen extends Screen {
             if (clicked != null) {
                 this.tab = clicked;
                 selectedUuid = null;
+                searchMatches = List.of();
+                searchDirty = false;
                 rebuildWidgets();
                 return true;
             }
+        }
+        if (tab == Tab.ADD && button == 0 && !searchMatches.isEmpty()) {
+            int dx = rightX + 6;
+            int dw = rightW - 84;
+            int dy = searchDropdownTop() + 1;
+            int rows = Math.min(searchMatches.size(), SEARCH_MAX_ROWS);
+            for (int i = 0; i < rows; i++) {
+                if (mouseX >= dx && mouseX < dx + dw && mouseY >= dy && mouseY < dy + SEARCH_ROW_H) {
+                    pickSearchMatch(searchMatches.get(i));
+                    return true;
+                }
+                dy += SEARCH_ROW_H;
+            }
+            searchMatches = List.of();
         }
         if (tab == Tab.JOIN && button == 0) {
             Friend f = joinFriendAt(mouseX, mouseY);
@@ -765,6 +856,18 @@ public final class FriendsScreen extends Screen {
                 }
                 y += 20;
             }
+            int sy = suggestRowsTop();
+            int bx = rightX + rightW - 26;
+            for (Suggestion s : suggestions) {
+                if (sy + SUGGEST_ROW_H > paneBottom) {
+                    break;
+                }
+                if (mouseX >= bx && mouseX <= bx + 18 && mouseY >= sy + 5 && mouseY <= sy + 19) {
+                    doAddSuggestion(s);
+                    return true;
+                }
+                sy += SUGGEST_ROW_H;
+            }
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -784,24 +887,23 @@ public final class FriendsScreen extends Screen {
     }
 
     private void openContextMenu(Friend f, int x, int y) {
-        selectedUuid = f.uuid();
         contextUuid = f.uuid();
         contextX = x;
         contextY = y;
         List<ContextEntry> entries = new ArrayList<>();
-        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.viewprofile"), this::doViewProfile, true));
+        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.viewprofile"), () -> doViewProfile(f), true));
         boolean canJoin = f.state() == GameplayState.HOSTING && f.joinCode() != null;
-        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.join"), this::doJoin, canJoin));
+        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.join"), () -> joinFriend(f), canJoin));
         if (HostAccessControl.isActive() && !f.uuid().equals(LanPlusClient.selfUuid())) {
-            entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.invite"), this::doInvite, true));
+            entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.invite"), () -> doInvite(f), true));
         }
         entries.add(new ContextEntry(
                 Component.translatable(f.muted() ? "gui.lanplus.action.unmute" : "gui.lanplus.action.mute"),
-                this::doToggleMute, true));
+                () -> doToggleMute(f), true));
         entries.add(new ContextEntry(
                 Component.translatable(f.blocked() ? "gui.lanplus.action.unblock" : "gui.lanplus.action.block"),
-                this::doToggleBlock, true));
-        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.remove"), this::doRemove, true));
+                () -> doToggleBlock(f), true));
+        entries.add(new ContextEntry(Component.translatable("gui.lanplus.action.remove"), () -> doRemove(f), true));
         contextEntries = entries;
     }
 
@@ -902,8 +1004,7 @@ public final class FriendsScreen extends Screen {
         int h = menuHeight();
         g.pose().pushPose();
         g.pose().translate(0, 0, 400);
-        g.fill(x, y, x + w, y + h, LanPlusUI.SURFACE_RAISED);
-        LanPlusUI.border(g, x, y, x + w, y + h);
+        LanPlusUI.button3d(g, x, y, x + w, y + h, LanPlusUI.SURFACE_RAISED);
         int ey = y + 2;
         for (ContextEntry e : contextEntries) {
             boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= ey && mouseY < ey + MENU_ROW_H;
@@ -944,8 +1045,136 @@ public final class FriendsScreen extends Screen {
         }));
     }
 
-    private void doInvite() {
-        Friend friend = selectedFriend();
+    private void loadSuggestions() {
+        FriendsService friends = LanPlusClient.friends();
+        if (friends == null) {
+            return;
+        }
+        friends.suggestions().whenComplete((list, err) -> Minecraft.getInstance().execute(() -> {
+            if (Minecraft.getInstance().screen != this) {
+                return;
+            }
+            suggestions = err == null && list != null ? list : List.of();
+        }));
+    }
+
+    private void doAddSuggestion(Suggestion suggestion) {
+        FriendsService friends = LanPlusClient.friends();
+        if (friends == null) {
+            return;
+        }
+        suggestions = suggestions.stream().filter(s -> !s.uuid().equals(suggestion.uuid())).toList();
+        setStatus(Component.translatable("gui.lanplus.add.sent", suggestion.username()));
+        friends.add(suggestion.uuid()).whenComplete((ok, err) -> Minecraft.getInstance().execute(() -> {
+            if (err != null || !Boolean.TRUE.equals(ok)) {
+                setStatus(Component.translatable("gui.lanplus.add.notfound", suggestion.username()));
+            }
+        }));
+    }
+
+    private void onAddTextChanged(String text) {
+        searchQuery = text == null ? "" : text.trim();
+        searchAt = System.currentTimeMillis();
+        if (searchQuery.length() < SEARCH_MIN_CHARS) {
+            searchMatches = List.of();
+            searchDirty = false;
+        } else {
+            searchDirty = true;
+        }
+    }
+
+    private void pumpSearch() {
+        if (!searchDirty || System.currentTimeMillis() - searchAt < SEARCH_DEBOUNCE_MS) {
+            return;
+        }
+        searchDirty = false;
+        fireSearch(searchQuery);
+    }
+
+    private void fireSearch(String query) {
+        var net = LanPlusClient.network();
+        if (net == null || query.length() < SEARCH_MIN_CHARS) {
+            searchMatches = List.of();
+            return;
+        }
+        net.searchUsers(query).whenComplete((list, err) -> Minecraft.getInstance().execute(() -> {
+            if (Minecraft.getInstance().screen != this || addBox == null) {
+                return;
+            }
+            if (!query.equals(addBox.getValue().trim())) {
+                return;
+            }
+            searchMatches = err == null && list != null ? filterSearch(list) : List.of();
+        }));
+    }
+
+    private List<ResolvedUser> filterSearch(List<ResolvedUser> list) {
+        UUID self = LanPlusClient.selfUuid();
+        Set<UUID> known = new HashSet<>();
+        for (Friend f : friends()) {
+            known.add(f.uuid());
+        }
+        List<ResolvedUser> out = new ArrayList<>();
+        for (ResolvedUser u : list) {
+            if (u.uuid().equals(self) || known.contains(u.uuid())) {
+                continue;
+            }
+            out.add(u);
+            if (out.size() >= SEARCH_MAX_ROWS) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    private int searchDropdownTop() {
+        return paneTop + 42;
+    }
+
+    private void renderSearchDropdown(GuiGraphics g, int mouseX, int mouseY) {
+        if (tab != Tab.ADD || searchMatches.isEmpty()) {
+            return;
+        }
+        int x = rightX + 6;
+        int w = rightW - 84;
+        int top = searchDropdownTop();
+        int rows = Math.min(searchMatches.size(), SEARCH_MAX_ROWS);
+        int h = rows * SEARCH_ROW_H + 2;
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 400);
+        LanPlusUI.panel(g, x, top, x + w, top + h);
+        int y = top + 1;
+        for (int i = 0; i < rows; i++) {
+            ResolvedUser u = searchMatches.get(i);
+            boolean hover = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + SEARCH_ROW_H;
+            if (hover) {
+                g.fill(x + 1, y, x + w - 1, y + SEARCH_ROW_H, LanPlusUI.SURFACE_HOVER);
+            }
+            ensureAvatar(u.uuid());
+            drawAvatar(g, u.uuid(), x + 3, y + 2, 14);
+            g.drawString(this.font, u.username(), x + 21, y + 5, LanPlusUI.TEXT, false);
+            int dotX = x + w - 10;
+            if (u.friendCode() != null) {
+                g.drawString(this.font, u.friendCode(), dotX - 6 - this.font.width(u.friendCode()),
+                        y + 5, LanPlusUI.FAINT, false);
+            }
+            g.fill(dotX, y + SEARCH_ROW_H / 2 - 2, dotX + 4, y + SEARCH_ROW_H / 2 + 2,
+                    u.online() ? LanPlusUI.ONLINE : LanPlusUI.MUTED);
+            y += SEARCH_ROW_H;
+        }
+        g.pose().popPose();
+    }
+
+    private void pickSearchMatch(ResolvedUser user) {
+        if (addBox != null) {
+            addBox.setValue(user.username());
+            addBox.setFocused(true);
+        }
+        searchMatches = List.of();
+        searchDirty = false;
+    }
+
+    private void doInvite(Friend friend) {
         InviteService invites = LanPlusClient.invites();
         if (friend == null || invites == null || !HostAccessControl.isActive()) {
             return;
@@ -1000,21 +1229,21 @@ public final class FriendsScreen extends Screen {
         }));
     }
 
-    private void doRemove() {
-        Friend friend = selectedFriend();
+    private void doRemove(Friend friend) {
         FriendsService friends = LanPlusClient.friends();
         if (friend == null || friends == null) {
             return;
         }
         setStatus(Component.translatable("gui.lanplus.removed", friend.username()));
         friends.remove(friend.uuid()).whenComplete((ok, err) -> Minecraft.getInstance().execute(() -> {
-            selectedUuid = null;
+            if (friend.uuid().equals(selectedUuid)) {
+                selectedUuid = null;
+            }
             rebuildWidgets();
         }));
     }
 
-    private void doToggleMute() {
-        Friend friend = selectedFriend();
+    private void doToggleMute(Friend friend) {
         FriendsService friends = LanPlusClient.friends();
         if (friend == null || friends == null) {
             return;
@@ -1028,8 +1257,7 @@ public final class FriendsScreen extends Screen {
                 }));
     }
 
-    private void doToggleBlock() {
-        Friend friend = selectedFriend();
+    private void doToggleBlock(Friend friend) {
         FriendsService friends = LanPlusClient.friends();
         if (friend == null || friends == null) {
             return;
@@ -1043,8 +1271,7 @@ public final class FriendsScreen extends Screen {
                 }));
     }
 
-    private void doViewProfile() {
-        Friend friend = selectedFriend();
+    private void doViewProfile(Friend friend) {
         if (friend != null) {
             Minecraft.getInstance().setScreen(new ProfileScreen(this, friend.uuid()));
         }

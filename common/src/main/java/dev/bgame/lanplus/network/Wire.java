@@ -12,6 +12,7 @@ import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.ProfileBackground;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
+import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinType;
 import dev.bgame.lanplus.api.UserProfile;
@@ -138,9 +139,16 @@ final class Wire {
         }
     }
 
-    record ResolvedUserDto(String uuid, String username, boolean online) {
+    record ResolvedUserDto(String uuid, String username, boolean online, String friendCode) {
         ResolvedUser toApi() {
-            return new ResolvedUser(UUID.fromString(uuid), username, online);
+            return new ResolvedUser(UUID.fromString(uuid), username, online, friendCode);
+        }
+    }
+
+    record SuggestionDto(String uuid, String username, String friendCode, int mutualCount, List<String> mutualNames) {
+        Suggestion toApi() {
+            return new Suggestion(UUID.fromString(uuid), username, friendCode, mutualCount,
+                    mutualNames == null ? List.of() : mutualNames);
         }
     }
 
@@ -158,7 +166,7 @@ final class Wire {
                       SettingsDto settings, ProgressionDto progression,
                       PlayedTogetherDto playedTogether) {
         Profile toApi(String base) {
-            SettingsDto s = settings == null ? new SettingsDto(true, true, true) : settings;
+            SettingsDto s = settings == null ? new SettingsDto(true, true, true, true) : settings;
             ProgressionDto p = progression == null ? new ProgressionDto(0, 0, null, null) : progression;
             return new Profile(UUID.fromString(uuid), username, friendCode,
                     skin == null ? null : skin.toApi(), pronouns, bio,
@@ -174,6 +182,7 @@ final class Wire {
                     !Boolean.FALSE.equals(s.favoriteVisible()),
                     !Boolean.FALSE.equals(s.currentlyPlayingVisible()),
                     !Boolean.FALSE.equals(s.recentlyPlayedVisible()),
+                    !Boolean.FALSE.equals(s.discoverable()),
                     p.tier() == null ? 0 : p.tier(),
                     p.advancements() == null ? 0 : p.advancements(),
                     p.xp() == null ? -1 : p.xp(),
@@ -294,13 +303,13 @@ final class Wire {
     record BannerUpdate(String uuid, String bannerId) {
     }
 
-    record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {
+    record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable) {
     }
 
     record ProfileUpdate(String uuid, String bio, String pronouns, Map<String, String> links,
                          Map<String, String> prompts, Boolean invisible,
                          Boolean favoriteVisible,
-                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible) {
+                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable) {
     }
 
     record FavoriteUpdate(String uuid, String favoriteModpackId) {

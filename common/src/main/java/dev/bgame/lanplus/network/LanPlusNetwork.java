@@ -7,6 +7,7 @@ import dev.bgame.lanplus.api.CosmeticCatalogEntry;
 import dev.bgame.lanplus.api.CosmeticShop;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.LibrarySkin;
+import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.Invite;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.PresenceUpdate;
@@ -44,7 +45,7 @@ public interface LanPlusNetwork {
     CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
                                             Map<String, String> prompts, Boolean invisible,
                                             Boolean favoriteVisible, Boolean currentlyPlayingVisible,
-                                            Boolean recentlyPlayedVisible);
+                                            Boolean recentlyPlayedVisible, Boolean discoverable);
     CompletableFuture<String> setFavoriteModpack(UUID uuid, String modpackId);
     CompletableFuture<String> setBackground(UUID uuid, String style, int color, int opacity, String imageId);
     CompletableFuture<String> setBanner(UUID uuid, String bannerId);
@@ -52,9 +53,6 @@ public interface LanPlusNetwork {
     CompletableFuture<List<CatalogImage>> getBanners();
     CompletableFuture<Void> reportAdvancement(UUID uuid, String advancementId);
     CompletableFuture<Void> reportUser(UUID targetUuid, String reason);
-    CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, String model);
-    CompletableFuture<Boolean> deleteSkin();
-
     CompletableFuture<List<LibrarySkin>> listSkins();
 
     CompletableFuture<SkinUploadResult> addSkin(byte[] png, String model);
@@ -87,6 +85,10 @@ public interface LanPlusNetwork {
     CompletableFuture<CosmeticShop> purchaseCosmetic(String cosmeticId);
 
     CompletableFuture<List<CosmeticCatalogEntry>> getCosmeticCatalog();
+
+    CompletableFuture<List<Suggestion>> getSuggestions(UUID uuid);
+
+    CompletableFuture<List<ResolvedUser>> searchUsers(String query);
 
     interface BackendEventListener {
 

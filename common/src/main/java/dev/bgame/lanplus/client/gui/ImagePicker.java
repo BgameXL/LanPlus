@@ -1,6 +1,7 @@
 package dev.bgame.lanplus.client.gui;
 
 import dev.bgame.lanplus.api.CatalogImage;
+import net.minecraft.util.Mth;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
@@ -10,9 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-public final class ImagePicker extends Screen {
+public final class ImagePicker extends LanPlusScreen {
 
-    private static final int MARGIN = 20;
     private static final int MAX_W = 460;
     private static final int GRID_PAD = 10;
     private static final int CELL_GAP = 8;
@@ -56,8 +56,8 @@ public final class ImagePicker extends Screen {
 
     @Override
     protected void init() {
-        contentW = Math.min(this.width - 2 * MARGIN, MAX_W);
-        boxX = (this.width - contentW) / 2;
+        contentW = fitWidth(MAX_W);
+        boxX = centerX(contentW);
         int panelTop = 36;
         int panelBottom = this.height - 40;
         gridTop = panelTop + 26;
@@ -72,8 +72,7 @@ public final class ImagePicker extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g);
-        LanPlusUI.backdrop(g, this.width, this.height);
+        drawBackdrop(g);
         int panelTop = 36;
         int panelBottom = this.height - 40;
         LanPlusUI.panel(g, boxX, panelTop, boxX + contentW, panelBottom);
@@ -138,7 +137,7 @@ public final class ImagePicker extends Screen {
             g.fill(cx, cy, cx + 2, cy + cellH, a);
             g.fill(cx + cellW - 2, cy, cx + cellW, cy + cellH, a);
         } else if (hover) {
-            LanPlusUI.border(g, cx - 1, cy - 1, cx + cellW + 1, cy + cellH + 1);
+            LanPlusUI.outline1(g, cx - 1, cy - 1, cx + cellW + 1, cy + cellH + 1, LanPlusUI.EDGE_DARK);
             g.fill(cx, cy, cx + cellW, cy + 2, LanPlusUI.ACCENT_TINT);
         }
         String label = none ? "" : img.id();
@@ -177,7 +176,7 @@ public final class ImagePicker extends Screen {
         int total = rows * rowH;
         int viewport = gridBottom - gridTop;
         int maxScroll = Math.max(0, total - viewport);
-        scrollY = Math.max(0, Math.min(maxScroll, scrollY - (int) (delta * 24)));
+        scrollY = Mth.clamp(scrollY - (int) (delta * 24), 0, maxScroll);
         return true;
     }
 

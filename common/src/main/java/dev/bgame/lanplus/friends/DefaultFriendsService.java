@@ -1,6 +1,7 @@
 package dev.bgame.lanplus.friends;
 
 import com.mojang.logging.LogUtils;
+import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.PlayerIdentity;
@@ -50,6 +51,15 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     @Override
     public List<ActivityEntry> activity() {
         return activityCache;
+    }
+
+    @Override
+    public CompletableFuture<List<Suggestion>> suggestions() {
+        UUID uuid = localUuid();
+        if (uuid == null) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return network.getSuggestions(uuid);
     }
 
     @Override

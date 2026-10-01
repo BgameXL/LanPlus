@@ -10,6 +10,8 @@ public interface AnnouncementsService {
 
     int unseenCount();
 
+    java.util.Set<Integer> unseenIds();
+
     void refresh();
 
     void markSeen(List<Integer> ids);

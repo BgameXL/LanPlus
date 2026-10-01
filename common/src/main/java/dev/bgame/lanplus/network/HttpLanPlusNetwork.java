@@ -21,6 +21,7 @@ import dev.bgame.lanplus.api.PresenceUpdate;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
+import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.api.UserProfile;
 import org.slf4j.Logger;
@@ -370,12 +371,12 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     public CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
                                                    Map<String, String> prompts, Boolean invisible,
                                                    Boolean favoriteVisible, Boolean currentlyPlayingVisible,
-                                                   Boolean recentlyPlayedVisible) {
+                                                   Boolean recentlyPlayedVisible, Boolean discoverable) {
         if (!configured() || uuid == null) {
             return CompletableFuture.completedFuture("offline");
         }
         Wire.ProfileUpdate body = new Wire.ProfileUpdate(uuid.toString(), bio, pronouns, links, prompts, invisible,
-                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible);
+                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible, discoverable);
         return postNulls("/profile/update", body)
                 .thenApply(this::parseUpdateResult)
                 .exceptionally(err -> {
@@ -460,46 +461,6 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                 });
     }
 
-    @Override
-    public CompletableFuture<SkinUploadResult> uploadSkin(byte[] png, String model) {
-        if (!configured() || png == null || png.length == 0) {
-            return CompletableFuture.completedFuture(new SkinUploadResult(null, null, "offline"));
-        }
-        String b64 = Base64.getEncoder().encodeToString(png);
-        return post("/skin", new Wire.SkinUpload(b64, model))
-                .thenApply(resp -> {
-                    Wire.SkinUploadResponse r = GSON.fromJson(resp.body(), Wire.SkinUploadResponse.class);
-                    if (r != null && r.url() != null) {
-
-                        String hash = r.hash() == null ? "" : r.hash();
-                        String version = hash.isEmpty() ? ""
-                                : "?v=" + hash.substring(0, Math.min(16, hash.length()));
-                        return new SkinUploadResult(base() + r.url() + version, r.hash(), null);
-                    }
-                    String error = r != null && r.error() != null ? r.error() : "error";
-                    return new SkinUploadResult(null, null, error);
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return new SkinUploadResult(null, null, "offline");
-                });
-    }
-
-    @Override
-    public CompletableFuture<Boolean> deleteSkin() {
-        if (!configured()) {
-            return CompletableFuture.completedFuture(false);
-        }
-        return post("/skin/delete", Map.of())
-                .thenApply(resp -> {
-                    Wire.Success s = GSON.fromJson(resp.body(), Wire.Success.class);
-                    return s != null && s.success();
-                })
-                .exceptionally(err -> {
-                    onError(err);
-                    return false;
-                });
-    }
 
     @Override
     public CompletableFuture<List<LibrarySkin>> listSkins() {
@@ -910,6 +871,53 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
             return out;
         }).exceptionally(err -> {
             LOGGER.debug("LAN+ cosmetic catalog failed: {}", err.toString());
+            return List.of();
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<Suggestion>> getSuggestions(UUID uuid) {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get("/friends/suggestions?uuid=" + uuid).thenApply(resp -> {
+            Wire.SuggestionDto[] arr = GSON.fromJson(resp.body(), Wire.SuggestionDto[].class);
+            if (arr == null) {
+                return List.<Suggestion>of();
+            }
+            List<Suggestion> out = new ArrayList<>(arr.length);
+            for (Wire.SuggestionDto d : arr) {
+                if (d != null && d.uuid() != null) {
+                    out.add(d.toApi());
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ suggestions failed: {}", err.toString());
+            return List.of();
+        });
+    }
+
+    @Override
+    public CompletableFuture<List<ResolvedUser>> searchUsers(String query) {
+        if (!configured() || query == null || query.isBlank()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        String encoded = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8);
+        return get("/users/search?q=" + encoded).thenApply(resp -> {
+            Wire.ResolvedUserDto[] arr = GSON.fromJson(resp.body(), Wire.ResolvedUserDto[].class);
+            if (arr == null) {
+                return List.<ResolvedUser>of();
+            }
+            List<ResolvedUser> out = new ArrayList<>(arr.length);
+            for (Wire.ResolvedUserDto d : arr) {
+                if (d != null && d.uuid() != null) {
+                    out.add(d.toApi());
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ user search failed: {}", err.toString());
             return List.of();
         });
     }
