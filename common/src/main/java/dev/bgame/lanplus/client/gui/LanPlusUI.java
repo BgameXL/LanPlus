@@ -164,7 +164,7 @@ final class LanPlusUI {
                      boolean selected, boolean enabled, boolean hover) {
         int bg = !enabled ? SURFACE_DISABLED : selected ? ACCENT_STRONG : (hover ? SURFACE_HOVER : SURFACE_RAISED);
         button3d(g, x, y, x + w, y + h, bg);
-        int color = !enabled ? FAINT : selected || hover ? TEXT : MUTED;
+        int color = !enabled ? FAINT : selected ? TEXT : hover ? MUTED : TEXT;
         int tx = x + (w - font.width(label)) / 2;
         g.drawString(font, label, tx, y + (h - 8) / 2, color, false);
     }

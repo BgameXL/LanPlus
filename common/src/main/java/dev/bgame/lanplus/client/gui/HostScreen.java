@@ -323,12 +323,11 @@ public final class HostScreen extends LanPlusScreen {
                     mouseX, mouseY);
         }
 
-        boolean vanillaEnabled = allowNonPremium && accessMode == HostAccessMode.EVERYONE;
         Component vanilla = Component.translatable("gui.lanplus.host.vanilla", Component.translatable(
                 allowVanillaJoin ? "gui.lanplus.host.vanilla.on" : "gui.lanplus.host.vanilla.off"));
         boolean vanillaHover = in(mouseX, mouseY, vanillaX, premiumRowY, vanillaW, DROPDOWN_H);
         LanPlusUI.chip(g, this.font, vanilla, vanillaX, premiumRowY, vanillaW, DROPDOWN_H,
-                allowVanillaJoin && vanillaEnabled, vanillaEnabled, vanillaHover);
+                allowVanillaJoin, true, vanillaHover);
         if (vanillaHover) {
             g.renderTooltip(this.font,
                     this.font.split(Component.translatable("gui.lanplus.host.vanilla.tip"), 220),
@@ -499,8 +498,7 @@ public final class HostScreen extends LanPlusScreen {
                 allowNonPremium = !allowNonPremium;
                 return true;
             }
-            if (allowNonPremium && accessMode == HostAccessMode.EVERYONE
-                    && in(mouseX, mouseY, vanillaX, premiumRowY, cardX + cardW - PAD - vanillaX, DROPDOWN_H)) {
+            if (in(mouseX, mouseY, vanillaX, premiumRowY, cardX + cardW - PAD - vanillaX, DROPDOWN_H)) {
                 allowVanillaJoin = !allowVanillaJoin;
                 return true;
             }
@@ -592,7 +590,7 @@ public final class HostScreen extends LanPlusScreen {
         Minecraft minecraft = Minecraft.getInstance();
         HostController.HostSettings settings = new HostController.HostSettings(
                 accessMode, Set.of(), allowNonPremium, gameType, difficulty, allowCheats, maxPlayers,
-                allowVanillaJoin && accessMode == HostAccessMode.EVERYONE);
+                allowVanillaJoin);
         if (inWorld) {
             if (accessMode == HostAccessMode.INVITED) {
                 minecraft.setScreen(new InviteOverlay(this, settings));

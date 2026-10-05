@@ -7,23 +7,32 @@ import net.minecraft.network.chat.Component;
 
 final class ColorPicker {
 
-    private static final int SV = 104;
-    private static final int HUE_W = 14;
+    private static final int SV_SIZE = 104;
+    private static final int SV_HUE_GAP = 8;
+    private static final int HUE_H = 12;
     private static final int HUE_GAP = 10;
-    private static final int PREVIEW_GAP = 14;
-    private static final int PREVIEW_W = 84;
-    private static final int PREVIEW_H = 44;
+    private static final int HEX_H = 16;
+    private static final int HEX_BOX_W = 52;
+    private static final int RGB_GAP = 4;
+    private static final int RGB_H = 9;
+    private static final int SWATCH = 12;
+    private static final int STEP = 2;
+
+    private static final int DRAG_NONE = -1;
+    private static final int DRAG_SV = 0;
+    private static final int DRAG_HUE = 1;
 
     private final Font font;
     private final EditBox hexBox;
-    private int x, y;
+    private int x, y, w;
     private float hue, sat, val;
     private int color;
-    private boolean svDrag, hueDrag;
+    private int drag = DRAG_NONE;
+    private boolean syncing;
 
     ColorPicker(Font font, int rgb) {
         this.font = font;
-        this.hexBox = new EditBox(font, 0, 0, PREVIEW_W, 18, Component.literal("hex"));
+        this.hexBox = new EditBox(font, 0, 0, HEX_BOX_W, HEX_H, Component.literal("hex"));
         this.hexBox.setMaxLength(6);
         this.hexBox.setResponder(this::onHexTyped);
         setColor(rgb);
@@ -33,12 +42,23 @@ final class ColorPicker {
         return hexBox;
     }
 
-    void layout(int x, int y) {
+    void layout(int x, int y, int w) {
         this.x = x;
         this.y = y;
-        int rx = x + SV + HUE_GAP + HUE_W + PREVIEW_GAP;
-        hexBox.setPosition(rx, y + 52);
-        hexBox.setWidth(PREVIEW_W);
+        this.w = w;
+        int hashW = font.width("#");
+        int lineW = SWATCH + 6 + hashW + 3 + HEX_BOX_W;
+        int lineX = x + (w - lineW) / 2;
+        hexBox.setPosition(lineX + SWATCH + 6 + hashW + 3, hexTop());
+        hexBox.setWidth(HEX_BOX_W);
+    }
+
+    static int preferredHeight() {
+        return SV_SIZE + SV_HUE_GAP + HUE_H + HUE_GAP + HEX_H + RGB_GAP + RGB_H;
+    }
+
+    int height() {
+        return preferredHeight();
     }
 
     int color() {
@@ -47,7 +67,13 @@ final class ColorPicker {
 
     void setColor(int rgb) {
         setColorInternal(rgb);
+        syncHexBox();
+    }
+
+    private void syncHexBox() {
+        syncing = true;
         hexBox.setValue(String.format("%06X", color));
+        syncing = false;
     }
 
     private void setColorInternal(int rgb) {
@@ -59,6 +85,9 @@ final class ColorPicker {
     }
 
     private void onHexTyped(String s) {
+        if (syncing) {
+            return;
+        }
         String t = s.trim();
         if (t.length() == 6) {
             try {
@@ -69,88 +98,153 @@ final class ColorPicker {
     }
 
     void render(GuiGraphics g) {
-        int svX = x;
-        int svY = y;
-        int hueX = x + SV + HUE_GAP;
-        int rx = hueX + HUE_W + PREVIEW_GAP;
+        renderSvField(g);
+        renderHueBar(g);
 
-        int step = 4;
-        for (int px = 0; px < SV; px += step) {
-            float s = px / (float) (SV - 1);
-            for (int py = 0; py < SV; py += step) {
-                float v = 1f - py / (float) (SV - 1);
-                g.fill(svX + px, svY + py, svX + Math.min(px + step, SV), svY + Math.min(py + step, SV),
-                        0xFF000000 | hsv(hue, s, v));
-            }
+        int hashW = font.width("#");
+        int lineW = SWATCH + 6 + hashW + 3 + HEX_BOX_W;
+        int lineX = x + (w - lineW) / 2;
+        int chipY = hexTop() + (HEX_H - SWATCH) / 2;
+        g.fill(lineX, chipY, lineX + SWATCH, chipY + SWATCH, 0xFF000000 | color);
+        LanPlusUI.outline1(g, lineX, chipY, lineX + SWATCH, chipY + SWATCH, LanPlusUI.EDGE_DARK);
+        g.drawString(font, "#", lineX + SWATCH + 6, hexTop() + (HEX_H - 8) / 2, LanPlusUI.FAINT, false);
+
+        int r = (color >> 16) & 0xFF;
+        int gc = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        String rgbLabel = "RGB ";
+        String rgbVal = r + " " + gc + " " + b;
+        int rgbX = x + (w - font.width(rgbLabel) - font.width(rgbVal)) / 2;
+        g.drawString(font, rgbLabel, rgbX, rgbTop(), LanPlusUI.MUTED, false);
+        g.drawString(font, rgbVal, rgbX + font.width(rgbLabel), rgbTop(), LanPlusUI.TEXT, false);
+    }
+
+    private void renderSvField(GuiGraphics g) {
+        int fx = svX();
+        int fy = svY();
+        int pure = hsv(hue, 1f, 1f);
+        for (int px = 0; px < SV_SIZE; px += STEP) {
+            float s = px / (float) (SV_SIZE - 1);
+            int col = lerp(0xFFFFFF, pure, s);
+            g.fill(fx + px, fy, fx + Math.min(px + STEP, SV_SIZE), fy + SV_SIZE, 0xFF000000 | col);
         }
-        LanPlusUI.outline1(g, svX, svY, svX + SV, svY + SV, LanPlusUI.EDGE_DARK);
-        int hx = Math.clamp(svX + Math.round(sat * (SV - 1)), svX + 4, svX + SV - 5);
-        int hy = Math.clamp(svY + Math.round((1f - val) * (SV - 1)), svY + 4, svY + SV - 5);
-        LanPlusUI.outline1(g, hx - 4, hy - 4, hx + 5, hy + 5, 0xFF000000);
-        LanPlusUI.outline1(g, hx - 3, hy - 3, hx + 4, hy + 4, 0xFFFFFFFF);
+        g.fillGradient(fx, fy, fx + SV_SIZE, fy + SV_SIZE, 0x00000000, 0xFF000000);
+        LanPlusUI.outline1(g, fx, fy, fx + SV_SIZE, fy + SV_SIZE, LanPlusUI.EDGE_DARK);
 
-        for (int py = 0; py < SV; py += 3) {
-            float h = py / (float) (SV - 1) * 360f;
-            g.fill(hueX, svY + py, hueX + HUE_W, svY + Math.min(py + 3, SV), 0xFF000000 | hsv(h, 1f, 1f));
+        int mx = Math.clamp(fx + Math.round(sat * (SV_SIZE - 1)), fx, fx + SV_SIZE - 1);
+        int my = Math.clamp(fy + Math.round((1f - val) * (SV_SIZE - 1)), fy, fy + SV_SIZE - 1);
+        LanPlusUI.outline1(g, mx - 3, my - 3, mx + 4, my + 4, 0xFF000000);
+        LanPlusUI.outline1(g, mx - 2, my - 2, mx + 3, my + 3, 0xFFFFFFFF);
+    }
+
+    private void renderHueBar(GuiGraphics g) {
+        int left = hueLeft();
+        int top = hueY();
+        int tw = w;
+        for (int px = 0; px < tw; px += STEP) {
+            float t = px / (float) (tw - 1);
+            g.fill(left + px, top, left + Math.min(px + STEP, tw), top + HUE_H, 0xFF000000 | hsv(t * 360f, 1f, 1f));
         }
-        LanPlusUI.outline1(g, hueX, svY, hueX + HUE_W, svY + SV, LanPlusUI.EDGE_DARK);
-        int huey = svY + Math.round(hue / 360f * (SV - 1));
-        g.fill(hueX - 2, huey - 1, hueX + HUE_W + 2, huey + 1, 0xFFFFFFFF);
+        LanPlusUI.outline1(g, left, top, left + tw, top + HUE_H, LanPlusUI.EDGE_DARK);
 
-        g.fill(rx, svY, rx + PREVIEW_W, svY + PREVIEW_H, 0xFF000000 | color);
-        LanPlusUI.outline1(g, rx, svY, rx + PREVIEW_W, svY + PREVIEW_H, LanPlusUI.EDGE_DARK);
-        g.drawString(font, "#", rx - 9, svY + 57, LanPlusUI.FAINT, false);
+        int hx = Math.clamp(left + Math.round(hue / 360f * (tw - 1)), left, left + tw - 1);
+        LanPlusUI.outline1(g, hx - 2, top - 2, hx + 3, top + HUE_H + 2, 0xFF000000);
+        g.fill(hx - 1, top - 1, hx + 2, top + HUE_H + 1, 0xFFFFFFFF);
     }
 
     boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button != 0) {
             return false;
         }
-        int hueX = x + SV + HUE_GAP;
-        if (mouseX >= x && mouseX < x + SV && mouseY >= y && mouseY < y + SV) {
-            svDrag = true;
-            setSV(mouseX, mouseY);
+        if (inSvField(mouseX, mouseY)) {
+            drag = DRAG_SV;
+            setFromSv(mouseX, mouseY);
             return true;
         }
-        if (mouseX >= hueX && mouseX < hueX + HUE_W && mouseY >= y && mouseY < y + SV) {
-            hueDrag = true;
-            setHue(mouseY);
+        if (inHueBar(mouseX, mouseY)) {
+            drag = DRAG_HUE;
+            setFromHue(mouseX);
             return true;
         }
         return false;
     }
 
     boolean mouseDragged(double mouseX, double mouseY) {
-        if (svDrag) {
-            setSV(mouseX, mouseY);
+        if (drag == DRAG_SV) {
+            setFromSv(mouseX, mouseY);
             return true;
         }
-        if (hueDrag) {
-            setHue(mouseY);
+        if (drag == DRAG_HUE) {
+            setFromHue(mouseX);
             return true;
         }
         return false;
     }
 
     void mouseReleased() {
-        svDrag = false;
-        hueDrag = false;
+        drag = DRAG_NONE;
     }
 
-    private void setSV(double mx, double my) {
-        sat = Math.clamp((float) (mx - x) / (SV - 1), 0f, 1f);
-        val = 1f - Math.clamp((float) (my - y) / (SV - 1), 0f, 1f);
+    private boolean inSvField(double mouseX, double mouseY) {
+        return mouseX >= svX() && mouseX <= svX() + SV_SIZE && mouseY >= svY() && mouseY <= svY() + SV_SIZE;
+    }
+
+    private boolean inHueBar(double mouseX, double mouseY) {
+        return mouseX >= hueLeft() - 4 && mouseX <= hueLeft() + w + 4
+                && mouseY >= hueY() - 2 && mouseY <= hueY() + HUE_H + 2;
+    }
+
+    private void setFromSv(double mouseX, double mouseY) {
+        sat = Math.clamp((float) (mouseX - svX()) / (SV_SIZE - 1), 0f, 1f);
+        val = Math.clamp(1f - (float) (mouseY - svY()) / (SV_SIZE - 1), 0f, 1f);
         applyHsv();
     }
 
-    private void setHue(double my) {
-        hue = Math.clamp((float) (my - y) / (SV - 1), 0f, 1f) * 360f;
+    private void setFromHue(double mouseX) {
+        hue = Math.clamp((float) (mouseX - hueLeft()) / (w - 1), 0f, 1f) * 360f;
         applyHsv();
+    }
+
+    private int svX() {
+        return x + (w - SV_SIZE) / 2;
+    }
+
+    private int svY() {
+        return y;
+    }
+
+    private int hueLeft() {
+        return x;
+    }
+
+    private int hueY() {
+        return y + SV_SIZE + SV_HUE_GAP;
+    }
+
+    private int hexTop() {
+        return hueY() + HUE_H + HUE_GAP;
+    }
+
+    private int rgbTop() {
+        return hexTop() + HEX_H + RGB_GAP;
     }
 
     private void applyHsv() {
         color = hsv(hue, sat, val);
-        hexBox.setValue(String.format("%06X", color));
+        syncHexBox();
+    }
+
+    private static int lerp(int a, int b, float t) {
+        int ar = (a >> 16) & 0xFF;
+        int ag = (a >> 8) & 0xFF;
+        int ab = a & 0xFF;
+        int br = (b >> 16) & 0xFF;
+        int bg = (b >> 8) & 0xFF;
+        int bb = b & 0xFF;
+        int r = Math.round(ar + (br - ar) * t);
+        int gc = Math.round(ag + (bg - ag) * t);
+        int bl = Math.round(ab + (bb - ab) * t);
+        return (r << 16) | (gc << 8) | bl;
     }
 
     private static int hsv(float h, float s, float v) {

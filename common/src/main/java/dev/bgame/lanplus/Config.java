@@ -35,6 +35,7 @@ public final class Config {
     public static int customAccent = 0x7B3FC4;
     public static int customBackground = 0x1E1926;
     public static int customText = 0xECEEF2;
+    public static int customMuted = 0x8B909A;
     public static boolean voiceEnabled = true;
     public static String voiceHost = "";
     public static String seenUpdateVersion = "";
@@ -62,6 +63,7 @@ public final class Config {
                 customAccent = getInt(json, "customAccent", customAccent);
                 customBackground = getInt(json, "customBackground", customBackground);
                 customText = getInt(json, "customText", customText);
+                customMuted = getInt(json, "customMuted", customMuted);
                 voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
                 voiceHost = getString(json, "voiceHost", voiceHost);
                 seenUpdateVersion = getString(json, "seenUpdateVersion", seenUpdateVersion);
@@ -89,6 +91,7 @@ public final class Config {
         json.addProperty("customAccent", customAccent);
         json.addProperty("customBackground", customBackground);
         json.addProperty("customText", customText);
+        json.addProperty("customMuted", customMuted);
         json.addProperty("voiceEnabled", voiceEnabled);
         json.addProperty("voiceHost", voiceHost);
         json.addProperty("seenUpdateVersion", seenUpdateVersion);
@@ -119,14 +122,6 @@ public final class Config {
 
     public static boolean setTheme(String id) {
         theme = id;
-        return save();
-    }
-
-    public static boolean setCustomTheme(int accent, int background, int text) {
-        customAccent = accent & 0xFFFFFF;
-        customBackground = background & 0xFFFFFF;
-        customText = text & 0xFFFFFF;
-        theme = "custom";
         return save();
     }
 

@@ -26,6 +26,7 @@ public final class BackgroundPicker extends LanPlusScreen {
     private static final int SWATCH_GAP = 6;
     private static final int IMG_COLS = 3;
     private static final int IMG_GAP = 8;
+    private static final int USE_BTN_W = 120;
 
     private final Screen parent;
     private final int[] palette;
@@ -84,12 +85,12 @@ public final class BackgroundPicker extends LanPlusScreen {
 
         if (tab == 0) {
             picker = new ColorPicker(this.font, initialColor);
-            picker.layout(boxX + PAD, customTop);
+            picker.layout(boxX + PAD, customTop, contentW - 2 * PAD);
             addRenderableWidget(picker.hexBox());
-            var hex = picker.hexBox();
             addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.bg.use"),
                             b -> commitSolid())
-                    .bounds(hex.getX(), hex.getY() + 22, hex.getWidth(), 18).primary().build());
+                    .bounds(boxX + (contentW - USE_BTN_W) / 2, customTop + picker.height() + 8, USE_BTN_W, 18)
+                    .primary().build());
         } else {
             picker = null;
         }
@@ -140,7 +141,8 @@ public final class BackgroundPicker extends LanPlusScreen {
     private void renderSolid(GuiGraphics g, int mouseX, int mouseY) {
         swatchCells.clear();
         int cols = Math.min(8, palette.length);
-        int x0 = boxX + PAD;
+        int gridW = cols * SWATCH + (cols - 1) * SWATCH_GAP;
+        int x0 = boxX + (contentW - gridW) / 2;
         int active = picker.color();
         for (int i = 0; i < palette.length; i++) {
             int cx = x0 + (i % cols) * (SWATCH + SWATCH_GAP);

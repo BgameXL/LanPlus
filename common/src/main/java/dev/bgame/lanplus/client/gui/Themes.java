@@ -45,22 +45,23 @@ final class Themes {
 
     static Theme resolve(String id) {
         if ("custom".equals(id)) {
-            return custom(Config.customAccent, Config.customBackground, Config.customText);
+            return custom(Config.customAccent, Config.customBackground, Config.customText, Config.customMuted);
         }
         return byId(id);
     }
 
-    static Theme custom(int accent, int background, int text) {
+    static Theme custom(int accent, int background, int text, int muted) {
         int ac = accent & 0xFFFFFF;
         int bg = background & 0xFFFFFF;
         int tx = text & 0xFFFFFF;
+        int mt = muted & 0xFFFFFF;
         return new Theme("custom", Component.translatable("gui.lanplus.theme.custom"),
                 0xF2000000 | bg, shade(bg, 0.81f), shade(bg, 1.48f), shade(bg, 0.96f), shade(bg, 0.63f),
                 shade(bg, 2.25f), shade(bg, 0.39f),
                 0xFF000000 | ac, shade(ac, 0.86f), shade(ac, 1.20f), 0x40000000 | ac, 0xFF000000 | ac,
                 0xFF000000 | mix(ac),
                 AMETHYST.online(), AMETHYST.amber(), AMETHYST.red(),
-                0xFF000000 | tx, shade(tx, 0.62f), shade(tx, 0.46f),
+                0xFF000000 | tx, 0xFF000000 | mt, shade(mt, 0.74f),
                 shade(bg, 1.56f), 0x14FFFFFF);
     }
 
@@ -69,9 +70,9 @@ final class Themes {
     }
 
     private static int mix(int rgb) {
-        int r = Math.round((rgb >> 16 & 0xFF) * (1 - (float) 0.45) + (16777215 >> 16 & 0xFF) * (float) 0.45);
-        int g = Math.round((rgb >> 8 & 0xFF) * (1 - (float) 0.45) + (16777215 >> 8 & 0xFF) * (float) 0.45);
-        int b = Math.round((rgb & 0xFF) * (1 - (float) 0.45) + (16777215 & 0xFF) * (float) 0.45);
+        int r = Math.round((rgb >> 16 & 0xFF) * 0.55f + 255 * 0.45f);
+        int g = Math.round((rgb >> 8 & 0xFF) * 0.55f + 255 * 0.45f);
+        int b = Math.round((rgb & 0xFF) * 0.55f + 255 * 0.45f);
         return (r << 16) | (g << 8) | b;
     }
 

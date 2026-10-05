@@ -64,7 +64,7 @@ public final class Dropdown {
                 g.fill(x + 1, iy, x + 2, iy + ITEM_H, LanPlusUI.ACCENT);
             }
             g.drawString(font, trim(font, labels.get(i), w - 10), x + 6, iy + 3,
-                    sel ? LanPlusUI.ACCENT : (hover ? LanPlusUI.TEXT : LanPlusUI.MUTED), false);
+                    sel ? LanPlusUI.ACCENT : (hover ? LanPlusUI.MUTED : LanPlusUI.TEXT), false);
             cells.add(new int[]{x, iy, w, ITEM_H, i});
         }
         g.pose().popPose();
