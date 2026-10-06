@@ -108,8 +108,8 @@ public final class ProfileScreen extends LanPlusScreen {
     private List<String> promptPickerOptions = new ArrayList<>();
     private final Dropdown choicePicker = new Dropdown();
     private List<String> choicePickerOptions = new ArrayList<>();
-    private static final int EDIT_SECTION_GAP = 18;
-    private static final int EDIT_W = 440;
+    private static final int EDIT_SECTION_GAP = 34;
+    private static final int EDIT_W = 500;
     private static final int EDIT_W_WIDE = 660;
     private static final int APP_FORM_W = 250;
     private static final int APP_ROW_H = 44;
