@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class TcpRelayTunnel implements RelayTunnel {
@@ -172,10 +173,20 @@ public final class TcpRelayTunnel implements RelayTunnel {
         }
     }
 
+    /** How long the other direction may keep draining after one side finished, so final packets still arrive. */
+    private static final long DRAIN_MS = 5000;
+
     private void pump(Socket a, Socket b) {
         Future<?> other = pool.submit(() -> copy(a, b));
         copy(b, a);
-        other.cancel(true);
+        // The local server is done (e.g. it just sent a kick/disconnect packet and closed). copy() already
+        // half-closed the relay side, so give that last packet time to reach the player before closing both
+        // sockets - closing right away can cut it off and the player only sees "Failed to connect".
+        try {
+            other.get(DRAIN_MS, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            other.cancel(true);
+        }
         closeQuietly(a);
         closeQuietly(b);
     }
@@ -194,7 +205,8 @@ public final class TcpRelayTunnel implements RelayTunnel {
         } finally {
             try {
                 to.shutdownOutput();
-            } catch (IOException ignored) {
+            } catch (IOException | UnsupportedOperationException ignored) {
+                // SSL sockets may refuse a half-close; pump() closes them shortly anyway.
             }
         }
     }
