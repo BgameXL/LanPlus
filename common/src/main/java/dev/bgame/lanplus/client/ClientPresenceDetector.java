@@ -78,6 +78,7 @@ public final class ClientPresenceDetector {
         presence.updateModpack(null);
         presence.updateWorld(null, null, false);
         presence.updateState(GameplayState.MENU, null, null);
+        LanPlusClient.setJoinedHost(null);
     }
 
     private static void publishModpackIfChanged(Minecraft mc, PresenceManager presence) {

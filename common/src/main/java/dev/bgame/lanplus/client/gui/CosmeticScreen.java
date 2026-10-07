@@ -25,10 +25,10 @@ import java.util.UUID;
 public final class CosmeticScreen extends LanPlusScreen {
 
     private static final int PAD = 12;
-    private static final int TAB_H = 22;
-    private static final int TAB_GAP = 6;
-    private static final int TAB_PADX = 9;
-    private static final int RIGHT_W = 224;
+    private static final int SIDEBAR_W = 96;
+    private static final int SIDE_ROW_H = 20;
+    private static final int SIDE_GAP = 3;
+    private static final int RIGHT_W = 208;
     private static final int COL_GAP = 12;
     private static final int CARD_MIN_W = 148;
     private static final int CARD_H = 152;
@@ -36,8 +36,11 @@ public final class CosmeticScreen extends LanPlusScreen {
     private static final int PREVIEW_LIFT = 4;
     private static final CosmeticSlot[] SLOTS = CosmeticSlot.values();
 
+    private enum Section {COSMETICS, FEATURED, OUTFITS}
+
     private final Screen parent;
     private final UUID uuid;
+    private Section section = Section.COSMETICS;
     private CosmeticSlot filter;
     private String selectedId;
     private final ModelView view = new ModelView(40f, 0.5f, 3f, 330f);
@@ -45,7 +48,7 @@ public final class CosmeticScreen extends LanPlusScreen {
     private final List<Row> rows = new ArrayList<>();
 
     private int cardX, cardY, cardW, cardH;
-    private int tabsY, contentTop, doneY;
+    private int sidebarX, contentTop, doneY;
     private int gridX, gridRight, gridTop, gridBottom, gridW, cols, cardWidth;
     private int rightX, rightTop, rightBottom, previewBottom, detailTop;
 
@@ -73,15 +76,15 @@ public final class CosmeticScreen extends LanPlusScreen {
         cardH = fitHeight(432);
         cardX = centerX(cardW);
         cardY = centerY(cardH);
-        tabsY = cardY + 32;
-        contentTop = tabsY + TAB_H + 8;
+        contentTop = cardY + 36;
         doneY = cardY + cardH - PAD - 20;
+        sidebarX = cardX + PAD;
         rightX = cardX + cardW - PAD - RIGHT_W;
         rightTop = contentTop;
         rightBottom = doneY - 8;
         previewBottom = rightTop + Math.round((rightBottom - rightTop) * 0.56f);
         detailTop = previewBottom + 8;
-        gridX = cardX + PAD;
+        gridX = sidebarX + SIDEBAR_W + COL_GAP;
         gridRight = rightX - COL_GAP;
         gridTop = contentTop;
         gridBottom = doneY - 4;
@@ -93,7 +96,7 @@ public final class CosmeticScreen extends LanPlusScreen {
     @Override
     protected void init() {
         layout();
-        LanPlusClient.ensureCosmeticShop();
+        LanPlusClient.refreshCosmetics();
         addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                 .bounds(cardX + cardW - 90 - PAD, doneY, 90, 20).build());
     }
@@ -107,8 +110,12 @@ public final class CosmeticScreen extends LanPlusScreen {
         LanPlusUI.panel(g, cardX, cardY, cardX + cardW, cardY + cardH);
         LanPlusUI.sectionHeader(g, this.font, this.title, cardX + PAD, cardY + PAD, cardX + cardW - PAD);
         renderWallet(g);
-        renderTabs(g, mouseX, mouseY);
-        renderGrid(g, mouseX, mouseY);
+        renderSidebar(g, mouseX, mouseY);
+        if (section == Section.COSMETICS) {
+            renderGrid(g, mouseX, mouseY);
+        } else {
+            renderPlaceholder(g);
+        }
         renderPreview(g);
         renderDetail(g, mouseX, mouseY);
 
@@ -126,29 +133,50 @@ public final class CosmeticScreen extends LanPlusScreen {
         g.drawString(this.font, label, x + 16, y + 5, LanPlusUI.TEXT, false);
     }
 
-    private void renderTabs(GuiGraphics g, int mouseX, int mouseY) {
-        int x = gridX;
-        for (int i = 0; i <= SLOTS.length; i++) {
-            CosmeticSlot slot = i == 0 ? null : SLOTS[i - 1];
-            Component label = i == 0 ? Component.translatable("gui.lanplus.cosmetics.all") : slotName(slot);
-            int w = this.font.width(label) + TAB_PADX * 2;
-            boolean active = filter == slot;
-            boolean hover = inside(mouseX, mouseY, x, tabsY, w, TAB_H);
-            int fill = active ? LanPlusUI.ACCENT_TINT : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
-            LanPlusUI.button3d(g, x, tabsY, x + w, tabsY + TAB_H, fill);
-            if (active) {
-                LanPlusUI.outline1(g, x, tabsY, x + w, tabsY + TAB_H, LanPlusUI.ACCENT);
-            }
-            g.drawString(this.font, label, x + TAB_PADX, tabsY + (TAB_H - 8) / 2,
-                    active || hover ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
-            CosmeticSlot target = slot;
-            rows.add(new Row(x, tabsY, w, TAB_H, () -> {
-                filter = target;
-                gridScroll = 0;
-            }));
-            x += w + TAB_GAP;
+    private void renderSidebar(GuiGraphics g, int mouseX, int mouseY) {
+        int y = contentTop;
+        y = sidebarEntry(g, mouseX, mouseY, y, Component.translatable("gui.lanplus.cosmetics.featured"),
+                section == Section.FEATURED, () -> section = Section.FEATURED);
+        y = sidebarEntry(g, mouseX, mouseY, y, Component.translatable("gui.lanplus.cosmetics.outfits"),
+                section == Section.OUTFITS, () -> section = Section.OUTFITS);
+        y += 3;
+        g.fill(sidebarX, y, sidebarX + SIDEBAR_W, y + 1, LanPlusUI.DIVIDER);
+        y += 4;
+        y = sidebarEntry(g, mouseX, mouseY, y, Component.translatable("gui.lanplus.cosmetics.all"),
+                section == Section.COSMETICS && filter == null, () -> selectCosmetics(null));
+        for (CosmeticSlot slot : SLOTS) {
+            y = sidebarEntry(g, mouseX, mouseY, y, slotName(slot),
+                    section == Section.COSMETICS && filter == slot, () -> selectCosmetics(slot));
         }
-        g.fill(gridX, contentTop - 5, gridRight, contentTop - 4, LanPlusUI.DIVIDER);
+        int divX = gridX - COL_GAP / 2;
+        g.fill(divX, contentTop, divX + 1, gridBottom, LanPlusUI.DIVIDER);
+    }
+
+    private int sidebarEntry(GuiGraphics g, int mouseX, int mouseY, int y, Component label,
+                             boolean active, Runnable action) {
+        boolean hover = inside(mouseX, mouseY, sidebarX, y, SIDEBAR_W, SIDE_ROW_H);
+        int fill = active ? LanPlusUI.ACCENT_TINT : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
+        LanPlusUI.button3d(g, sidebarX, y, sidebarX + SIDEBAR_W, y + SIDE_ROW_H, fill);
+        if (active) {
+            LanPlusUI.outline1(g, sidebarX, y, sidebarX + SIDEBAR_W, y + SIDE_ROW_H, LanPlusUI.ACCENT);
+        }
+        g.drawString(this.font, label, sidebarX + 8, y + (SIDE_ROW_H - 8) / 2,
+                active || hover ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
+        rows.add(new Row(sidebarX, y, SIDEBAR_W, SIDE_ROW_H, action));
+        return y + SIDE_ROW_H + SIDE_GAP;
+    }
+
+    private void selectCosmetics(CosmeticSlot slot) {
+        section = Section.COSMETICS;
+        filter = slot;
+        gridScroll = 0;
+    }
+
+    private void renderPlaceholder(GuiGraphics g) {
+        String key = section == Section.FEATURED
+                ? "gui.lanplus.cosmetics.featured.soon" : "gui.lanplus.cosmetics.outfits.soon";
+        g.drawCenteredString(this.font, Component.translatable(key),
+                (gridX + gridRight) / 2, gridTop + 24, LanPlusUI.FAINT);
     }
 
     private void renderGrid(GuiGraphics g, int mouseX, int mouseY) {
@@ -251,8 +279,9 @@ public final class CosmeticScreen extends LanPlusScreen {
         int clipBottom = previewBottom - 6;
         int cx = (rightX + rightX + RIGHT_W) / 2;
 
-        g.fill(rightX, rightTop, rightX + RIGHT_W, previewBottom, 0x33101018);
-        LanPlusUI.outline1(g, rightX, rightTop, rightX + RIGHT_W, previewBottom, LanPlusUI.EDGE_DARK);
+        g.fill(rightX, rightTop, rightX + RIGHT_W, rightBottom, 0x33101018);
+        LanPlusUI.outline1(g, rightX, rightTop, rightX + RIGHT_W, rightBottom, LanPlusUI.EDGE_DARK);
+        g.fill(rightX + 6, previewBottom, rightX + RIGHT_W - 6, previewBottom + 1, LanPlusUI.DIVIDER);
 
         view.advance();
 
@@ -272,14 +301,11 @@ public final class CosmeticScreen extends LanPlusScreen {
     }
 
     private void renderDetail(GuiGraphics g, int mouseX, int mouseY) {
-        LanPlusUI.panel(g, rightX, detailTop, rightX + RIGHT_W, rightBottom);
-        int x = rightX + 10;
-        int right = rightX + RIGHT_W - 10;
         if (selectedId == null) {
-            g.drawCenteredString(this.font, Component.translatable("gui.lanplus.cosmetics.pick"),
-                    (rightX + rightX + RIGHT_W) / 2, detailTop + (rightBottom - detailTop) / 2 - 4, LanPlusUI.FAINT);
             return;
         }
+        int x = rightX + 10;
+        int right = rightX + RIGHT_W - 10;
         CosmeticMeta m = LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().meta(selectedId);
         String rarity = m == null ? "common" : m.rarity();
         String name = m != null ? m.name() : selectedId;

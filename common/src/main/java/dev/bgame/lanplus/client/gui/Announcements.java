@@ -76,8 +76,11 @@ public final class Announcements extends LanPlusScreen {
         addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                 .bounds(cardX + cardW - 90 - PAD, cardY + cardH - 26, 90, 20).build());
         AnnouncementsService svc = LanPlusClient.announcements();
-        if (svc != null && newIds.isEmpty()) {
-            newIds = Set.copyOf(svc.unseenIds());
+        if (svc != null) {
+            svc.refresh();
+            if (newIds.isEmpty()) {
+                newIds = Set.copyOf(svc.unseenIds());
+            }
         }
         markSeen();
     }

@@ -1,5 +1,6 @@
 package dev.bgame.lanplus.client.gui;
 
+import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.api.ActivityEntry;
 import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.Friend;
@@ -19,17 +20,20 @@ import dev.bgame.lanplus.client.SkinTextures;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.invites.HostAccessControl;
 import dev.bgame.lanplus.invites.InviteService;
+import dev.bgame.lanplus.network.SvcBridge;
 import dev.bgame.lanplus.presence.PresenceManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.PlayerFaceRenderer;
+import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.server.level.ServerPlayer;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -195,21 +199,23 @@ public final class FriendsScreen extends LanPlusScreen {
         } else if (tab == Tab.DETAILS) {
             HostInfo info = hostInfo();
             if (info != null) {
-                int bx = rightX + rightW - 116;
+                int bx = contentRight - 116;
+                int addrBtnY = paneBottom - 52;
+                int codeBtnY = paneBottom - 22;
                 addRenderableWidget(LanplusButton.create(showLabel(showAddress), b -> {
                             showAddress = !showAddress;
                             rebuildWidgets();
                         })
-                        .bounds(bx, paneTop + 62, 52, 18).build());
+                        .bounds(bx, addrBtnY, 52, 18).build());
                 addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.address()))
-                        .bounds(bx + 56, paneTop + 62, 52, 18).build());
+                        .bounds(bx + 56, addrBtnY, 52, 18).build());
                 addRenderableWidget(LanplusButton.create(showLabel(showCode), b -> {
                             showCode = !showCode;
                             rebuildWidgets();
                         })
-                        .bounds(bx, paneTop + 94, 52, 18).build());
+                        .bounds(bx, codeBtnY, 52, 18).build());
                 addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.details.copy"), b -> copyToClipboard(info.code()))
-                        .bounds(bx + 56, paneTop + 94, 52, 18).build());
+                        .bounds(bx + 56, codeBtnY, 52, 18).build());
             }
         } else if (tab == Tab.FRIENDS) {
             Friend sel = selectedFriend();
@@ -236,6 +242,7 @@ public final class FriendsScreen extends LanPlusScreen {
             if (fs != null) {
                 fs.refresh();
                 fs.refreshActivity();
+                fs.refreshDiscoverableHosts();
             }
         }
     }
@@ -249,7 +256,9 @@ public final class FriendsScreen extends LanPlusScreen {
         int dividerX = leftX + LEFT_W;
         LanPlusUI.panel(g, leftX, headerTop, contentRight, footerBottom);
         g.fill(leftX + 1, paneTop, contentRight - 1, paneTop + 1, LanPlusUI.DIVIDER);
-        g.fill(dividerX, paneTop + 1, dividerX + 1, paneBottom, LanPlusUI.DIVIDER);
+        if (tab != Tab.DETAILS) {
+            g.fill(dividerX, paneTop + 1, dividerX + 1, paneBottom, LanPlusUI.DIVIDER);
+        }
         g.fill(leftX + 1, paneBottom, contentRight - 1, paneBottom + 1, LanPlusUI.DIVIDER);
 
         int wx = LanPlusUI.wordmark(g, this.font, leftX + 8, headerTop + 10);
@@ -272,7 +281,11 @@ public final class FriendsScreen extends LanPlusScreen {
             case DETAILS -> {
             }
         }
-        renderDetail(g, rightX, rightW);
+        if (tab == Tab.DETAILS) {
+            renderDetails(g, leftX, contentRight - leftX);
+        } else {
+            renderDetail(g, rightX, rightW);
+        }
 
         if (status != null) {
             if (System.currentTimeMillis() < statusUntil) {
@@ -508,7 +521,7 @@ public final class FriendsScreen extends LanPlusScreen {
     private void renderJoinList(GuiGraphics g, int mouseX, int mouseY, int paneBottom) {
         g.drawString(this.font, Component.translatable("gui.lanplus.join.hosting.title"),
                 leftX + 6, paneTop + 4, LanPlusUI.TEXT, false);
-        List<Friend> hosting = hostingFriends();
+        List<Friend> hosting = joinableHosts();
         if (hosting.isEmpty()) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.join.hosting.empty"),
                     leftX + LEFT_W / 2, paneTop + 34, LanPlusUI.FAINT);
@@ -529,7 +542,7 @@ public final class FriendsScreen extends LanPlusScreen {
             return null;
         }
         int y = paneTop + 18;
-        for (Friend f : hostingFriends()) {
+        for (Friend f : joinableHosts()) {
             if (y + ROW_H > paneBottom) {
                 return null;
             }
@@ -555,10 +568,6 @@ public final class FriendsScreen extends LanPlusScreen {
         }
         if (tab == Tab.JOIN) {
             renderJoinDetail(g, x, w);
-            return;
-        }
-        if (tab == Tab.DETAILS) {
-            renderDetails(g, x, w);
             return;
         }
         Friend f = selectedFriend();
@@ -627,21 +636,158 @@ public final class FriendsScreen extends LanPlusScreen {
     }
 
     private void renderDetails(GuiGraphics g, int x, int w) {
-        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.details.title"), x + 6, paneTop + 6, x + w - 6);
         HostInfo info = hostInfo();
-        if (info == null) {
-            g.drawCenteredString(this.font, Component.translatable("gui.lanplus.details.nothosting"),
-                    x + w / 2, paneTop + 40, LanPlusUI.FAINT);
+        if (info != null) {
+            renderHostDetails(g, x, w, info);
             return;
         }
-        g.drawString(this.font, Component.translatable("gui.lanplus.details.world", safe(info.world())),
-                x + 6, paneTop + 26, LanPlusUI.MUTED, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.details.access", modeName(info.mode())),
-                x + 6, paneTop + 38, LanPlusUI.MUTED, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.details.address"), x + 6, paneTop + 54, LanPlusUI.FAINT, false);
-        g.drawString(this.font, showAddress ? safe(info.address()) : mask(info.address()), x + 6, paneTop + 66, LanPlusUI.ONLINE, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.details.code"), x + 6, paneTop + 86, LanPlusUI.FAINT, false);
-        g.drawString(this.font, showCode ? safe(info.code()) : mask(info.code()), x + 6, paneTop + 98, LanPlusUI.ONLINE, false);
+        GuestInfo guest = guestInfo();
+        if (guest != null) {
+            renderGuestDetails(g, x, w, guest);
+            return;
+        }
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.details.title"), x + 6, paneTop + 6, x + w - 6);
+        g.drawCenteredString(this.font, Component.translatable("gui.lanplus.details.nothosting"),
+                x + w / 2, paneTop + 40, LanPlusUI.FAINT);
+    }
+
+    private void renderHostDetails(GuiGraphics g, int x, int w, HostInfo info) {
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.details.title"), x + 6, paneTop + 6, x + w - 6);
+        int lx = x + 6;
+        MutableComponent world = Component.translatable("gui.lanplus.details.world", safe(info.world()));
+        if (info.modpack() != null && !info.modpack().isEmpty()) {
+            world.append(Component.literal("  ·  "))
+                    .append(Component.translatable("gui.lanplus.details.modpack", info.modpack()));
+        }
+        g.drawString(this.font, world, lx, paneTop + 24, LanPlusUI.MUTED, false);
+        g.drawString(this.font, modeLine(info.gameMode(), info.difficulty(), info.cheats()), lx, paneTop + 36, LanPlusUI.MUTED, false);
+        g.drawString(this.font, accessLine(info), lx, paneTop + 48, LanPlusUI.MUTED, false);
+        g.drawString(this.font, connectionLine(), lx, paneTop + 60, LanPlusUI.MUTED, false);
+
+        List<ServerPlayer> players = onlinePlayers();
+        g.drawString(this.font, Component.translatable("gui.lanplus.details.players", players.size(), info.maxPlayers()),
+                lx, paneTop + 78, LanPlusUI.FAINT, false);
+        int rowY = paneTop + 92;
+        int limit = paneBottom - 76;
+        int shown = 0;
+        for (ServerPlayer p : players) {
+            if (rowY + 16 > limit) {
+                g.drawString(this.font, Component.translatable("gui.lanplus.details.players.more", players.size() - shown),
+                        lx, rowY + 2, LanPlusUI.FAINT, false);
+                break;
+            }
+            drawAvatar(g, p.getUUID(), lx, rowY, 14);
+            g.drawString(this.font, p.getGameProfile().getName(), lx + 20, rowY + 3, LanPlusUI.TEXT, false);
+            rowY += 18;
+            shown++;
+        }
+
+        int addrLabelY = paneBottom - 60;
+        int codeLabelY = paneBottom - 30;
+        g.fill(x + 6, addrLabelY - 8, x + w - 6, addrLabelY - 7, LanPlusUI.DIVIDER);
+        g.drawString(this.font, Component.translatable("gui.lanplus.details.address"), lx, addrLabelY, LanPlusUI.FAINT, false);
+        g.drawString(this.font, showAddress ? safe(info.address()) : mask(info.address()), lx, addrLabelY + 12, LanPlusUI.ONLINE, false);
+        g.drawString(this.font, Component.translatable("gui.lanplus.details.code"), lx, codeLabelY, LanPlusUI.FAINT, false);
+        g.drawString(this.font, showCode ? safe(info.code()) : mask(info.code()), lx, codeLabelY + 12, LanPlusUI.ONLINE, false);
+    }
+
+    private Component modeLine(String gameMode, String difficulty, boolean cheats) {
+        MutableComponent line = Component.empty().append(gameModeComp(gameMode));
+        if (difficulty != null) {
+            line.append(Component.literal(" · ")).append(difficultyComp(difficulty));
+        }
+        line.append(Component.literal(" · "));
+        line.append(Component.translatable(cheats ? "gui.lanplus.details.cheats.on" : "gui.lanplus.details.cheats.off"));
+        return line;
+    }
+
+    private Component gameModeComp(String gm) {
+        return gm == null ? Component.translatable("gui.lanplus.details.unknown")
+                : Component.translatable("selectWorld.gameMode." + gm.toLowerCase(Locale.ROOT));
+    }
+
+    private Component difficultyComp(String d) {
+        return Component.translatable("options.difficulty." + d.toLowerCase(Locale.ROOT));
+    }
+
+    private Component accessLine(HostInfo info) {
+        MutableComponent line = Component.empty().append(modeName(info.mode()));
+        if (info.mode() == HostAccessMode.INVITED && info.invited() > 0) {
+            line.append(Component.literal(" ")).append(Component.translatable("gui.lanplus.details.invited", info.invited()));
+        }
+        line.append(Component.literal(" · "));
+        line.append(Component.translatable(info.offline() ? "gui.lanplus.details.offline" : "gui.lanplus.details.premium"));
+        if (info.vanilla()) {
+            line.append(Component.literal(" · ")).append(Component.translatable("gui.lanplus.details.vanillaon"));
+        }
+        return line;
+    }
+
+    private Component connectionLine() {
+        MutableComponent line = Component.empty().append(Component.translatable(
+                LanPlusClient.isHostingViaRelay() ? "gui.lanplus.details.internet" : "gui.lanplus.details.lan"));
+        if (Config.voiceEnabled && SvcBridge.installed()) {
+            line.append(Component.literal(" · ")).append(Component.translatable("gui.lanplus.details.voiceon"));
+        }
+        long since = HostController.hostingSince();
+        if (since > 0L) {
+            line.append(Component.literal(" · ")).append(Component.translatable(
+                    "gui.lanplus.details.uptime", formatUptime(System.currentTimeMillis() - since)));
+        }
+        return line;
+    }
+
+    private List<ServerPlayer> onlinePlayers() {
+        var server = Minecraft.getInstance().getSingleplayerServer();
+        return server == null ? List.of() : server.getPlayerList().getPlayers();
+    }
+
+    private static String formatUptime(long ms) {
+        long sec = Math.max(0, ms / 1000L);
+        long h = sec / 3600;
+        long m = (sec % 3600) / 60;
+        if (h > 0) {
+            return h + "h " + m + "m";
+        }
+        return m > 0 ? m + "m" : sec + "s";
+    }
+
+    private void renderGuestDetails(GuiGraphics g, int x, int w, GuestInfo guest) {
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.details.guest.title"), x + 6, paneTop + 6, x + w - 6);
+        int lx = x + 6;
+        if (guest.host() != null) {
+            g.drawString(this.font, Component.translatable("gui.lanplus.details.connectedto", guest.host()),
+                    lx, paneTop + 24, LanPlusUI.MUTED, false);
+            if (guest.world() != null && !guest.world().isEmpty()) {
+                g.drawString(this.font, Component.translatable("gui.lanplus.details.world", safe(guest.world())),
+                        lx, paneTop + 36, LanPlusUI.MUTED, false);
+            }
+            if (guest.gameMode() != null) {
+                g.drawString(this.font, modeLine(guest.gameMode(), guest.difficulty(), guest.cheats()),
+                        lx, paneTop + 48, LanPlusUI.MUTED, false);
+            }
+        } else {
+            g.drawString(this.font, Component.translatable("gui.lanplus.details.connected"),
+                    lx, paneTop + 24, LanPlusUI.MUTED, false);
+        }
+
+        List<PlayerInfo> players = connectedPlayers();
+        g.drawString(this.font, Component.translatable("gui.lanplus.details.players.simple", players.size()),
+                lx, paneTop + 66, LanPlusUI.FAINT, false);
+        int rowY = paneTop + 80;
+        int limit = paneBottom - 12;
+        int shown = 0;
+        for (PlayerInfo p : players) {
+            if (rowY + 16 > limit) {
+                g.drawString(this.font, Component.translatable("gui.lanplus.details.players.more", players.size() - shown),
+                        lx, rowY + 2, LanPlusUI.FAINT, false);
+                break;
+            }
+            drawAvatar(g, p.getProfile().getId(), lx, rowY, 14);
+            g.drawString(this.font, p.getProfile().getName(), lx + 20, rowY + 3, LanPlusUI.TEXT, false);
+            rowY += 18;
+            shown++;
+        }
     }
 
     private void renderHub(GuiGraphics g, int x, int w) {
@@ -712,6 +858,15 @@ public final class FriendsScreen extends LanPlusScreen {
         return out;
     }
 
+    private List<Friend> joinableHosts() {
+        List<Friend> out = hostingFriends();
+        FriendsService fs = LanPlusClient.friends();
+        if (fs != null) {
+            out.addAll(fs.discoverableHosts());
+        }
+        return out;
+    }
+
     private Friend hubFriendHosting() {
         List<Friend> hosting = hostingFriends();
         return hosting.isEmpty() ? null : hosting.get(0);
@@ -721,7 +876,7 @@ public final class FriendsScreen extends LanPlusScreen {
         if (selectedUuid == null) {
             return null;
         }
-        for (Friend f : hostingFriends()) {
+        for (Friend f : joinableHosts()) {
             if (f.uuid().equals(selectedUuid)) {
                 return f;
             }
@@ -1198,6 +1353,7 @@ public final class FriendsScreen extends LanPlusScreen {
         setStatus(Component.translatable("gui.lanplus.join.connecting", friend.username()));
         invites.resolve(friend.joinCode()).whenComplete((invite, err) -> Minecraft.getInstance().execute(() -> {
             if (err == null && invite != null && invite.address() != null) {
+                LanPlusClient.setJoinedHost(friend.uuid());
                 connectTo(invite.address());
             } else {
                 setStatus(Component.translatable("gui.lanplus.join.failed"));
@@ -1221,6 +1377,7 @@ public final class FriendsScreen extends LanPlusScreen {
         setStatus(Component.translatable("gui.lanplus.join.connecting", code));
         invites.resolve(code).whenComplete((invite, err) -> Minecraft.getInstance().execute(() -> {
             if (err == null && invite != null && invite.address() != null) {
+                LanPlusClient.setJoinedHost(null);
                 connectTo(invite.address());
             } else {
                 setStatus(Component.translatable("gui.lanplus.join.failed"));
@@ -1306,7 +1463,9 @@ public final class FriendsScreen extends LanPlusScreen {
         return friends == null ? null : friends.localProfile();
     }
 
-    private record HostInfo(String world, HostAccessMode mode, String address, String code) {
+    private record HostInfo(String world, HostAccessMode mode, String address, String code,
+                            String gameMode, String difficulty, boolean cheats, String modpack,
+                            int maxPlayers, int invited, boolean offline, boolean vanilla) {
     }
 
     private HostInfo hostInfo() {
@@ -1318,7 +1477,49 @@ public final class FriendsScreen extends LanPlusScreen {
         if (s == null || s.state() != GameplayState.HOSTING || s.address() == null) {
             return null;
         }
-        return new HostInfo(s.worldName(), HostAccessControl.mode(), s.address(), s.joinCode());
+        return new HostInfo(s.worldName(), HostAccessControl.mode(), s.address(), s.joinCode(),
+                s.gameMode(), s.difficulty(), s.allowCommands(), s.modpackId(),
+                HostAccessControl.maxPlayers(), HostAccessControl.allowedSnapshot().size(),
+                HostController.isOfflineHosting(), HostAccessControl.allowVanillaJoin());
+    }
+
+    private record GuestInfo(String host, String world, String gameMode, String difficulty, boolean cheats) {
+    }
+
+    private GuestInfo guestInfo() {
+        PresenceManager presence = LanPlusClient.presence();
+        if (presence == null) {
+            return null;
+        }
+        PresenceSnapshot s = presence.current();
+        if (s == null || s.state() != GameplayState.MULTIPLAYER) {
+            return null;
+        }
+        Friend host = joinedHostFriend();
+        if (host == null) {
+            return new GuestInfo(null, null, null, null, false);
+        }
+        return new GuestInfo(host.username(), host.worldName(), host.gameMode(), host.difficulty(), host.allowCommands());
+    }
+
+    private Friend joinedHostFriend() {
+        UUID h = LanPlusClient.joinedHost();
+        if (h == null) {
+            return null;
+        }
+        for (Friend f : friends()) {
+            if (h.equals(f.uuid())) {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    private List<PlayerInfo> connectedPlayers() {
+        if (Minecraft.getInstance().getConnection() == null) {
+            return List.of();
+        }
+        return new ArrayList<>(Minecraft.getInstance().getConnection().getListedOnlinePlayers());
     }
 
     private Component modeName(HostAccessMode mode) {

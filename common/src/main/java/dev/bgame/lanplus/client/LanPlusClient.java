@@ -212,6 +212,20 @@ public final class LanPlusClient {
         return invites;
     }
 
+    public static boolean isHostingViaRelay() {
+        return relayTunnel != null && relayTunnel.isOpen();
+    }
+
+    private static volatile java.util.UUID joinedHost;
+
+    public static void setJoinedHost(java.util.UUID uuid) {
+        joinedHost = uuid;
+    }
+
+    public static java.util.UUID joinedHost() {
+        return joinedHost;
+    }
+
     public static SkinService skins() {
         return skins;
     }
@@ -258,6 +272,18 @@ public final class LanPlusClient {
                 applyShop(shop);
             }
         });
+    }
+
+    public static void refreshCosmetics() {
+        if (cosmeticAssets != null) {
+            cosmeticAssets.refreshCatalog();
+        }
+        ensureCosmeticShop();
+        UUID self = selfUuid();
+        if (self != null) {
+            requestedLoadouts.remove(self);
+            ensureCosmeticLoadout(self);
+        }
     }
 
     public static void completePurchase(UUID player, String id) {

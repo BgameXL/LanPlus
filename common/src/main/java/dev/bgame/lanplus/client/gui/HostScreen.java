@@ -42,6 +42,7 @@ public final class HostScreen extends LanPlusScreen {
     private static final int HEADER_H = 24;
     private static final int SECTION_H = 16;
     private static final int LABEL_PAD = 12;
+    private static final long TOOLTIP_DELAY_MS = 500L;
     private static final int CTRL_W = 110;
     private static final GameType[] GAME_TYPES = GameType.values();
     private static final Difficulty[] DIFFICULTIES = Difficulty.values();
@@ -59,6 +60,8 @@ public final class HostScreen extends LanPlusScreen {
     private int selected = -1;
     private int listScroll;
     private HostAccessMode accessMode = HostAccessMode.FRIENDS;
+    private String hoverTip;
+    private long hoverStart;
     private boolean allowNonPremium;
     private boolean allowVanillaJoin;
     private GameType gameType = GameType.SURVIVAL;
@@ -304,8 +307,10 @@ public final class HostScreen extends LanPlusScreen {
                 cardX + PAD, chipW);
         renderModeChip(g, mouseX, mouseY, HostAccessMode.FRIENDS, "gui.lanplus.host.access.friends",
                 cardX + PAD + chipW + 6, chipW);
+        renderModeChip(g, mouseX, mouseY, HostAccessMode.FRIENDS_OF_FRIENDS, "gui.lanplus.host.access.friends_of_friends",
+                cardX + PAD + 2 * (chipW + 6), chipW);
         renderModeChip(g, mouseX, mouseY, HostAccessMode.INVITED, "gui.lanplus.host.access.invited",
-                cardX + PAD + 2 * (chipW + 6), cardW - 2 * PAD - 2 * (chipW + 6));
+                cardX + PAD + 3 * (chipW + 6), cardW - 2 * PAD - 3 * (chipW + 6));
 
         int halfW = (cardW - 2 * PAD - 6) / 2;
         int premiumX = cardX + PAD;
@@ -317,21 +322,28 @@ public final class HostScreen extends LanPlusScreen {
         boolean hover = in(mouseX, mouseY, premiumX, premiumRowY, halfW, DROPDOWN_H);
         LanPlusUI.chip(g, this.font, premium, premiumX, premiumRowY, halfW, DROPDOWN_H,
                 allowNonPremium, true, hover);
-        if (hover) {
-            g.renderTooltip(this.font,
-                    this.font.split(Component.translatable("gui.lanplus.host.nonpremium.tip"), 220),
-                    mouseX, mouseY);
-        }
 
         Component vanilla = Component.translatable("gui.lanplus.host.vanilla", Component.translatable(
                 allowVanillaJoin ? "gui.lanplus.host.vanilla.on" : "gui.lanplus.host.vanilla.off"));
         boolean vanillaHover = in(mouseX, mouseY, vanillaX, premiumRowY, vanillaW, DROPDOWN_H);
         LanPlusUI.chip(g, this.font, vanilla, vanillaX, premiumRowY, vanillaW, DROPDOWN_H,
                 allowVanillaJoin, true, vanillaHover);
-        if (vanillaHover) {
-            g.renderTooltip(this.font,
-                    this.font.split(Component.translatable("gui.lanplus.host.vanilla.tip"), 220),
-                    mouseX, mouseY);
+
+        String tip;
+        if (hover) {
+            tip = "gui.lanplus.host.nonpremium.tip";
+        } else if (vanillaHover) {
+            tip = "gui.lanplus.host.vanilla.tip";
+        } else {
+            HostAccessMode hovered = accessModeAt(mouseX, mouseY);
+            tip = hovered == null ? null : accessTipKey(hovered);
+        }
+        if (!java.util.Objects.equals(tip, hoverTip)) {
+            hoverTip = tip;
+            hoverStart = System.currentTimeMillis();
+        }
+        if (tip != null && System.currentTimeMillis() - hoverStart >= TOOLTIP_DELAY_MS) {
+            g.renderTooltip(this.font, this.font.split(Component.translatable(tip), 220), mouseX, mouseY);
         }
     }
 
@@ -342,8 +354,34 @@ public final class HostScreen extends LanPlusScreen {
                 accessMode == mode, true, hover);
     }
 
+    private HostAccessMode accessModeAt(double mouseX, double mouseY) {
+        if (!in(mouseX, mouseY, cardX + PAD, accessRowY, cardW - 2 * PAD, DROPDOWN_H)) {
+            return null;
+        }
+        int chipW = accessChipW();
+        if (mouseX < cardX + PAD + chipW + 6) {
+            return HostAccessMode.EVERYONE;
+        }
+        if (mouseX < cardX + PAD + 2 * (chipW + 6)) {
+            return HostAccessMode.FRIENDS;
+        }
+        if (mouseX < cardX + PAD + 3 * (chipW + 6)) {
+            return HostAccessMode.FRIENDS_OF_FRIENDS;
+        }
+        return HostAccessMode.INVITED;
+    }
+
+    private static String accessTipKey(HostAccessMode mode) {
+        return switch (mode) {
+            case EVERYONE -> "gui.lanplus.host.access.everyone.tip";
+            case FRIENDS -> "gui.lanplus.host.access.friends.tip";
+            case FRIENDS_OF_FRIENDS -> "gui.lanplus.host.access.friends_of_friends.tip";
+            case INVITED -> "gui.lanplus.host.access.invited.tip";
+        };
+    }
+
     private int accessChipW() {
-        return (cardW - 2 * PAD - 2 * 6) / 3;
+        return (cardW - 2 * PAD - 3 * 6) / 4;
     }
 
     private Component gameTypeLabel(GameType gt) {
@@ -481,15 +519,9 @@ public final class HostScreen extends LanPlusScreen {
 
     private boolean handleSharedClick(double mouseX, double mouseY, int button) {
         if (button == 0) {
-            if (in(mouseX, mouseY, cardX + PAD, accessRowY, cardW - 2 * PAD, DROPDOWN_H)) {
-                int chipW = accessChipW();
-                if (mouseX < cardX + PAD + chipW) {
-                    accessMode = HostAccessMode.EVERYONE;
-                } else if (mouseX < cardX + PAD + 2 * chipW + 6) {
-                    accessMode = HostAccessMode.FRIENDS;
-                } else {
-                    accessMode = HostAccessMode.INVITED;
-                }
+            HostAccessMode picked = accessModeAt(mouseX, mouseY);
+            if (picked != null) {
+                accessMode = picked;
                 return true;
             }
             int halfW = (cardW - 2 * PAD - 6) / 2;

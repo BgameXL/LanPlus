@@ -15,9 +15,11 @@ public interface FriendsService {
     List<Friend> friends();
     List<ResolvedUser> requests();
     List<ActivityEntry> activity();
+    List<Friend> discoverableHosts();
     UserProfile localProfile();
     CompletableFuture<List<Friend>> refresh();
     CompletableFuture<List<ActivityEntry>> refreshActivity();
+    CompletableFuture<List<Friend>> refreshDiscoverableHosts();
     CompletableFuture<List<Suggestion>> suggestions();
     CompletableFuture<Boolean> add(UUID friendUuid);
     CompletableFuture<Boolean> addByQuery(String query);

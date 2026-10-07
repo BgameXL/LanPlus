@@ -29,6 +29,7 @@ public final class HostController {
     private static volatile HostSettings pending;
     private static volatile long pendingAt;
     private static volatile boolean offlineHosting;
+    private static volatile long hostingSince;
 
     private HostController() {
     }
@@ -40,6 +41,10 @@ public final class HostController {
 
     public static boolean isOfflineHosting() {
         return offlineHosting;
+    }
+
+    public static long hostingSince() {
+        return hostingSince;
     }
 
     public static void requestHost(HostSettings settings) {
@@ -55,6 +60,7 @@ public final class HostController {
                 HostAccessControl.clear();
             }
             offlineHosting = false;
+            hostingSince = 0L;
             PauseMenuButtons.resetHostedInWorld();
         }
 
@@ -80,6 +86,9 @@ public final class HostController {
         offlineHosting = s.allowNonPremium();
         server.execute(() -> {
             HostAccessControl.set(s.mode(), host, initial, s.maxPlayers(), s.allowVanillaJoin());
+            if (hostingSince == 0L) {
+                hostingSince = System.currentTimeMillis();
+            }
             if (s.allowNonPremium()) {
                 server.setUsesAuthentication(false);
             }

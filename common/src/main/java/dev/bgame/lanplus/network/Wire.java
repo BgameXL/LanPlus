@@ -51,6 +51,16 @@ final class Wire {
         }
     }
 
+    record DiscoverableHostDto(String uuid, String username, String worldName, String joinCode,
+                               String gameMode, String difficulty, Skin skin,
+                               int mutualCount, List<String> mutualNames) {
+        dev.bgame.lanplus.api.Friend toApi() {
+            return new dev.bgame.lanplus.api.Friend(UUID.fromString(uuid), username,
+                    Connectivity.ONLINE, GameplayState.HOSTING, worldName, joinCode,
+                    skin == null ? null : skin.toApi(), false, false, 0, gameMode, difficulty, false);
+        }
+    }
+
     record FriendAdd(String uuid, String friendUuid) {
     }
 

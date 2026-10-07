@@ -231,6 +231,29 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
+    public CompletableFuture<List<Friend>> getDiscoverableHosts() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return get("/hosts/discoverable").thenApply(resp -> {
+            Wire.DiscoverableHostDto[] arr = GSON.fromJson(resp.body(), Wire.DiscoverableHostDto[].class);
+            if (arr == null) {
+                return List.<Friend>of();
+            }
+            List<Friend> out = new ArrayList<>(arr.length);
+            for (Wire.DiscoverableHostDto d : arr) {
+                if (d != null && d.uuid() != null) {
+                    out.add(d.toApi());
+                }
+            }
+            return out;
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ discoverable hosts failed: {}", err.toString());
+            return List.of();
+        });
+    }
+
+    @Override
     public CompletableFuture<List<ActivityEntry>> getActivity() {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
@@ -1020,6 +1043,11 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
                         UUID uuid = UUID.fromString(obj.get("uuid").getAsString());
                         String joinCode = optionalString(obj, "joinCode");
                         fanout(l -> l.onFriendStartedHosting(uuid, joinCode));
+                    }
+                    case "DISCOVERABLE_HOST_STARTED" -> {
+                        UUID uuid = UUID.fromString(obj.get("uuid").getAsString());
+                        String joinCode = optionalString(obj, "joinCode");
+                        fanout(l -> l.onDiscoverableHostStarted(uuid, joinCode));
                     }
                     case "FRIEND_REQUEST" -> {
                         UUID fromUuid = UUID.fromString(obj.get("fromUuid").getAsString());

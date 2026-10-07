@@ -61,6 +61,8 @@ public interface LanPlusNetwork {
 
     CompletableFuture<List<ActivityEntry>> getActivity();
 
+    CompletableFuture<List<Friend>> getDiscoverableHosts();
+
     CompletableFuture<List<Announcement>> getAnnouncements();
 
     CompletableFuture<List<Announcement>> getUnseenAnnouncements();
@@ -132,6 +134,9 @@ public interface LanPlusNetwork {
         }
 
         default void onFriendStartedHosting(UUID uuid, String joinCode) {
+        }
+
+        default void onDiscoverableHostStarted(UUID uuid, String joinCode) {
         }
 
         default void onFriendRequest(UUID fromUuid, String fromUsername) {

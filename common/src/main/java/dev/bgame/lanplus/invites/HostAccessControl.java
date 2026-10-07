@@ -35,7 +35,7 @@ public final class HostAccessControl {
     }
 
     public static void invite(UUID uuid) {
-        if (uuid != null && mode == HostAccessMode.INVITED) {
+        if (uuid != null && (mode == HostAccessMode.INVITED || mode == HostAccessMode.FRIENDS_OF_FRIENDS)) {
             allowed.add(uuid);
         }
     }
@@ -66,6 +66,10 @@ public final class HostAccessControl {
 
     public static HostAccessMode mode() {
         return mode;
+    }
+
+    public static boolean allowVanillaJoin() {
+        return allowVanillaJoin;
     }
 
     public static Set<UUID> allowedSnapshot() {
