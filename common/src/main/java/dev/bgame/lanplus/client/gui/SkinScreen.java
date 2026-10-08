@@ -142,11 +142,9 @@ public final class SkinScreen extends LanPlusScreen {
         LanPlusUI.slot(g, mx0, my0, mx1, my1);
         int cx = (mx0 + mx1) / 2;
         int feetY = my1 - 40;
-        SkinTextures st = LanPlusClient.skinTextures();
-        SkinTextures.Resolved res = st == null || uuid == null ? null : st.get(uuid);
-        ResourceLocation skin = res != null ? res.texture()
-                : DefaultPlayerSkin.get(uuid == null ? UUID.randomUUID() : uuid).texture();
-        boolean modelSlim = res != null ? res.slim() : slim;
+        SkinTextures.Resolved res = SkinTextures.resolveOrDefault(LanPlusClient.skinTextures(), uuid, slim);
+        ResourceLocation skin = res.texture();
+        boolean modelSlim = res.slim();
         float scale = Math.min(79f, (feetY - my0 - 14) * 0.5f) * view.zoom();
         g.enableScissor(mx0 + 1, my0 + 1, mx1 - 1, my1 - 1);
         g.fill(cx - 22, feetY - 1, cx + 22, feetY, 0x44000000);

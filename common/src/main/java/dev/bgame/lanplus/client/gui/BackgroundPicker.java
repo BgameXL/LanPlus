@@ -130,8 +130,8 @@ public final class BackgroundPicker extends LanPlusScreen {
             boolean active = tab == i;
             boolean hover = mouseX >= x && mouseX < x + tabW && mouseY >= y && mouseY < y + 14;
             Component label = Component.translatable(labels[i]);
-            g.drawString(this.font, label, x + (tabW - this.font.width(label)) / 2, y + 2,
-                    active ? LanPlusUI.TEXT : (hover ? LanPlusUI.MUTED : LanPlusUI.FAINT), false);
+            LanPlusUI.textCentered(g, this.font, label, x, y + 2, tabW,
+                    active ? LanPlusUI.TEXT : (hover ? LanPlusUI.MUTED : LanPlusUI.FAINT));
             if (active) {
                 g.fill(x + 6, y + 13, x + tabW - 6, y + 14, LanPlusUI.ACCENT);
             }

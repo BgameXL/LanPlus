@@ -98,6 +98,7 @@
   "gui.lanplus.host.commands.off": "OFF",
   "gui.lanplus.host.difficulty": "Difficulty",
   "gui.lanplus.host.maxplayers": "Max Players",
+  "gui.lanplus.host.hardcore.tip": "This world is Hardcore.",
   "gui.lanplus.host.start": "开放",
   "gui.lanplus.invite.title": "邀请好友",
   "gui.lanplus.invite.hostnow": "立即开放",

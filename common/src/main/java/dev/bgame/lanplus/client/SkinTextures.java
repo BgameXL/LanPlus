@@ -5,6 +5,7 @@ import dev.bgame.lanplus.LanplusCommon;
 import dev.bgame.lanplus.skins.SkinTextureSink;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.client.resources.DefaultPlayerSkin;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.UUID;
@@ -22,6 +23,15 @@ public final class SkinTextures implements SkinTextureSink {
 
     public Resolved get(UUID player) {
         return byPlayer.get(player);
+    }
+
+    public static Resolved resolveOrDefault(SkinTextures textures, UUID uuid, boolean slimFallback) {
+        Resolved res = textures == null || uuid == null ? null : textures.get(uuid);
+        if (res != null) {
+            return res;
+        }
+        UUID key = uuid == null ? UUID.randomUUID() : uuid;
+        return new Resolved(DefaultPlayerSkin.get(key).texture(), slimFallback);
     }
 
     public void remove(UUID player) {

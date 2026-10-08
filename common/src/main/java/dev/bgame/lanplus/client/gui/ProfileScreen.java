@@ -59,7 +59,7 @@ public final class ProfileScreen extends LanPlusScreen {
             0x9B59B6, 0xB36AF0, 0xF1A33C, 0xF0C24A};
     private int bgStyle = BG_DARK;
     private int bgColor = 0x101216;
-    private int bgOpacity = 92;
+    private static final int BG_OPACITY = 92;
     private String bgImageId;
     private CatalogImage bgImage;
     private CatalogImage banner;
@@ -886,7 +886,7 @@ public final class ProfileScreen extends LanPlusScreen {
             ProfileImages.Tex tex = ProfileImages.get(bgImage);
             if (tex != null) {
                 ProfileImages.blitCover(g, tex, 0, 0, screenWidth, screenHeight);
-                g.fill(0, 0, screenWidth, screenHeight, alpha(bgOpacity));
+                g.fill(0, 0, screenWidth, screenHeight, alpha(BG_OPACITY));
                 return;
             }
         }
@@ -894,7 +894,7 @@ public final class ProfileScreen extends LanPlusScreen {
             g.fill(0, 0, screenWidth, screenHeight, 0xFF000000 | (bgColor & 0xFFFFFF));
             return;
         }
-        g.fill(0, 0, screenWidth, screenHeight, alpha(bgOpacity) | 0x0C0D10);
+        g.fill(0, 0, screenWidth, screenHeight, alpha(BG_OPACITY) | 0x0C0D10);
     }
 
     private static int alpha(int opacity0to100) {
@@ -1097,7 +1097,7 @@ public final class ProfileScreen extends LanPlusScreen {
             ProfileImages.Tex tex = ProfileImages.get(bgImage);
             if (tex != null) {
                 ProfileImages.blitCover(g, tex, cx0, cy0, cw, ch);
-                g.fill(cx0, cy0, cx0 + cw, cy0 + ch, alpha(bgOpacity));
+                g.fill(cx0, cy0, cx0 + cw, cy0 + ch, alpha(BG_OPACITY));
             } else {
                 g.fill(cx0, cy0, cx0 + cw, cy0 + ch, 0xFF0C0D10);
             }
@@ -1159,7 +1159,7 @@ public final class ProfileScreen extends LanPlusScreen {
             boolean hover = mouseX >= x && mouseX < x + tabW
                     && mouseY >= EDIT_TAB_Y - 3 && mouseY < EDIT_TAB_Y + 12;
             int color = active ? LanPlusUI.TEXT : (hover ? LanPlusUI.MUTED : LanPlusUI.FAINT);
-            g.drawString(this.font, label, x + (tabW - this.font.width(label)) / 2, EDIT_TAB_Y, color, false);
+            LanPlusUI.textCentered(g, this.font, label, x, EDIT_TAB_Y, tabW, color);
             if (active) {
                 g.fill(x + 6, EDIT_TAB_Y + 11, x + tabW - 6, EDIT_TAB_Y + 12, LanPlusUI.ACCENT);
             }
@@ -1865,7 +1865,7 @@ public final class ProfileScreen extends LanPlusScreen {
             }
         }
         setStatus(Component.translatable("gui.lanplus.profile.saving"));
-        CompletableFuture<String> bgF = svc.setBackground(bgStyleName(), bgColor, bgOpacity, bgImageId);
+        CompletableFuture<String> bgF = svc.setBackground(bgStyleName(), bgColor, BG_OPACITY, bgImageId);
         CompletableFuture<String> bannerF = svc.setBanner(banner == null ? null : banner.id());
         CompletableFuture<String> saveF = svc.save(bio, pronouns, links, prompts, invisibleToggle,
                 favoriteVisibleToggle, playingVisibleToggle, recentlyPlayedVisibleToggle, discoverableToggle, profilePublicToggle);
@@ -1933,7 +1933,6 @@ public final class ProfileScreen extends LanPlusScreen {
             default -> BG_DARK;
         };
         bgColor = bg.color() & 0xFFFFFF;
-        bgOpacity = Math.clamp(bg.opacity(), 0, 100);
         bgImage = bg.image();
         bgImageId = bg.image() == null ? null : bg.image().id();
     }

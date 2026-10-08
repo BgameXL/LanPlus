@@ -160,13 +160,16 @@ final class LanPlusUI {
         return x + font.width("+");
     }
 
+    static void textCentered(GuiGraphics g, Font font, Component label, int x, int y, int w, int color) {
+        g.drawString(font, label, x + (w - font.width(label)) / 2, y, color, false);
+    }
+
     static void chip(GuiGraphics g, Font font, Component label, int x, int y, int w, int h,
                      boolean selected, boolean enabled, boolean hover) {
         int bg = !enabled ? SURFACE_DISABLED : selected ? ACCENT_STRONG : (hover ? SURFACE_HOVER : SURFACE_RAISED);
         button3d(g, x, y, x + w, y + h, bg);
         int color = !enabled ? FAINT : selected ? TEXT : hover ? MUTED : TEXT;
-        int tx = x + (w - font.width(label)) / 2;
-        g.drawString(font, label, tx, y + (h - 8) / 2, color, false);
+        textCentered(g, font, label, x, y + (h - 8) / 2, w, color);
     }
 
     static String relativeTime(long epochMillis) {

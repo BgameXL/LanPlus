@@ -259,20 +259,36 @@ public final class HostScreen extends LanPlusScreen {
     }
 
     private void renderWorldSettings(GuiGraphics g, int mouseX, int mouseY) {
+        boolean hc = hardcore();
         g.drawString(this.font, Component.translatable("gui.lanplus.host.gamemode"),
                 cardX + PAD, gameRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
-        renderDropdownButton(g, ctrlX, gameRowY, gameTypeLabel(gameType), gameTypeDd.isOpen(), mouseX, mouseY);
+        if (hc) {
+            LanPlusUI.chip(g, this.font, gameTypeLabel(GameType.SURVIVAL), ctrlX, gameRowY, CTRL_W, DROPDOWN_H,
+                    false, false, false);
+        } else {
+            renderDropdownButton(g, ctrlX, gameRowY, gameTypeLabel(gameType), gameTypeDd.isOpen(), mouseX, mouseY);
+        }
 
         g.drawString(this.font, Component.translatable("gui.lanplus.host.commands"),
                 cardX + PAD, cmdRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
-        Component commands = Component.translatable(
-                allowCheats ? "gui.lanplus.host.commands.on" : "gui.lanplus.host.commands.off");
-        LanPlusUI.chip(g, this.font, commands, ctrlX, cmdRowY, CTRL_W, DROPDOWN_H,
-                allowCheats, true, in(mouseX, mouseY, ctrlX, cmdRowY, CTRL_W, DROPDOWN_H));
+        if (hc) {
+            LanPlusUI.chip(g, this.font, Component.translatable("gui.lanplus.host.commands.off"),
+                    ctrlX, cmdRowY, CTRL_W, DROPDOWN_H, false, false, false);
+        } else {
+            Component commands = Component.translatable(
+                    allowCheats ? "gui.lanplus.host.commands.on" : "gui.lanplus.host.commands.off");
+            LanPlusUI.chip(g, this.font, commands, ctrlX, cmdRowY, CTRL_W, DROPDOWN_H,
+                    allowCheats, true, in(mouseX, mouseY, ctrlX, cmdRowY, CTRL_W, DROPDOWN_H));
+        }
 
         g.drawString(this.font, Component.translatable("gui.lanplus.host.difficulty"),
                 cardX + PAD, diffRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
-        renderDropdownButton(g, ctrlX, diffRowY, difficultyLabel(difficulty), difficultyDd.isOpen(), mouseX, mouseY);
+        if (hc) {
+            LanPlusUI.chip(g, this.font, difficultyLabel(Difficulty.HARD), ctrlX, diffRowY, CTRL_W, DROPDOWN_H,
+                    false, false, false);
+        } else {
+            renderDropdownButton(g, ctrlX, diffRowY, difficultyLabel(difficulty), difficultyDd.isOpen(), mouseX, mouseY);
+        }
 
         g.drawString(this.font, Component.translatable("gui.lanplus.host.maxplayers"),
                 cardX + PAD, playersRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
@@ -288,6 +304,20 @@ public final class HostScreen extends LanPlusScreen {
                 canUp ? (hoverUp ? LanPlusUI.TEXT : LanPlusUI.MUTED) : LanPlusUI.FAINT, false);
         g.drawCenteredString(this.font, Component.literal(Integer.toString(maxPlayers)),
                 ctrlX + CTRL_W / 2, textY, LanPlusUI.TEXT);
+
+        if (hc && in(mouseX, mouseY, ctrlX, gameRowY, CTRL_W, diffRowY + DROPDOWN_H - gameRowY)) {
+            g.renderTooltip(this.font,
+                    this.font.split(Component.translatable("gui.lanplus.host.hardcore.tip"), 200), mouseX, mouseY);
+        }
+    }
+
+    private boolean hardcore() {
+        if (inWorld) {
+            var server = Minecraft.getInstance().getSingleplayerServer();
+            return server != null && server.getWorldData().isHardcore();
+        }
+        LevelSummary world = selected >= 0 && selected < worlds.size() ? worlds.get(selected) : null;
+        return world != null && world.getSettings().hardcore();
     }
 
     private void renderDropdownButton(GuiGraphics g, int x, int y, Component label,
@@ -295,7 +325,8 @@ public final class HostScreen extends LanPlusScreen {
         boolean hover = in(mouseX, mouseY, x, y, CTRL_W, DROPDOWN_H);
         int bg = open ? LanPlusUI.ACCENT : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
         LanPlusUI.button3d(g, x, y, x + CTRL_W, y + DROPDOWN_H, bg);
-        g.drawString(this.font, label, x + 6, y + (DROPDOWN_H - 8) / 2, LanPlusUI.TEXT, false);
+        g.drawString(this.font, label, x + (CTRL_W - this.font.width(label)) / 2, y + (DROPDOWN_H - 8) / 2,
+                LanPlusUI.TEXT, false);
         Component caret = Component.literal(open ? "▲" : "▼");
         g.drawString(this.font, caret, x + CTRL_W - 14, y + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
     }
@@ -464,6 +495,8 @@ public final class HostScreen extends LanPlusScreen {
                     int idx = (int) ((mouseY - (listTop + 2 - listScroll)) / ROW_H);
                     if (idx >= 0 && idx < worlds.size()) {
                         selected = idx;
+                        gameTypeDd.close();
+                        difficultyDd.close();
                         rebuildWidgets();
                     }
                     return true;
@@ -474,7 +507,8 @@ public final class HostScreen extends LanPlusScreen {
     }
 
     private boolean handleSettingClick(double mouseX, double mouseY) {
-        if (gameTypeDd.isOpen()) {
+        boolean hc = hardcore();
+        if (!hc && gameTypeDd.isOpen()) {
             int ci = gameTypeDd.clicked(mouseX, mouseY);
             if (ci >= 0) {
                 gameType = GAME_TYPES[ci];
@@ -482,7 +516,7 @@ public final class HostScreen extends LanPlusScreen {
             gameTypeDd.close();
             return true;
         }
-        if (difficultyDd.isOpen()) {
+        if (!hc && difficultyDd.isOpen()) {
             int ci = difficultyDd.clicked(mouseX, mouseY);
             if (ci >= 0) {
                 difficulty = DIFFICULTIES[ci];
@@ -491,18 +525,18 @@ public final class HostScreen extends LanPlusScreen {
             return true;
         }
 
-        if (in(mouseX, mouseY, ctrlX, gameRowY, CTRL_W, DROPDOWN_H)) {
+        if (!hc && in(mouseX, mouseY, ctrlX, gameRowY, CTRL_W, DROPDOWN_H)) {
             gameTypeDd.open(0);
             difficultyDd.close();
             return true;
         }
-        if (in(mouseX, mouseY, ctrlX, diffRowY, CTRL_W, DROPDOWN_H)) {
+        if (!hc && in(mouseX, mouseY, ctrlX, diffRowY, CTRL_W, DROPDOWN_H)) {
             difficultyDd.open(0);
             gameTypeDd.close();
             return true;
         }
 
-        if (in(mouseX, mouseY, ctrlX, cmdRowY, CTRL_W, DROPDOWN_H)) {
+        if (!hc && in(mouseX, mouseY, ctrlX, cmdRowY, CTRL_W, DROPDOWN_H)) {
             allowCheats = !allowCheats;
             return true;
         }
@@ -620,9 +654,11 @@ public final class HostScreen extends LanPlusScreen {
 
     private void doStart() {
         Minecraft minecraft = Minecraft.getInstance();
+        boolean hc = hardcore();
         HostController.HostSettings settings = new HostController.HostSettings(
-                accessMode, Set.of(), allowNonPremium, gameType, difficulty, allowCheats, maxPlayers,
-                allowVanillaJoin);
+                accessMode, Set.of(), allowNonPremium,
+                hc ? GameType.SURVIVAL : gameType, hc ? Difficulty.HARD : difficulty,
+                !hc && allowCheats, maxPlayers, allowVanillaJoin);
         if (inWorld) {
             if (accessMode == HostAccessMode.INVITED) {
                 minecraft.setScreen(new InviteOverlay(this, settings));
