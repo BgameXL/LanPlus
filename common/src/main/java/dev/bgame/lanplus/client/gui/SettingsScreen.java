@@ -30,7 +30,8 @@ public final class SettingsScreen extends LanPlusScreen {
     private enum ThemeTarget {
         ACCENT("gui.lanplus.theme.accent"),
         BACKGROUND("gui.lanplus.theme.background"),
-        TEXT("gui.lanplus.theme.text");
+        TEXT("gui.lanplus.theme.text"),
+        MUTED("gui.lanplus.theme.muted");
         final String key;
 
         ThemeTarget(String key) {
@@ -39,11 +40,12 @@ public final class SettingsScreen extends LanPlusScreen {
     }
 
     private static final int CATEGORY_W = 94;
+    private static final int CH_COLS = 2;
+    private static final int CH_ROW_H = 20;
+    private static final int CH_ROW_GAP = 6;
     private static final int TOGGLE_ROW_STEP = 48;
     private static final int MAX_URL_LENGTH = 2048;
     private static final int MAX_ADDRESS_LENGTH = 260;
-    private static final int CARD_GAP = 8;
-    private static final int CARD_H = 66;
     private final Screen parent;
     private Cat selected = Cat.GENERAL;
     private EditBox backendBox;
@@ -56,7 +58,8 @@ public final class SettingsScreen extends LanPlusScreen {
     private ColorPicker themePicker;
     private ThemeTarget themeTarget = ThemeTarget.ACCENT;
     private int px, py, pw, ph, headerBottom, sidebarX, dividerX, contentX, contentW, contentTop;
-    private int cardW, cardsTop, editorTop;
+    private int innerX, innerY, innerW, innerH, innerLeftX, leftW, chY, chW, pickerY;
+    private int dividerThemeX, presetX, presetColW, presetTop, resetY;
 
     public SettingsScreen(Screen parent) {
         super(Component.translatable("gui.lanplus.settings.title"));
@@ -77,9 +80,32 @@ public final class SettingsScreen extends LanPlusScreen {
         contentX = dividerX + 12;
         contentW = px + pw - 12 - contentX;
         contentTop = headerBottom + 10;
-        cardW = (contentW - 3 * CARD_GAP) / 4;
-        cardsTop = contentTop + 16;
-        editorTop = cardsTop + CARD_H + 10;
+        themeLayout();
+    }
+
+    private void themeLayout() {
+        int pad = 14;
+        int gap = 14;
+        presetColW = 88;
+        innerW = contentW;
+        innerX = contentX;
+        int chRows = (ThemeTarget.values().length + CH_COLS - 1) / CH_COLS;
+        int channelsH = chRows * CH_ROW_H + (chRows - 1) * CH_ROW_GAP;
+        innerH = pad + channelsH + 14 + ColorPicker.preferredHeight() + pad;
+        innerY = contentTop + 2;
+        innerLeftX = innerX + pad;
+        leftW = innerW - 2 * pad - presetColW - 2 * gap - 1;
+        dividerThemeX = innerLeftX + leftW + gap;
+        presetX = dividerThemeX + 1 + gap;
+        presetTop = innerY + pad;
+        chY = innerY + pad;
+        int maxLabel = 0;
+        for (ThemeTarget t : ThemeTarget.values()) {
+            maxLabel = Math.max(maxLabel, this.font.width(Component.translatable(t.key)));
+        }
+        chW = 18 + maxLabel + 10;
+        pickerY = chY + channelsH + 14;
+        resetY = innerY + innerH - pad - 18;
     }
 
     @Override
@@ -239,109 +265,76 @@ public final class SettingsScreen extends LanPlusScreen {
     }
 
     private void renderTheme(GuiGraphics g) {
-        Theme customPreview = Themes.custom(liveSeed(ThemeTarget.ACCENT),
-                liveSeed(ThemeTarget.BACKGROUND), liveSeed(ThemeTarget.TEXT));
-        if ("custom".equals(Config.theme)) {
-            LanPlusUI.apply(customPreview);
-        }
+        LanPlusUI.apply(Themes.custom(liveSeed(ThemeTarget.ACCENT), liveSeed(ThemeTarget.BACKGROUND),
+                liveSeed(ThemeTarget.TEXT), liveSeed(ThemeTarget.MUTED)));
 
-        g.drawString(this.font, Component.translatable("gui.lanplus.settings.theme.desc"),
-                contentX, contentTop + 2, LanPlusUI.MUTED, false);
+        g.fill(dividerThemeX, innerY + 14, dividerThemeX + 1, innerY + innerH - 14, LanPlusUI.DIVIDER);
 
-        for (int i = 0; i < 4; i++) {
-            Theme card = i < Themes.ALL.size() ? Themes.ALL.get(i) : customPreview;
-            renderCard(g, i, card);
-        }
-
+        renderChannels(g);
         if (themePicker != null) {
-            renderCustomEditor(g);
+            themePicker.render(g);
         }
+        renderPresets(g);
     }
 
-    private void renderCard(GuiGraphics g, int index, Theme theme) {
-        String id = index < Themes.ALL.size() ? theme.id() : "custom";
-        boolean selected = id.equals(Config.theme);
-        int x = cardX(index);
-        int y = cardsTop;
-        LanPlusUI.button3d(g, x, y, x + cardW, y + CARD_H, LanPlusUI.SURFACE_RAISED);
-        if (selected) {
-            LanPlusUI.outline1(g, x, y, x + cardW, y + CARD_H, LanPlusUI.ACCENT);
-        }
-
-        Component name = index < Themes.ALL.size()
-                ? theme.name() : Component.translatable("gui.lanplus.theme.custom");
-        g.drawString(this.font, name, x + 8, y + 8, selected ? LanPlusUI.ACCENT : LanPlusUI.TEXT, false);
-        g.drawString(this.font, "+", x + cardW - 8 - this.font.width("+"), y + 8,
-                selected ? LanPlusUI.LIME : LanPlusUI.MUTED, false);
-
-        int[] ramp = {theme.accentStrong(), theme.accent(), theme.accentHover(), theme.link()};
-        int sw = (cardW - 16) / ramp.length;
-        for (int i = 0; i < ramp.length; i++) {
-            g.fill(x + 8 + i * sw, y + 22, x + 8 + (i + 1) * sw, y + 34, 0xFF000000 | (ramp[i] & 0xFFFFFF));
-        }
-        LanPlusUI.outline1(g, x + 8, y + 22, x + 8 + ramp.length * sw, y + 34, LanPlusUI.EDGE_DARK);
-
-        int dy = y + 38;
-        List<FormattedCharSequence> desc = this.font.split(
-                Component.translatable("gui.lanplus.theme." + id + ".desc"), cardW - 16);
-        for (int i = 0; i < desc.size() && i < 2; i++) {
-            g.drawString(this.font, desc.get(i), x + 8, dy, LanPlusUI.MUTED, false);
-            dy += 10;
-        }
-    }
-
-    private void renderCustomEditor(GuiGraphics g) {
-        int y = editorTop;
-        g.drawString(this.font, Component.translatable("gui.lanplus.theme.custom"), contentX, y, LanPlusUI.ACCENT, false);
-        g.drawString(this.font, Component.translatable("gui.lanplus.theme.tune"), contentX, y + 11, LanPlusUI.MUTED, false);
-        g.fill(contentX, y + 24, contentX + contentW, y + 25, LanPlusUI.DIVIDER);
-
-        int ty = y + 32;
-        int tw = (contentW - 2 * 6) / 3;
-        for (ThemeTarget t : ThemeTarget.values()) {
-            int tx = contentX + t.ordinal() * (tw + 6);
+    private void renderChannels(GuiGraphics g) {
+        ThemeTarget[] all = ThemeTarget.values();
+        for (int i = 0; i < all.length; i++) {
+            ThemeTarget t = all[i];
+            int tx = innerLeftX + (i % CH_COLS) * (chW + 6);
+            int ty = chY + (i / CH_COLS) * (CH_ROW_H + CH_ROW_GAP);
             boolean sel = t == themeTarget;
-            LanPlusUI.button3d(g, tx, ty, tx + tw, ty + 20, sel ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
-            g.fill(tx + 5, ty + 6, tx + 15, ty + 15, 0xFF000000 | (liveSeed(t) & 0xFFFFFF));
-            LanPlusUI.outline1(g, tx + 5, ty + 6, tx + 15, ty + 15, LanPlusUI.EDGE_DARK);
+            LanPlusUI.button3d(g, tx, ty, tx + chW, ty + CH_ROW_H, sel ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE);
+            g.fill(tx + 6, ty + 6, tx + 14, ty + 14, 0xFF000000 | (liveSeed(t) & 0xFFFFFF));
+            LanPlusUI.outline1(g, tx + 6, ty + 6, tx + 14, ty + 14, LanPlusUI.EDGE_DARK);
             if (sel) {
-                LanPlusUI.outline1(g, tx, ty, tx + tw, ty + 20, LanPlusUI.ACCENT);
+                LanPlusUI.outline1(g, tx, ty, tx + chW, ty + CH_ROW_H, LanPlusUI.ACCENT);
             }
-            g.drawString(this.font, Component.translatable(t.key), tx + 19, ty + 6,
+            g.drawString(this.font, Component.translatable(t.key), tx + 18, ty + 6,
                     sel ? LanPlusUI.TEXT : LanPlusUI.MUTED, false);
         }
-        themePicker.render(g);
+    }
+
+    private void renderPresets(GuiGraphics g) {
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings.theme"),
+                presetX, presetTop, LanPlusUI.FAINT, false);
+        int sw = 18;
+        for (int i = 0; i < Themes.ALL.size(); i++) {
+            Theme t = Themes.ALL.get(i);
+            int rowY = presetTop + 14 + i * 24;
+            g.fill(presetX, rowY, presetX + sw, rowY + sw, 0xFF000000 | (t.accent() & 0xFFFFFF));
+            LanPlusUI.outline1(g, presetX, rowY, presetX + sw, rowY + sw, LanPlusUI.EDGE_DARK);
+            g.drawString(this.font, t.name(), presetX + sw + 6, rowY + 5, LanPlusUI.MUTED, false);
+        }
     }
 
     private void addThemeWidgets() {
         if (!"custom".equals(Config.theme)) {
-            themePicker = null;
-            return;
+            seedCustomFrom(Themes.resolve(Config.theme));
+            Config.setTheme("custom");
+            LanPlusUI.apply(Themes.custom(Config.customAccent, Config.customBackground, Config.customText,
+                    Config.customMuted));
+            Config.save();
         }
         themeTarget = ThemeTarget.ACCENT;
         themePicker = new ColorPicker(this.font, configSeed(ThemeTarget.ACCENT));
-        themePicker.layout(contentX, editorTop + 62);
+        themePicker.layout(innerLeftX, pickerY, leftW);
         addRenderableWidget(themePicker.hexBox());
         addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.theme.reset"), b -> resetTheme())
-                .bounds(contentX + contentW - 110, editorTop, 110, 18).build());
+                .bounds(presetX, resetY, presetColW + 8, 18).build());
     }
 
-    private void selectThemeCard(int index) {
-        if (index < Themes.ALL.size()) {
-            Theme preset = Themes.ALL.get(index);
-            if (themePicker != null) {
-                persistTheme();
-            }
-            LanPlusUI.apply(preset);
-            Config.setTheme(preset.id());
-            rebuildWidgets();
-        } else if (!"custom".equals(Config.theme)) {
-            Config.setCustomTheme(configSeed(ThemeTarget.ACCENT), configSeed(ThemeTarget.BACKGROUND),
-                    configSeed(ThemeTarget.TEXT));
-            LanPlusUI.apply(Themes.custom(configSeed(ThemeTarget.ACCENT), configSeed(ThemeTarget.BACKGROUND),
-                    configSeed(ThemeTarget.TEXT)));
-            rebuildWidgets();
-        }
+    private void selectPreset(int index) {
+        seedCustomFrom(Themes.ALL.get(index));
+        themePicker.setColor(configSeed(themeTarget));
+        Config.save();
+    }
+
+    private void seedCustomFrom(Theme t) {
+        Config.customAccent = t.accent() & 0xFFFFFF;
+        Config.customBackground = t.surface() & 0xFFFFFF;
+        Config.customText = t.text() & 0xFFFFFF;
+        Config.customMuted = t.muted() & 0xFFFFFF;
     }
 
     private void selectThemeTarget(ThemeTarget t) {
@@ -354,9 +347,7 @@ public final class SettingsScreen extends LanPlusScreen {
     }
 
     private void resetTheme() {
-        Config.customAccent = Themes.AMETHYST.accent() & 0xFFFFFF;
-        Config.customBackground = Themes.AMETHYST.surface() & 0xFFFFFF;
-        Config.customText = Themes.AMETHYST.text() & 0xFFFFFF;
+        seedCustomFrom(Themes.AMETHYST);
         themePicker.setColor(configSeed(themeTarget));
         Config.save();
     }
@@ -366,6 +357,7 @@ public final class SettingsScreen extends LanPlusScreen {
             case ACCENT -> Config.customAccent = themePicker.color();
             case BACKGROUND -> Config.customBackground = themePicker.color();
             case TEXT -> Config.customText = themePicker.color();
+            case MUTED -> Config.customMuted = themePicker.color();
         }
     }
 
@@ -379,15 +371,12 @@ public final class SettingsScreen extends LanPlusScreen {
             case ACCENT -> Config.customAccent;
             case BACKGROUND -> Config.customBackground;
             case TEXT -> Config.customText;
+            case MUTED -> Config.customMuted;
         };
     }
 
     private int liveSeed(ThemeTarget t) {
         return themePicker != null && t == themeTarget ? themePicker.color() : configSeed(t);
-    }
-
-    private int cardX(int index) {
-        return contentX + index * (cardW + CARD_GAP);
     }
 
     private void renderAdvanced(GuiGraphics g) {
@@ -468,21 +457,19 @@ public final class SettingsScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (selected == Cat.THEME && button == 0) {
-            int card = cardIndexAt(mouseX, mouseY);
-            if (card >= 0) {
-                selectThemeCard(card);
+        if (selected == Cat.THEME && button == 0 && themePicker != null) {
+            int preset = presetAt(mouseX, mouseY);
+            if (preset >= 0) {
+                selectPreset(preset);
                 return true;
             }
-            if (themePicker != null) {
-                ThemeTarget target = targetAt(mouseX, mouseY);
-                if (target != null) {
-                    selectThemeTarget(target);
-                    return true;
-                }
-                if (themePicker.mouseClicked(mouseX, mouseY, button)) {
-                    return true;
-                }
+            ThemeTarget target = targetAt(mouseX, mouseY);
+            if (target != null) {
+                selectThemeTarget(target);
+                return true;
+            }
+            if (themePicker.mouseClicked(mouseX, mouseY, button)) {
+                return true;
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -505,13 +492,13 @@ public final class SettingsScreen extends LanPlusScreen {
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
-    private int cardIndexAt(double mouseX, double mouseY) {
-        if (mouseY < cardsTop || mouseY >= cardsTop + CARD_H) {
+    private int presetAt(double mouseX, double mouseY) {
+        if (mouseX < presetX || mouseX > presetX + presetColW) {
             return -1;
         }
-        for (int i = 0; i < 4; i++) {
-            int x = cardX(i);
-            if (mouseX >= x && mouseX < x + cardW) {
+        for (int i = 0; i < Themes.ALL.size(); i++) {
+            int rowY = presetTop + 14 + i * 24;
+            if (mouseY >= rowY && mouseY <= rowY + 18) {
                 return i;
             }
         }
@@ -519,15 +506,12 @@ public final class SettingsScreen extends LanPlusScreen {
     }
 
     private ThemeTarget targetAt(double mouseX, double mouseY) {
-        int ty = editorTop + 32;
-        if (mouseY < ty || mouseY >= ty + 20) {
-            return null;
-        }
-        int tw = (contentW - 2 * 6) / 3;
-        for (ThemeTarget t : ThemeTarget.values()) {
-            int tx = contentX + t.ordinal() * (tw + 6);
-            if (mouseX >= tx && mouseX < tx + tw) {
-                return t;
+        ThemeTarget[] all = ThemeTarget.values();
+        for (int i = 0; i < all.length; i++) {
+            int tx = innerLeftX + (i % CH_COLS) * (chW + 6);
+            int ty = chY + (i / CH_COLS) * (CH_ROW_H + CH_ROW_GAP);
+            if (mouseX >= tx && mouseX < tx + chW && mouseY >= ty && mouseY < ty + CH_ROW_H) {
+                return all[i];
             }
         }
         return null;

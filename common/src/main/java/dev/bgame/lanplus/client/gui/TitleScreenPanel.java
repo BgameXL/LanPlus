@@ -20,6 +20,7 @@ public final class TitleScreenPanel {
     private static final ResourceLocation PROFILE_ICON = icon("profile");
     private static final ResourceLocation ANNOUNCEMENTS_ICON = icon("announcements");
     private static final ResourceLocation SETTINGS_ICON = icon("settings");
+    private static final ResourceLocation COSMETICS_ICON = icon("cosmetics");
 
     private static final int RAIL_MARGIN = 8;
     private static final int VMARGIN = 8;
@@ -85,7 +86,7 @@ public final class TitleScreenPanel {
                 open(new ProfileScreen(title(), id));
             }
         }));
-        out.add(new Btn(null, "+", LanPlusUI.LAVENDER, false, Component.translatable("gui.lanplus.menu.cosmetics"), 0,
+        out.add(new Btn(COSMETICS_ICON, null, 0, false, Component.translatable("gui.lanplus.menu.cosmetics"), 0,
                 () -> open(new CosmeticScreen(title()))));
         out.add(new Btn(ANNOUNCEMENTS_ICON, null, 0, false, Component.translatable("gui.lanplus.menu.news"), unseen,
                 () -> open(new Announcements(title()))));

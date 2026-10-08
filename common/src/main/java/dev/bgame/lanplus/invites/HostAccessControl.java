@@ -53,7 +53,7 @@ public final class HostAccessControl {
         if (!offlineHosting) {
             return false;
         }
-        return !(allowVanillaJoin && mode == HostAccessMode.EVERYONE);
+        return !allowVanillaJoin;
     }
 
     public static boolean isActive() {
