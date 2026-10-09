@@ -36,6 +36,7 @@ public final class Config {
     public static int customBackground = 0x1E1926;
     public static int customText = 0xECEEF2;
     public static int customMuted = 0x8B909A;
+    public static int uiOpacity = 100;
     public static boolean voiceEnabled = true;
     public static String voiceHost = "";
     public static String seenUpdateVersion = "";
@@ -64,6 +65,7 @@ public final class Config {
                 customBackground = getInt(json, "customBackground", customBackground);
                 customText = getInt(json, "customText", customText);
                 customMuted = getInt(json, "customMuted", customMuted);
+                uiOpacity = Math.clamp(getInt(json, "uiOpacity", uiOpacity), 25, 100);
                 voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
                 voiceHost = getString(json, "voiceHost", voiceHost);
                 seenUpdateVersion = getString(json, "seenUpdateVersion", seenUpdateVersion);
@@ -92,6 +94,7 @@ public final class Config {
         json.addProperty("customBackground", customBackground);
         json.addProperty("customText", customText);
         json.addProperty("customMuted", customMuted);
+        json.addProperty("uiOpacity", uiOpacity);
         json.addProperty("voiceEnabled", voiceEnabled);
         json.addProperty("voiceHost", voiceHost);
         json.addProperty("seenUpdateVersion", seenUpdateVersion);

@@ -418,7 +418,7 @@ public final class FriendsScreen extends LanPlusScreen {
         drawAvatar(g, f.uuid(), leftX + 6, y + 3, 18);
         g.fill(leftX + 28, y + ROW_H / 2 - 3, leftX + 34, y + ROW_H / 2 + 3, statusColor(f.connectivity()));
         g.drawString(this.font, f.username(), leftX + 40, y + 4, LanPlusUI.TEXT, false);
-        g.drawString(this.font, secondaryText(f), leftX + 40, y + 14, LanPlusUI.MUTED, false);
+        LanPlusUI.scrollingText(g, this.font, secondaryText(f), leftX + 40, y + 14, LEFT_W - 48, LanPlusUI.MUTED);
         if (unread) {
             int bx = leftX + LEFT_W - 12;
             int by = y + ROW_H / 2 - 3;
@@ -580,7 +580,7 @@ public final class FriendsScreen extends LanPlusScreen {
         g.fill(x + 40, paneTop + 22, x + 46, paneTop + 28, statusColor(f.connectivity()));
         g.drawString(this.font, connectivityText(f), x + 50, paneTop + 22, LanPlusUI.MUTED, false);
         g.fill(x + 8, paneTop + 38, x + w - 8, paneTop + 39, LanPlusUI.DIVIDER);
-        g.drawString(this.font, secondaryText(f), x + 8, paneTop + 46, LanPlusUI.MUTED, false);
+        LanPlusUI.scrollingText(g, this.font, secondaryText(f), x + 8, paneTop + 46, w - 16, LanPlusUI.MUTED);
         if (f.state() == GameplayState.HOSTING && f.joinCode() != null) {
             g.drawString(this.font, Component.translatable("gui.lanplus.notif.invitedyou"),
                     x + 8, paneTop + 60, LanPlusUI.ACCENT, false);
@@ -593,8 +593,8 @@ public final class FriendsScreen extends LanPlusScreen {
             drawAvatar(g, sel.uuid(), x + 8, paneTop + 8, 24);
             g.drawString(this.font, sel.username(), x + 40, paneTop + 10, LanPlusUI.TEXT, false);
             g.fill(x + 40, paneTop + 22, x + 46, paneTop + 28, statusColor(sel.connectivity()));
-            g.drawString(this.font, Component.translatable("gui.lanplus.state.hosting", world(sel)),
-                    x + 50, paneTop + 22, LanPlusUI.MUTED, false);
+            LanPlusUI.scrollingText(g, this.font, Component.translatable("gui.lanplus.state.hosting", world(sel)),
+                    x + 50, paneTop + 22, w - 58, LanPlusUI.MUTED);
             Component details = worldDetail(sel);
             if (details != null) {
                 g.drawString(this.font, details, x + 8, paneTop + 40, LanPlusUI.FAINT, false);
@@ -807,7 +807,8 @@ public final class FriendsScreen extends LanPlusScreen {
             g.drawString(this.font,
                     Component.translatable("gui.lanplus.hub.friendhosting", hosting.username()),
                     x + 40, paneTop + 10, LanPlusUI.TEXT, false);
-            g.drawString(this.font, world(hosting), x + 40, paneTop + 22, LanPlusUI.MUTED, false);
+            LanPlusUI.scrollingText(g, this.font, Component.literal(world(hosting)), x + 40, paneTop + 22,
+                    w - 48, LanPlusUI.MUTED);
         } else {
             g.drawString(this.font, Component.translatable("gui.lanplus.hub.nobody"),
                     x + 8, paneTop + 10, LanPlusUI.MUTED, false);

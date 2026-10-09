@@ -11,9 +11,6 @@
     "dev/bgame/lanplus/mixin/client/PlayerAdvancementsMixin": {
       "Lnet/minecraft/advancements/AdvancementRewards;grant(Lnet/minecraft/server/level/ServerPlayer;)V": "Lnet/minecraft/class_170;method_748(Lnet/minecraft/class_3222;)V",
       "award(Lnet/minecraft/advancements/AdvancementHolder;Ljava/lang/String;)Z": "Lnet/minecraft/class_2985;method_12878(Lnet/minecraft/class_8779;Ljava/lang/String;)Z"
-    },
-    "dev/bgame/lanplus/mixin/client/ScreenAccessor": {
-      "addRenderableWidget": "method_37063(Lnet/minecraft/class_364;)Lnet/minecraft/class_364;"
     }
   }
 }

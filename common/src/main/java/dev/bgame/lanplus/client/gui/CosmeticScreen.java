@@ -224,6 +224,7 @@ public final class CosmeticScreen extends LanPlusScreen {
                 int tcx = x + cardWidth / 2;
                 int tcy = (y + 12 + thumbBottom) / 2;
                 g.enableScissor(x + 4, y + 8, x + cardWidth - 4, thumbBottom);
+                LanPlusClient.cosmetics().animate(id, uuid, 0f, 0f, 0f);
                 CosmeticGeoRender.renderThumb(g, model, LanPlusClient.cosmetics().bounds(id), tcx, tcy, thumb, spin());
                 g.disableScissor();
             }
@@ -497,7 +498,7 @@ public final class CosmeticScreen extends LanPlusScreen {
     }
 
     private static float spin() {
-        return ((float) System.currentTimeMillis() / 40L) % 360L;
+        return (float) System.currentTimeMillis() / 40L % 90L;
     }
 
     private static int rarityColor(String rarity) {

@@ -4,7 +4,6 @@ import dev.bgame.lanplus.client.ClientPresenceDetector;
 import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.LanPlusKeybinds;
-import dev.bgame.lanplus.client.PauseMenuButtons;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.client.gui.TitleScreenPanel;
 import net.fabricmc.api.ClientModInitializer;
@@ -32,10 +31,6 @@ public class LanplusFabricClient implements ClientModInitializer {
 
         HudRenderCallback.EVENT.register((context, tickDelta) -> {
             LanPlusNotifications.onRenderGui(context);
-        });
-
-        ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
-            PauseMenuButtons.tryAddHostButton(screen);
         });
 
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {

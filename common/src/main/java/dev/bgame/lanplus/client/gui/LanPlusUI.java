@@ -67,6 +67,18 @@ final class LanPlusUI {
         FAINT = t.faint();
         BORDER = t.border();
         DIVIDER = t.divider();
+
+        int op = Config.uiOpacity;
+        SURFACE = scaleAlpha(SURFACE, op);
+        SURFACE_RAISED = scaleAlpha(SURFACE_RAISED, op);
+        SURFACE_HOVER = scaleAlpha(SURFACE_HOVER, op);
+        SURFACE_DISABLED = scaleAlpha(SURFACE_DISABLED, op);
+        SLOT = scaleAlpha(SLOT, op);
+    }
+
+    private static int scaleAlpha(int argb, int pct) {
+        int a = (argb >>> 24) * pct / 100;
+        return (a << 24) | (argb & 0xFFFFFF);
     }
 
     static void background(GuiGraphics g, int width, int height) {
@@ -162,6 +174,24 @@ final class LanPlusUI {
 
     static void textCentered(GuiGraphics g, Font font, Component label, int x, int y, int w, int color) {
         g.drawString(font, label, x + (w - font.width(label)) / 2, y, color, false);
+    }
+
+    static void scrollingText(GuiGraphics g, Font font, Component label, int x, int y, int maxWidth, int color) {
+        int tw = font.width(label);
+        if (tw <= maxWidth) {
+            g.drawString(font, label, x, y, color, false);
+            return;
+        }
+        int diff = tw - maxWidth;
+        double period = Math.max(diff * 0.5, 3.0);
+        double seconds = System.currentTimeMillis() / 1000.0;
+        double phase = Math.sin((Math.PI / 2) * Math.cos((Math.PI * 2) * seconds / period)) / 2.0 + 0.5;
+        g.enableScissor(x, y - 1, x + maxWidth, y + 9);
+        g.pose().pushPose();
+        g.pose().translate(-phase * diff, 0, 0);
+        g.drawString(font, label, x, y, color, false);
+        g.pose().popPose();
+        g.disableScissor();
     }
 
     static void chip(GuiGraphics g, Font font, Component label, int x, int y, int w, int h,

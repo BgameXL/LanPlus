@@ -43,6 +43,10 @@ public final class ProfileScreen extends LanPlusScreen {
     private static final int MAX_LAYOUT_W = 620;
     private static final int SIDEBAR_W = 250;
     private static final int CONTENT_TOP = 32;
+    private static final int HEADER_TOP = 6;
+    private static final int HEADER_H = 26;
+    private static final int FOOTER_H = 26;
+    private static final int CLOSE_W = 60;
     private static final String[] PLATFORMS =
             {"discord", "instagram", "twitter", "youtube", "twitch", "tiktok", "paypal", "kofi"};
     private static final String[] PRONOUN_CYCLE = {null, "he/him", "she/her", "they/them"};
@@ -315,27 +319,27 @@ public final class ProfileScreen extends LanPlusScreen {
                                 rebuildWidgets();
                             })
                     .bounds(bx + 96, by, 90, 20).build());
+        } else if (loaded && profile != null) {
+            addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
+                    .bounds(right - CLOSE_W - 4, HEADER_TOP + 3, CLOSE_W, 20).build());
+            int footerBtnY = this.height - 8 - FOOTER_H + 1;
+            if (own) {
+                addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.edit"),
+                                b -> {
+                                    editing = true;
+                                    primeEdit();
+                                    rebuildWidgets();
+                                })
+                        .bounds(left + 4, footerBtnY + 2, 110, 20).build());
+            } else {
+                addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.report"),
+                                b -> Minecraft.getInstance().setScreen(new ReportScreen(this, uuid,
+                                        profile.username() == null ? "" : profile.username())))
+                        .bounds(left + 4, footerBtnY + 2, 110, 20).build());
+            }
         } else {
             addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                     .bounds(right - 80, this.height - 28, 80, 20).build());
-            if (loaded && profile != null) {
-                addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.back"), b -> onClose())
-                        .bounds(left, 6, 80, 20).build());
-                if (own) {
-                    addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.edit"),
-                                    b -> {
-                                        editing = true;
-                                        primeEdit();
-                                        rebuildWidgets();
-                                    })
-                            .bounds(left, this.height - 28, 110, 20).build());
-                } else {
-                    addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.report"),
-                                    b -> Minecraft.getInstance().setScreen(new ReportScreen(this, uuid,
-                                            profile.username() == null ? "" : profile.username())))
-                            .bounds(left, this.height - 28, 110, 20).build());
-                }
-            }
         }
     }
 
@@ -717,7 +721,9 @@ public final class ProfileScreen extends LanPlusScreen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         renderBackdrop(g, this.width, this.height);
-        g.drawCenteredString(this.font, this.title, this.width / 2, 12, LanPlusUI.TEXT);
+        if (editing || !loaded || profile == null) {
+            g.drawCenteredString(this.font, this.title, this.width / 2, 12, LanPlusUI.TEXT);
+        }
 
         if (!loaded) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.profile.loading"),
@@ -742,6 +748,7 @@ public final class ProfileScreen extends LanPlusScreen {
             renderPanel(g);
             renderUnifiedFrame(g);
             renderBannerIdentity(g);
+            renderBars(g);
         }
 
         if (status != null) {
@@ -886,7 +893,6 @@ public final class ProfileScreen extends LanPlusScreen {
             ProfileImages.Tex tex = ProfileImages.get(bgImage);
             if (tex != null) {
                 ProfileImages.blitCover(g, tex, 0, 0, screenWidth, screenHeight);
-                g.fill(0, 0, screenWidth, screenHeight, alpha(BG_OPACITY));
                 return;
             }
         }
@@ -894,11 +900,11 @@ public final class ProfileScreen extends LanPlusScreen {
             g.fill(0, 0, screenWidth, screenHeight, 0xFF000000 | (bgColor & 0xFFFFFF));
             return;
         }
-        g.fill(0, 0, screenWidth, screenHeight, alpha(BG_OPACITY) | 0x0C0D10);
+        g.fill(0, 0, screenWidth, screenHeight, alpha() | 0x0C0D10);
     }
 
-    private static int alpha(int opacity0to100) {
-        return (Math.clamp(opacity0to100 * 255L / 100, 0, 255)) << 24;
+    private static int alpha() {
+        return (Math.clamp(ProfileScreen.BG_OPACITY * 255L / 100, 0, 255)) << 24;
     }
 
     private void renderEditDecor(GuiGraphics g, int mouseX, int mouseY) {
@@ -1097,7 +1103,7 @@ public final class ProfileScreen extends LanPlusScreen {
             ProfileImages.Tex tex = ProfileImages.get(bgImage);
             if (tex != null) {
                 ProfileImages.blitCover(g, tex, cx0, cy0, cw, ch);
-                g.fill(cx0, cy0, cx0 + cw, cy0 + ch, alpha(BG_OPACITY));
+                g.fill(cx0, cy0, cx0 + cw, cy0 + ch, alpha());
             } else {
                 g.fill(cx0, cy0, cx0 + cw, cy0 + ch, 0xFF0C0D10);
             }
@@ -1592,6 +1598,17 @@ public final class ProfileScreen extends LanPlusScreen {
 
     private static boolean isLive(Friend f) {
         return f.connectivity() == Connectivity.ONLINE || f.connectivity() == Connectivity.STALE;
+    }
+
+    private void renderBars(GuiGraphics g) {
+        int left = layoutLeft();
+        int right = left + layoutWidth();
+
+        LanPlusUI.panel(g, left, HEADER_TOP, right, HEADER_TOP + HEADER_H);
+        g.drawString(this.font, this.title, left + 10, HEADER_TOP + (HEADER_H - 8) / 2, LanPlusUI.TEXT, false);
+
+        int ft = this.height - 8 - FOOTER_H;
+        LanPlusUI.panel(g, left, ft, right, ft + FOOTER_H);
     }
 
     private void renderUnifiedFrame(GuiGraphics g) {

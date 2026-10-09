@@ -43,6 +43,8 @@ public final class SettingsScreen extends LanPlusScreen {
     private static final int CH_COLS = 2;
     private static final int CH_ROW_H = 20;
     private static final int CH_ROW_GAP = 6;
+    private static final int OPACITY_BLOCK = 20;
+    private static final int OPACITY_MIN = 25;
     private static final int TOGGLE_ROW_STEP = 48;
     private static final int MAX_URL_LENGTH = 2048;
     private static final int MAX_ADDRESS_LENGTH = 260;
@@ -58,7 +60,8 @@ public final class SettingsScreen extends LanPlusScreen {
     private ColorPicker themePicker;
     private ThemeTarget themeTarget = ThemeTarget.ACCENT;
     private int px, py, pw, ph, headerBottom, sidebarX, dividerX, contentX, contentW, contentTop;
-    private int innerX, innerY, innerW, innerH, innerLeftX, leftW, chY, chW, pickerY;
+    private int innerX, innerY, innerW, innerH, innerLeftX, leftW, chY, chW, pickerY, opacityY, opacityW;
+    private boolean opacityDrag;
     private int dividerThemeX, presetX, presetColW, presetTop, resetY;
 
     public SettingsScreen(Screen parent) {
@@ -91,7 +94,7 @@ public final class SettingsScreen extends LanPlusScreen {
         innerX = contentX;
         int chRows = (ThemeTarget.values().length + CH_COLS - 1) / CH_COLS;
         int channelsH = chRows * CH_ROW_H + (chRows - 1) * CH_ROW_GAP;
-        innerH = pad + channelsH + 14 + ColorPicker.preferredHeight() + pad;
+        innerH = pad + channelsH + 14 + ColorPicker.preferredHeight() + 12 + OPACITY_BLOCK + pad;
         innerY = contentTop + 2;
         innerLeftX = innerX + pad;
         leftW = innerW - 2 * pad - presetColW - 2 * gap - 1;
@@ -105,6 +108,8 @@ public final class SettingsScreen extends LanPlusScreen {
         }
         chW = 18 + maxLabel + 10;
         pickerY = chY + channelsH + 14;
+        opacityY = pickerY + ColorPicker.preferredHeight() + 22;
+        opacityW = leftW * 2 / 5;
         resetY = innerY + innerH - pad - 18;
     }
 
@@ -274,7 +279,22 @@ public final class SettingsScreen extends LanPlusScreen {
         if (themePicker != null) {
             themePicker.render(g);
         }
+        renderOpacity(g);
         renderPresets(g);
+    }
+
+    private void renderOpacity(GuiGraphics g) {
+        int tx = innerLeftX;
+        int tw = opacityW;
+        int ty = opacityY;
+        g.drawString(this.font, Component.translatable("gui.lanplus.theme.opacity", Config.uiOpacity),
+                tx, ty - 11, LanPlusUI.MUTED, false);
+        g.fill(tx, ty, tx + tw, ty + 6, LanPlusUI.SLOT);
+        LanPlusUI.outline1(g, tx, ty, tx + tw, ty + 6, LanPlusUI.EDGE_DARK);
+        int fillW = Math.round((Config.uiOpacity - OPACITY_MIN) / (float) (100 - OPACITY_MIN) * tw);
+        g.fill(tx, ty, tx + fillW, ty + 6, LanPlusUI.ACCENT);
+        int knobX = Math.clamp(tx + fillW - 2, tx, tx + tw - 4);
+        g.fill(knobX, ty - 2, knobX + 4, ty + 8, LanPlusUI.TEXT);
     }
 
     private void renderChannels(GuiGraphics g) {
@@ -349,6 +369,7 @@ public final class SettingsScreen extends LanPlusScreen {
     private void resetTheme() {
         seedCustomFrom(Themes.AMETHYST);
         themePicker.setColor(configSeed(themeTarget));
+        Config.uiOpacity = 100;
         Config.save();
     }
 
@@ -468,6 +489,11 @@ public final class SettingsScreen extends LanPlusScreen {
                 selectThemeTarget(target);
                 return true;
             }
+            if (inOpacity(mouseX, mouseY)) {
+                opacityDrag = true;
+                setOpacityFromMouse(mouseX);
+                return true;
+            }
             if (themePicker.mouseClicked(mouseX, mouseY, button)) {
                 return true;
             }
@@ -477,6 +503,10 @@ public final class SettingsScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+        if (opacityDrag) {
+            setOpacityFromMouse(mouseX);
+            return true;
+        }
         if (themePicker != null && themePicker.mouseDragged(mouseX, mouseY)) {
             return true;
         }
@@ -485,6 +515,7 @@ public final class SettingsScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        opacityDrag = false;
         if (themePicker != null) {
             themePicker.mouseReleased();
             persistTheme();
@@ -503,6 +534,16 @@ public final class SettingsScreen extends LanPlusScreen {
             }
         }
         return -1;
+    }
+
+    private boolean inOpacity(double mouseX, double mouseY) {
+        return mouseX >= innerLeftX && mouseX <= innerLeftX + opacityW
+                && mouseY >= opacityY - 4 && mouseY <= opacityY + 10;
+    }
+
+    private void setOpacityFromMouse(double mouseX) {
+        float f = (float) (mouseX - innerLeftX) / opacityW;
+        Config.uiOpacity = Math.clamp(OPACITY_MIN + Math.round(f * (100 - OPACITY_MIN)), OPACITY_MIN, 100);
     }
 
     private ThemeTarget targetAt(double mouseX, double mouseY) {

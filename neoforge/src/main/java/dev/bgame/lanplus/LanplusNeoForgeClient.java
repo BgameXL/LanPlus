@@ -5,7 +5,6 @@ import dev.bgame.lanplus.client.ClientPresenceDetector;
 import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.LanPlusKeybinds;
-import dev.bgame.lanplus.client.PauseMenuButtons;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.client.gui.TitleScreenPanel;
 import net.neoforged.bus.api.IEventBus;
@@ -32,7 +31,6 @@ public final class LanplusNeoForgeClient {
         gameBus.addListener(LanplusNeoForgeClient::onRenderGui);
         gameBus.addListener(LanplusNeoForgeClient::onScreenRender);
         gameBus.addListener(LanplusNeoForgeClient::onScreenClick);
-        gameBus.addListener(LanplusNeoForgeClient::onScreenInit);
         gameBus.addListener(LanplusNeoForgeClient::onAdvancementEarn);
         gameBus.addListener(LanplusNeoForgeClient::onLoggingOut);
     }
@@ -66,10 +64,6 @@ public final class LanplusNeoForgeClient {
                 || LanPlusNotifications.onMouseClick(event.getMouseX(), event.getMouseY(), event.getButton())) {
             event.setCanceled(true);
         }
-    }
-
-    private static void onScreenInit(ScreenEvent.Init.Post event) {
-        PauseMenuButtons.tryAddHostButton(event.getScreen());
     }
 
     private static void onAdvancementEarn(AdvancementEvent.AdvancementEarnEvent event) {

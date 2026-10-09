@@ -9,8 +9,7 @@
   ],
   "client": [
     "client.AbstractClientPlayerMixin",
-    "client.PlayerRendererMixin",
-    "client.ScreenAccessor"
+    "client.PlayerRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1
