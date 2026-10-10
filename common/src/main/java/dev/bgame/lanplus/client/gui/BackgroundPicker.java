@@ -64,6 +64,7 @@ public final class BackgroundPicker extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         contentW = fitWidth(MAX_W);
         boxX = centerX(contentW);
         panelTop = 30;

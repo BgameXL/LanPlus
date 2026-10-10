@@ -72,6 +72,7 @@ public final class Announcements extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         layout();
         addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                 .bounds(cardX + cardW - 90 - PAD, cardY + cardH - 26, 90, 20).build());

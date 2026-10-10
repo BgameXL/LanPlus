@@ -39,6 +39,7 @@ public final class ReportScreen extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         layout();
         if (state != State.CHOOSING) {
             int buttonY = cardY + cardH + 6;

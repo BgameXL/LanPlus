@@ -115,6 +115,7 @@ public final class SettingsScreen extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         layout();
         addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.settings.back"), b -> onClose())
                 .bounds(px + 8, py + 7, 54, 18).build());

@@ -167,6 +167,7 @@ public final class FriendsScreen extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         layout();
 
         int btnY = paneBottom + 4;

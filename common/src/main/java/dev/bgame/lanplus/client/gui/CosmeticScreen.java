@@ -95,6 +95,7 @@ public final class CosmeticScreen extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         layout();
         LanPlusClient.refreshCosmetics();
         addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())

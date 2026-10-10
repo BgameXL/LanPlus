@@ -297,6 +297,7 @@ public final class ProfileScreen extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         if (!loaded) {
             loadProfile();
         }
@@ -321,9 +322,9 @@ public final class ProfileScreen extends LanPlusScreen {
                             })
                     .bounds(bx + 96, by, 90, 20).build());
         } else if (loaded && profile != null) {
-            addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
-                    .bounds(right - CLOSE_W - 4, HEADER_TOP + 3, CLOSE_W, 20).build());
             int footerBtnY = this.height - 8 - FOOTER_H + 1;
+            addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
+                    .bounds(right - CLOSE_W - 4, footerBtnY + 2, CLOSE_W, 20).build());
             if (own) {
                 addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.edit"),
                                 b -> {
@@ -1606,7 +1607,11 @@ public final class ProfileScreen extends LanPlusScreen {
         int right = left + layoutWidth();
 
         LanPlusUI.panel(g, left, HEADER_TOP, right, HEADER_TOP + HEADER_H);
-        g.drawString(this.font, this.title, left + 10, HEADER_TOP + (HEADER_H - 8) / 2, LanPlusUI.TEXT, false);
+        Component word = Component.translatable("gui.lanplus.profile.word");
+        int totalW = this.font.width("LAN") + this.font.width("+") + 6 + this.font.width(word);
+        int ty = HEADER_TOP + (HEADER_H - 8) / 2;
+        int wx = LanPlusUI.wordmark(g, this.font, (left + right - totalW) / 2, ty);
+        g.drawString(this.font, word, wx + 6, ty, LanPlusUI.MUTED, false);
 
         int ft = this.height - 8 - FOOTER_H;
         LanPlusUI.panel(g, left, ft, right, ft + FOOTER_H);
@@ -1637,7 +1642,7 @@ public final class ProfileScreen extends LanPlusScreen {
         int y = panelTop + 8 - scrollY;
 
         y = sectionHeader(g, x, y, x + textW, Component.translatable("gui.lanplus.profile.cosmetics"));
-        y = renderCosmeticsShowcase(g, x, y, textW);
+        y = renderCosmeticsShowcase(g, x, y);
         y += SECTION_GAP;
 
         y = sectionHeader(g, x, y, x + textW, Component.translatable("gui.lanplus.profile.questions"));
@@ -1683,15 +1688,7 @@ public final class ProfileScreen extends LanPlusScreen {
         return y + 17;
     }
 
-    private String cosmeticChipSub(String slotName, String rarity) {
-        String slot = Component.translatable("gui.lanplus.menu.slot." + slotName.toLowerCase(java.util.Locale.ROOT))
-                .getString();
-        String rar = rarity == null || rarity.isEmpty() ? ""
-                : Character.toUpperCase(rarity.charAt(0)) + rarity.substring(1);
-        return rar.isEmpty() ? slot : slot + " · " + rar;
-    }
-
-    private int renderCosmeticsShowcase(GuiGraphics g, int x, int y, int textW) {
+    private int renderCosmeticsShowcase(GuiGraphics g, int x, int y) {
         int renderW = 104;
         int renderH = 150;
         cmBoxX = x;
@@ -1713,30 +1710,6 @@ public final class ProfileScreen extends LanPlusScreen {
         g.enableScissor(x + 1, y + 1, x + renderW - 1, y + renderH - 1);
         drawPlayerModel(g, x + renderW / 2, y + renderH - 26);
         g.disableScissor();
-
-        if (loadout != null && !loadout.isEmpty()) {
-            int sx = x + renderW + 8;
-            int rightBound = x + textW;
-            int chipH = 24;
-            int cx = sx;
-            int cy = y;
-            for (String id : loadout.values()) {
-                var m = cm.meta(id);
-                String name = m != null ? m.name() : id;
-                String sub = m == null ? "" : cosmeticChipSub(m.slot().name(), m.rarity());
-                int chipW = Math.max(this.font.width(name), this.font.width(sub)) + 12;
-                if (cx != sx && cx + chipW > rightBound) {
-                    cx = sx;
-                    cy += chipH + 4;
-                }
-                LanPlusUI.button3d(g, cx, cy, cx + chipW, cy + chipH, LanPlusUI.SURFACE_RAISED);
-                g.drawString(this.font, name, cx + 6, cy + 4, LanPlusUI.TEXT, false);
-                if (!sub.isEmpty()) {
-                    g.drawString(this.font, sub, cx + 6, cy + 14, LanPlusUI.FAINT, false);
-                }
-                cx += chipW + 4;
-            }
-        }
         return y + renderH;
     }
 

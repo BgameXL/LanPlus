@@ -90,6 +90,7 @@ public final class SkinScreen extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         layout();
         addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.skin.browse"),
                         b -> openFilePicker())

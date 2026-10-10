@@ -55,6 +55,7 @@ public final class ImagePicker extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         contentW = fitWidth(MAX_W);
         boxX = centerX(contentW);
         int panelTop = 36;

@@ -155,6 +155,7 @@ public final class HostScreen extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         if (!inWorld) {
             if (loading && !loadStarted) {
                 loadStarted = true;

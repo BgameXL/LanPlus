@@ -29,6 +29,7 @@ public final class UpdateScreen extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         boxX = (this.width - W) / 2;
         boxY = (this.height - H) / 2;
         int by = boxY + H - 32;
