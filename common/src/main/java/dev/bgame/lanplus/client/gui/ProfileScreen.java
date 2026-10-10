@@ -63,7 +63,7 @@ public final class ProfileScreen extends LanPlusScreen {
             0x9B59B6, 0xB36AF0, 0xF1A33C, 0xF0C24A};
     private int bgStyle = BG_DARK;
     private int bgColor = 0x101216;
-    private static final int BG_OPACITY = 92;
+    private static final int BG_OPACITY = 100;
     private String bgImageId;
     private CatalogImage bgImage;
     private CatalogImage banner;
@@ -1366,15 +1366,15 @@ public final class ProfileScreen extends LanPlusScreen {
     }
 
     private int contentTop() {
-        return CONTENT_TOP + (banner == null ? 0 : bannerHeight() + 6);
+        return CONTENT_TOP + (banner == null ? 0 : bannerHeight() + 1);
     }
 
     private void renderBanner(GuiGraphics g) {
         if (banner == null) {
             return;
         }
-        int left = layoutLeft();
-        int right = left + layoutWidth();
+        int left = layoutLeft() + 1;
+        int right = left + layoutWidth() - 2;
         int top = CONTENT_TOP;
         int bottom = top + bannerHeight();
         g.fill(left, top, right, bottom, LanPlusUI.SLOT);

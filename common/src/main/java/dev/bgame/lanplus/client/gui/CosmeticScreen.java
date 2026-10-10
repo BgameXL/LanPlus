@@ -129,7 +129,7 @@ public final class CosmeticScreen extends LanPlusScreen {
         int w = this.font.width(label) + 22;
         int x = cardX + cardW - PAD - w;
         int y = cardY + PAD - 8;
-        LanPlusUI.button3d(g, x, y, x + w, y + 18, LanPlusUI.SURFACE_RAISED);
+        LanPlusUI.button3D(g, x, y, x + w, y + 18, LanPlusUI.SURFACE_RAISED);
         g.fill(x + 8, y + 7, x + 12, y + 11, LanPlusUI.ACCENT);
         g.drawString(this.font, label, x + 16, y + 5, LanPlusUI.TEXT, false);
     }
@@ -157,7 +157,7 @@ public final class CosmeticScreen extends LanPlusScreen {
                              boolean active, Runnable action) {
         boolean hover = inside(mouseX, mouseY, sidebarX, y, SIDEBAR_W, SIDE_ROW_H);
         int fill = active ? LanPlusUI.ACCENT_TINT : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
-        LanPlusUI.button3d(g, sidebarX, y, sidebarX + SIDEBAR_W, y + SIDE_ROW_H, fill);
+        LanPlusUI.button3D(g, sidebarX, y, sidebarX + SIDEBAR_W, y + SIDE_ROW_H, fill);
         if (active) {
             LanPlusUI.outline1(g, sidebarX, y, sidebarX + SIDEBAR_W, y + SIDE_ROW_H, LanPlusUI.ACCENT);
         }
@@ -211,7 +211,7 @@ public final class CosmeticScreen extends LanPlusScreen {
         boolean sel = id.equals(selectedId);
         boolean hover = clickable && inside(mouseX, mouseY, x, y, cardWidth, CARD_H);
         int fill = sel ? LanPlusUI.ACCENT_TINT : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
-        LanPlusUI.button3d(g, x, y, x + cardWidth, y + CARD_H, fill);
+        LanPlusUI.button3D(g, x, y, x + cardWidth, y + CARD_H, fill);
 
         CosmeticMeta m = LanPlusClient.cosmetics() == null ? null : LanPlusClient.cosmetics().meta(id);
         String rarity = m == null ? "common" : m.rarity();
@@ -339,14 +339,14 @@ public final class CosmeticScreen extends LanPlusScreen {
         boolean hover = inside(mouseX, mouseY, bx, by, w, 24);
 
         if (equipped) {
-            LanPlusUI.button3d(g, bx, by, bx + w, by + 24, hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
+            LanPlusUI.button3D(g, bx, by, bx + w, by + 24, hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
             LanPlusUI.textCentered(g, this.font, Component.translatable("gui.lanplus.cosmetics.unequip"), bx, by + 8, w,
                     hover ? LanPlusUI.TEXT : LanPlusUI.MUTED);
             rows.add(new Row(bx, by, w, 24, this::unequipSelected));
             return;
         }
         if (owned) {
-            LanPlusUI.button3d(g, bx, by, bx + w, by + 24, hover ? LanPlusUI.ACCENT_HOVER : LanPlusUI.ACCENT_TINT);
+            LanPlusUI.button3D(g, bx, by, bx + w, by + 24, hover ? LanPlusUI.ACCENT_HOVER : LanPlusUI.ACCENT_TINT);
             LanPlusUI.textCentered(g, this.font, Component.translatable("gui.lanplus.cosmetics.equip"), bx, by + 8, w, LanPlusUI.TEXT);
             rows.add(new Row(bx, by, w, 24, this::equipSelected));
             return;

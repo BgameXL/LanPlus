@@ -109,7 +109,7 @@ public final class TitleScreenPanel {
     }
 
     private static void drawButton(GuiGraphics g, Font font, int x, int y, int w, Btn b, boolean hover) {
-        LanPlusUI.button3d(g, x, y, x + w, y + BTN, hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
+        LanPlusUI.button3D(g, x, y, x + w, y + BTN, hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
         if (b.primary()) {
             LanPlusUI.outline1(g, x, y, x + w, y + BTN, LanPlusUI.LIME);
         }

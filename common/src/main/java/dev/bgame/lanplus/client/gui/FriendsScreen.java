@@ -1160,7 +1160,7 @@ public final class FriendsScreen extends LanPlusScreen {
         int h = menuHeight();
         g.pose().pushPose();
         g.pose().translate(0, 0, 400);
-        LanPlusUI.button3d(g, x, y, x + w, y + h, LanPlusUI.SURFACE_RAISED);
+        LanPlusUI.button3D(g, x, y, x + w, y + h, LanPlusUI.SURFACE_RAISED);
         int ey = y + 2;
         for (ContextEntry e : contextEntries) {
             boolean hover = mouseX >= x && mouseX <= x + w && mouseY >= ey && mouseY < ey + MENU_ROW_H;

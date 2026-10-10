@@ -1,17 +1,22 @@
 package dev.bgame.lanplus.client.gui;
 
 import dev.bgame.lanplus.Config;
+import dev.bgame.lanplus.LanplusCommon;
 import dev.bgame.lanplus.client.LanPlusClient;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -19,13 +24,42 @@ import java.util.function.Consumer;
 public final class SettingsScreen extends LanPlusScreen {
 
     private enum Cat {
-        GENERAL("general"), THEME("theme"), ADVANCED("advanced");
+        GENERAL("general"), THEME("theme"), ADVANCED("advanced"), ABOUT("about");
         final String key;
 
         Cat(String key) {
             this.key = key;
         }
     }
+
+    private record SocialLinks(ResourceLocation icon, int texSize, String url, String label) {
+    }
+
+    private record LinkHit(int x, int y, int size, String url) {
+    }
+
+    private record Credit(String name, String role, List<SocialLinks> socials) {
+    }
+
+    private static final List<Credit> CREDITS = List.of( // Frums - Credits
+            new Credit("Bgame", "Creator & Developer",
+                    List.of(social("github", 16, "https://github.com/BgameXL", "GitHub"))));
+
+    private static final List<SocialLinks> LINKS = List.of(
+            social("discord", 16, "https://discord.gg/kAKk3wRAVh", "Discord"),
+            social("github", 16, "https://github.com/BgameXL/LanPlus", "GitHub"),
+            social("modrinth", 32, "https://modrinth.com/mod/lanplus", "Modrinth"),
+            social("curseforge", 16, "https://www.curseforge.com/minecraft/mc-mods/lan", "CurseForge"),
+            social("ko_fi", 16, "https://ko-fi.com/bgame", "Ko-fi"));
+
+    private static SocialLinks social(String name, int texSize, String url, String label) {
+        return new SocialLinks(
+                ResourceLocation.fromNamespaceAndPath(LanplusCommon.MODID, "textures/gui/social/" + name + ".png"),
+                texSize, url, label);
+    }
+
+    private final List<LinkHit> linkHits = new ArrayList<>();
+    private Component linkTooltip;
 
     private enum ThemeTarget {
         ACCENT("gui.lanplus.theme.accent"),
@@ -213,6 +247,7 @@ public final class SettingsScreen extends LanPlusScreen {
             case GENERAL -> renderGeneral(g);
             case THEME -> renderTheme(g);
             case ADVANCED -> renderAdvanced(g);
+            case ABOUT -> renderAbout(g, mouseX, mouseY);
         }
 
         if (status != null) {
@@ -220,6 +255,10 @@ public final class SettingsScreen extends LanPlusScreen {
         }
 
         super.render(g, mouseX, mouseY, partialTick);
+
+        if (selected == Cat.ABOUT && linkTooltip != null) {
+            g.renderTooltip(this.font, linkTooltip, mouseX, mouseY);
+        }
     }
 
     private void renderGeneral(GuiGraphics g) {
@@ -305,7 +344,7 @@ public final class SettingsScreen extends LanPlusScreen {
             int tx = innerLeftX + (i % CH_COLS) * (chW + 6);
             int ty = chY + (i / CH_COLS) * (CH_ROW_H + CH_ROW_GAP);
             boolean sel = t == themeTarget;
-            LanPlusUI.button3d(g, tx, ty, tx + chW, ty + CH_ROW_H, sel ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE);
+            LanPlusUI.button3D(g, tx, ty, tx + chW, ty + CH_ROW_H, sel ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE);
             g.fill(tx + 6, ty + 6, tx + 14, ty + 14, 0xFF000000 | (liveSeed(t) & 0xFFFFFF));
             LanPlusUI.outline1(g, tx + 6, ty + 6, tx + 14, ty + 14, LanPlusUI.EDGE_DARK);
             if (sel) {
@@ -477,8 +516,73 @@ public final class SettingsScreen extends LanPlusScreen {
         }
     }
 
+    private void renderAbout(GuiGraphics g, int mouseX, int mouseY) {
+        linkHits.clear();
+        linkTooltip = null;
+        int x = contentX;
+        int y = contentTop + 4;
+
+        LanPlusUI.wordmark(g, this.font, x, y);
+        y += 18;
+
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.settings.credits"),
+                x, y, contentX + contentW);
+        y += 17;
+        for (Credit c : CREDITS) {
+            g.fill(x + 1, y + 2, x + 4, y + 5, LanPlusUI.ACCENT);
+            g.drawString(this.font, c.name(), x + 10, y, LanPlusUI.TEXT, false);
+            int rx = x + 10 + this.font.width(c.name()) + 8;
+            g.drawString(this.font, c.role(), rx, y, LanPlusUI.MUTED, false);
+            int sx = rx + this.font.width(c.role()) + 8;
+            for (SocialLinks s : c.socials()) {
+                sx = iconButton(g, sx, y - 3, 14, s, mouseX, mouseY) + 3;
+            }
+            y += 15;
+        }
+        y += 8;
+
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.settings.links"),
+                x, y, contentX + contentW);
+        y += 20;
+        int bx = x;
+        for (SocialLinks link : LINKS) {
+            bx = iconButton(g, bx, y, 22, link, mouseX, mouseY) + 5;
+        }
+    }
+
+    private int iconButton(GuiGraphics g, int bx, int y, int bs, SocialLinks link, int mouseX, int mouseY) {
+        boolean hover = mouseX >= bx && mouseX < bx + bs && mouseY >= y && mouseY < y + bs;
+        LanPlusUI.button3D(g, bx, y, bx + bs, y + bs, hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
+        if (hover) {
+            LanPlusUI.outline1(g, bx, y, bx + bs, y + bs, LanPlusUI.ACCENT);
+            linkTooltip = Component.literal(link.label());
+        }
+        int ic = bs - 6;
+        g.blit(link.icon(), bx + (bs - ic) / 2, y + (bs - ic) / 2, ic, ic, 0f, 0f,
+                link.texSize(), link.texSize(), link.texSize(), link.texSize());
+        linkHits.add(new LinkHit(bx, y, bs, link.url()));
+        return bx + bs;
+    }
+
+    private void openLink(String url) {
+        Minecraft.getInstance().setScreen(new ConfirmLinkScreen(yes -> {
+            if (yes) {
+                Util.getPlatform().openUri(url);
+            }
+            Minecraft.getInstance().setScreen(this);
+        }, url, false));
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (selected == Cat.ABOUT && button == 0) {
+            for (LinkHit h : linkHits) {
+                if (mouseX >= h.x() && mouseX < h.x() + h.size() && mouseY >= h.y() && mouseY < h.y() + h.size()) {
+                    openLink(h.url());
+                    return true;
+                }
+            }
+        }
         if (selected == Cat.THEME && button == 0 && themePicker != null) {
             int preset = presetAt(mouseX, mouseY);
             if (preset >= 0) {
@@ -615,7 +719,7 @@ public final class SettingsScreen extends LanPlusScreen {
             boolean selected = category == SettingsScreen.this.selected;
             boolean highlighted = isHoveredOrFocused();
             if (selected) {
-                LanPlusUI.button3d(g, x, y, x + getWidth(), y + getHeight(), LanPlusUI.SURFACE_RAISED);
+                LanPlusUI.button3D(g, x, y, x + getWidth(), y + getHeight(), LanPlusUI.SURFACE_RAISED);
             } else if (highlighted) {
                 g.fill(x, y, x + getWidth(), y + getHeight(), LanPlusUI.SURFACE_HOVER);
             }

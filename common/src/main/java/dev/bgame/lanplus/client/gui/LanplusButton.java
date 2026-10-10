@@ -32,7 +32,7 @@ public final class LanplusButton extends Button {
         } else {
             int bg = !isActive() ? LanPlusUI.SURFACE_DISABLED
                     : isHovered() ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
-            LanPlusUI.button3d(g, x, y, x + w, y + h, bg);
+            LanPlusUI.button3D(g, x, y, x + w, y + h, bg);
             color = !isActive() ? LanPlusUI.FAINT : isHovered() ? LanPlusUI.MUTED : LanPlusUI.TEXT;
         }
         LanPlusUI.textCentered(g, Minecraft.getInstance().font, getMessage(), x, y + (h - 8) / 2, w, color);

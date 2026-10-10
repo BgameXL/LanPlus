@@ -189,7 +189,7 @@ public final class Announcements extends LanPlusScreen {
             boolean hover = mouseX >= sidebarX && mouseX < sidebarX + SIDEBAR_W
                     && mouseY >= y && mouseY < y + SB_ROW_H;
             if (sel) {
-                LanPlusUI.button3d(g, sidebarX, y, sidebarX + SIDEBAR_W, rowBottom, LanPlusUI.SURFACE_RAISED);
+                LanPlusUI.button3D(g, sidebarX, y, sidebarX + SIDEBAR_W, rowBottom, LanPlusUI.SURFACE_RAISED);
             } else if (hover) {
                 g.fill(sidebarX, y, sidebarX + SIDEBAR_W, rowBottom, LanPlusUI.SURFACE_HOVER);
             }

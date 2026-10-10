@@ -115,7 +115,7 @@ final class LanPlusUI {
         return Math.clamp(v, 0, 255);
     }
 
-    static void button3d(GuiGraphics g, int x0, int y0, int x1, int y1, int fill) {
+    static void button3D(GuiGraphics g, int x0, int y0, int x1, int y1, int fill) {
         outline1(g, x0, y0, x1, y1, EDGE_DARK);
         g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill);
         outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, shade(fill, 1.4f));
@@ -197,7 +197,7 @@ final class LanPlusUI {
     static void chip(GuiGraphics g, Font font, Component label, int x, int y, int w, int h,
                      boolean selected, boolean enabled, boolean hover) {
         int bg = !enabled ? SURFACE_DISABLED : selected ? ACCENT_STRONG : (hover ? SURFACE_HOVER : SURFACE_RAISED);
-        button3d(g, x, y, x + w, y + h, bg);
+        button3D(g, x, y, x + w, y + h, bg);
         int color = !enabled ? FAINT : selected ? TEXT : hover ? MUTED : TEXT;
         textCentered(g, font, label, x, y + (h - 8) / 2, w, color);
     }

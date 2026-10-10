@@ -298,7 +298,7 @@ public final class HostScreen extends LanPlusScreen {
         boolean canUp = maxPlayers < MAX_PLAYERS;
         boolean hoverDown = canDown && in(mouseX, mouseY, ctrlX + 4, playersRowY, STEP_HIT_W, DROPDOWN_H);
         boolean hoverUp = canUp && in(mouseX, mouseY, ctrlX + CTRL_W - 4 - STEP_HIT_W, playersRowY, STEP_HIT_W, DROPDOWN_H);
-        LanPlusUI.button3d(g, ctrlX, playersRowY, ctrlX + CTRL_W, playersRowY + DROPDOWN_H, LanPlusUI.SURFACE_RAISED);
+        LanPlusUI.button3D(g, ctrlX, playersRowY, ctrlX + CTRL_W, playersRowY + DROPDOWN_H, LanPlusUI.SURFACE_RAISED);
         g.drawString(this.font, Component.literal("-"), ctrlX + 8, textY,
                 canDown ? (hoverDown ? LanPlusUI.TEXT : LanPlusUI.MUTED) : LanPlusUI.FAINT, false);
         g.drawString(this.font, Component.literal("+"), ctrlX + CTRL_W - 12, textY,
@@ -325,7 +325,7 @@ public final class HostScreen extends LanPlusScreen {
                                       boolean open, int mouseX, int mouseY) {
         boolean hover = in(mouseX, mouseY, x, y, CTRL_W, DROPDOWN_H);
         int bg = open ? LanPlusUI.ACCENT : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
-        LanPlusUI.button3d(g, x, y, x + CTRL_W, y + DROPDOWN_H, bg);
+        LanPlusUI.button3D(g, x, y, x + CTRL_W, y + DROPDOWN_H, bg);
         g.drawString(this.font, label, x + (CTRL_W - this.font.width(label)) / 2, y + (DROPDOWN_H - 8) / 2,
                 LanPlusUI.TEXT, false);
         Component caret = Component.literal(open ? "▲" : "▼");
