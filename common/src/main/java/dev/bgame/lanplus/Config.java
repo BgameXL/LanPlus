@@ -65,7 +65,7 @@ public final class Config {
                 customBackground = getInt(json, "customBackground", customBackground);
                 customText = getInt(json, "customText", customText);
                 customMuted = getInt(json, "customMuted", customMuted);
-                uiOpacity = Math.clamp(getInt(json, "uiOpacity", uiOpacity), 25, 100);
+                uiOpacity = Math.clamp(getInt(json, "uiOpacity", uiOpacity), 0, 100);
                 voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
                 voiceHost = getString(json, "voiceHost", voiceHost);
                 seenUpdateVersion = getString(json, "seenUpdateVersion", seenUpdateVersion);

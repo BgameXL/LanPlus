@@ -20,11 +20,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class TcpRelayTunnel implements RelayTunnel {
@@ -32,6 +28,7 @@ public final class TcpRelayTunnel implements RelayTunnel {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new Gson();
     private static final int CONNECT_TIMEOUT_MS = 5_000;
+    private static final long DRAIN_MS = 5000;
     private final boolean plaintext;
     private final ExecutorService pool = Executors.newCachedThreadPool(daemon("lanplus-relay"));
     private volatile Socket control;
@@ -173,11 +170,18 @@ public final class TcpRelayTunnel implements RelayTunnel {
     }
 
     private void pump(Socket a, Socket b) {
-        Future<?> other = pool.submit(() -> copy(a, b));
-        copy(b, a);
-        other.cancel(true);
-        closeQuietly(a);
-        closeQuietly(b);
+        try {
+            Future<?> other = pool.submit(() -> copy(a, b));
+            copy(b, a);
+            try {
+                other.get(DRAIN_MS, TimeUnit.MILLISECONDS);
+            } catch (Exception e) {
+                other.cancel(true);
+            }
+        } finally {
+            closeQuietly(a);
+            closeQuietly(b);
+        }
     }
 
     private static void copy(Socket from, Socket to) {

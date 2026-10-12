@@ -69,15 +69,15 @@ final class LanPlusUI {
         DIVIDER = t.divider();
 
         int op = Config.uiOpacity;
-        SURFACE = scaleAlpha(SURFACE, op);
-        SURFACE_RAISED = scaleAlpha(SURFACE_RAISED, op);
-        SURFACE_HOVER = scaleAlpha(SURFACE_HOVER, op);
-        SURFACE_DISABLED = scaleAlpha(SURFACE_DISABLED, op);
-        SLOT = scaleAlpha(SLOT, op);
+        SURFACE = withOpacity(SURFACE, op);
+        SURFACE_RAISED = withOpacity(SURFACE_RAISED, op);
+        SURFACE_HOVER = withOpacity(SURFACE_HOVER, op);
+        SURFACE_DISABLED = withOpacity(SURFACE_DISABLED, op);
+        SLOT = withOpacity(SLOT, op);
     }
 
-    private static int scaleAlpha(int argb, int pct) {
-        int a = (argb >>> 24) * pct / 100;
+    private static int withOpacity(int argb, int pct) {
+        int a = 255 * pct / 100;
         return (a << 24) | (argb & 0xFFFFFF);
     }
 

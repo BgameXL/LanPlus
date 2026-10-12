@@ -42,9 +42,7 @@ public final class ProfileScreen extends LanPlusScreen {
     private static final int SECTION_GAP = 12;
     private static final int MAX_LAYOUT_W = 620;
     private static final int SIDEBAR_W = 250;
-    private static final int CONTENT_TOP = 32;
-    private static final int HEADER_TOP = 6;
-    private static final int HEADER_H = 26;
+    private static final int CONTENT_TOP = 8;
     private static final int FOOTER_H = 26;
     private static final int CLOSE_W = 60;
     private static final String[] PLATFORMS =
@@ -723,9 +721,6 @@ public final class ProfileScreen extends LanPlusScreen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         renderBackdrop(g, this.width, this.height);
-        if (editing || !loaded || profile == null) {
-            g.drawCenteredString(this.font, this.title, this.width / 2, 12, LanPlusUI.TEXT);
-        }
 
         if (!loaded) {
             g.drawCenteredString(this.font, Component.translatable("gui.lanplus.profile.loading"),
@@ -750,7 +745,7 @@ public final class ProfileScreen extends LanPlusScreen {
             renderPanel(g);
             renderUnifiedFrame(g);
             renderBannerIdentity(g);
-            renderBars(g);
+            renderFooter(g);
         }
 
         if (status != null) {
@@ -1602,16 +1597,9 @@ public final class ProfileScreen extends LanPlusScreen {
         return f.connectivity() == Connectivity.ONLINE || f.connectivity() == Connectivity.STALE;
     }
 
-    private void renderBars(GuiGraphics g) {
+    private void renderFooter(GuiGraphics g) {
         int left = layoutLeft();
         int right = left + layoutWidth();
-
-        LanPlusUI.panel(g, left, HEADER_TOP, right, HEADER_TOP + HEADER_H);
-        Component word = Component.translatable("gui.lanplus.profile.word");
-        int totalW = this.font.width("LAN") + this.font.width("+") + 6 + this.font.width(word);
-        int ty = HEADER_TOP + (HEADER_H - 8) / 2;
-        int wx = LanPlusUI.wordmark(g, this.font, (left + right - totalW) / 2, ty);
-        g.drawString(this.font, word, wx + 6, ty, LanPlusUI.MUTED, false);
 
         int ft = this.height - 8 - FOOTER_H;
         LanPlusUI.panel(g, left, ft, right, ft + FOOTER_H);

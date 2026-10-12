@@ -78,7 +78,7 @@ public final class SettingsScreen extends LanPlusScreen {
     private static final int CH_ROW_H = 20;
     private static final int CH_ROW_GAP = 6;
     private static final int OPACITY_BLOCK = 20;
-    private static final int OPACITY_MIN = 25;
+    private static final int OPACITY_MIN = 0;
     private static final int TOGGLE_ROW_STEP = 48;
     private static final int MAX_URL_LENGTH = 2048;
     private static final int MAX_ADDRESS_LENGTH = 260;
