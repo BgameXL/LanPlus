@@ -5,6 +5,7 @@ import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.CosmeticCatalogEntry;
 import dev.bgame.lanplus.api.CosmeticShop;
+import dev.bgame.lanplus.api.DomainStatus;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.Invite;
 import dev.bgame.lanplus.api.LibrarySkin;
@@ -111,6 +112,10 @@ public interface LanPlusNetwork {
     CompletableFuture<Invite> resolveInvite(String code);
 
     CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);
+
+    CompletableFuture<DomainStatus> getDomainStatus();
+
+    CompletableFuture<DomainStatus> rerollDomain();
 
     void connectEvents(UUID uuid, BackendEventListener listener);
 

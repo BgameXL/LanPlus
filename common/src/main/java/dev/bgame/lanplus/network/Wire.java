@@ -10,6 +10,7 @@ import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.PlayedTogether;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.ProfileBackground;
+import dev.bgame.lanplus.api.DomainStatus;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.SkinRef;
@@ -108,6 +109,12 @@ final class Wire {
     record RelayTicketDto(String ticket, String relayHost, int relayPort, String domain, int expiresIn) {
         RelayTicket toApi() {
             return new RelayTicket(ticket, relayHost, relayPort, domain, expiresIn);
+        }
+    }
+
+    record DomainStatusDto(boolean ok, String domain, long changedAt, long cooldownMs, long canRerollAt) {
+        DomainStatus toApi() {
+            return new DomainStatus(ok, domain, changedAt, cooldownMs, canRerollAt);
         }
     }
 

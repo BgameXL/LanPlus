@@ -2,7 +2,9 @@ package dev.bgame.lanplus.client.gui;
 
 import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.LanplusCommon;
+import dev.bgame.lanplus.api.DomainStatus;
 import dev.bgame.lanplus.client.LanPlusClient;
+import dev.bgame.lanplus.network.LanPlusNetwork;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -87,6 +89,10 @@ public final class SettingsScreen extends LanPlusScreen {
     private EditBox backendBox;
     private EditBox relayAddrBox;
     private EditBox voiceHostBox;
+    private LanplusButton domainButton;
+    private DomainStatus domainStatus;
+    private boolean domainLoading;
+    private boolean domainRerolling;
     private String backendDraft;
     private String relayAddressDraft;
     private String voiceHostDraft;
@@ -258,6 +264,11 @@ public final class SettingsScreen extends LanPlusScreen {
 
         if (selected == Cat.ABOUT && linkTooltip != null) {
             g.renderTooltip(this.font, linkTooltip, mouseX, mouseY);
+        }
+        if (selected == Cat.ADVANCED && domainButton != null && domainButton.isHovered()) {
+            g.renderTooltip(this.font,
+                    this.font.split(Component.translatable("gui.lanplus.settings.domain.tooltip"), 220),
+                    mouseX, mouseY);
         }
     }
 
@@ -442,14 +453,117 @@ public final class SettingsScreen extends LanPlusScreen {
 
     private void renderAdvanced(GuiGraphics g) {
         int x = contentX;
-        int y = renderToggleRow(g, contentTop + 2, "relay_plain");
+        int y = renderDomainRow(g, contentTop + 2);
+        y = renderToggleRow(g, y, "relay_plain");
         y = fieldRow(g, x, y, "backend", backendBox);
         y = fieldRow(g, x, y, "relay_address", relayAddrBox);
         fieldRow(g, x, y, "voice_host", voiceHostBox);
     }
 
+    private int renderDomainRow(GuiGraphics g, int y) {
+        int x = contentX;
+        int w = contentW;
+        updateDomainButton();
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings.domain"), x, y + 5, LanPlusUI.TEXT, false);
+        Component value;
+        int color;
+        if (domainStatus != null && domainStatus.domain() != null) {
+            value = Component.literal(domainStatus.domain());
+            color = LanPlusUI.ACCENT;
+        } else {
+            value = Component.translatable(domainLoading
+                    ? "gui.lanplus.settings.domain.loading"
+                    : "gui.lanplus.settings.domain.unavailable");
+            color = LanPlusUI.MUTED;
+        }
+        g.drawString(this.font, value, x, y + 18, color, false);
+        g.fill(x, y + 40, x + w, y + 41, LanPlusUI.DIVIDER);
+        return y + TOGGLE_ROW_STEP;
+    }
+
+    private void updateDomainButton() {
+        if (domainButton == null) {
+            return;
+        }
+        if (domainRerolling) {
+            domainButton.active = false;
+            domainButton.setMessage(Component.translatable("gui.lanplus.settings.domain.changing"));
+            return;
+        }
+        if (domainStatus == null || domainStatus.domain() == null) {
+            domainButton.active = false;
+            domainButton.setMessage(Component.translatable("gui.lanplus.settings.domain.change"));
+            return;
+        }
+        long remaining = domainStatus.canRerollAt() - System.currentTimeMillis();
+        if (remaining > 0) {
+            domainButton.active = false;
+            domainButton.setMessage(Component.translatable("gui.lanplus.settings.domain.cooldown",
+                    formatCountdown(remaining)));
+        } else {
+            domainButton.active = true;
+            domainButton.setMessage(Component.translatable("gui.lanplus.settings.domain.change"));
+        }
+    }
+
+    private static String formatCountdown(long ms) {
+        long minutes = ms / 60_000;
+        long days = minutes / (24 * 60);
+        long hours = (minutes / 60) % 24;
+        long mins = minutes % 60;
+        if (days > 0) {
+            return days + "d " + hours + "h";
+        }
+        if (hours > 0) {
+            return hours + "h " + mins + "m";
+        }
+        return Math.max(1, mins) + "m";
+    }
+
+    private void loadDomainStatus() {
+        LanPlusNetwork net = LanPlusClient.network();
+        if (net == null || domainLoading || domainStatus != null) {
+            return;
+        }
+        domainLoading = true;
+        net.getDomainStatus().whenComplete((status, error) ->
+                Minecraft.getInstance().execute(() -> {
+                    if (Minecraft.getInstance().screen != this) {
+                        return;
+                    }
+                    domainLoading = false;
+                    if (error == null && status != null) {
+                        domainStatus = status;
+                    }
+                }));
+    }
+
+    private void rerollDomain() {
+        LanPlusNetwork net = LanPlusClient.network();
+        if (net == null || domainRerolling) {
+            return;
+        }
+        domainRerolling = true;
+        net.rerollDomain().whenComplete((status, error) ->
+                Minecraft.getInstance().execute(() -> {
+                    if (Minecraft.getInstance().screen != this) {
+                        return;
+                    }
+                    domainRerolling = false;
+                    if (error == null && status != null) {
+                        domainStatus = status;
+                    }
+                }));
+    }
+
     private void addAdvancedWidgets() {
-        addToggle(contentTop + 2, "relay_plain", () -> Config.relayDevPlaintext,
+        int bw = 150;
+        domainButton = LanplusButton.create(
+                        Component.translatable("gui.lanplus.settings.domain.change"), b -> rerollDomain())
+                .bounds(contentX + contentW - bw, contentTop + 13, bw, 18).build();
+        addRenderableWidget(domainButton);
+        loadDomainStatus();
+        addToggle(contentTop + 2 + TOGGLE_ROW_STEP, "relay_plain", () -> Config.relayDevPlaintext,
                 () -> Config.relayDevPlaintext = !Config.relayDevPlaintext);
         backendBox = advancedBox(backendDraft, MAX_URL_LENGTH,
                 "gui.lanplus.settings.backend", "gui.lanplus.settings.backend", value -> {

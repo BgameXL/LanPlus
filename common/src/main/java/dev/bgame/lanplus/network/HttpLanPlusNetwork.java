@@ -21,6 +21,7 @@ import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.CosmeticCatalogEntry;
 import dev.bgame.lanplus.api.CosmeticShop;
+import dev.bgame.lanplus.api.DomainStatus;
 import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.api.Suggestion;
@@ -715,6 +716,34 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         return post("/relay/ticket", new Wire.RelayTicketRequest(id.uuid().toString(), gated)).thenApply(resp -> {
             Wire.RelayTicketDto dto = GSON.fromJson(resp.body(), Wire.RelayTicketDto.class);
             return dto == null || dto.ticket() == null ? null : dto.toApi();
+        }).exceptionally(err -> {
+            onError(err);
+            return null;
+        });
+    }
+
+    @Override
+    public CompletableFuture<DomainStatus> getDomainStatus() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return get("/relay/domain").thenApply(resp -> {
+            Wire.DomainStatusDto dto = GSON.fromJson(resp.body(), Wire.DomainStatusDto.class);
+            return dto == null || dto.domain() == null ? null : dto.toApi();
+        }).exceptionally(err -> {
+            onError(err);
+            return null;
+        });
+    }
+
+    @Override
+    public CompletableFuture<DomainStatus> rerollDomain() {
+        if (!configured()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return post("/relay/domain/reroll", new Object()).thenApply(resp -> {
+            Wire.DomainStatusDto dto = GSON.fromJson(resp.body(), Wire.DomainStatusDto.class);
+            return dto == null || dto.domain() == null ? null : dto.toApi();
         }).exceptionally(err -> {
             onError(err);
             return null;

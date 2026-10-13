@@ -38,11 +38,11 @@ In a CurseForge / Modrinth export, `config/` ships under `overrides/config/`, so
 - **`modpackId`** (required): a stable, unique id. Lowercase letters, digits, `-`, `_` (e.g. `astro-greg`, `start-beyond`). Treat it as permanent, everything keys off it.
 - **`version`** (optional): LAN+ ignores it. Include it for your own bookkeeping if you want.
 
-LAN+ trusts the id the file declares, it does not scan your mod list. The file is per-instance, so it applies to every world in that install (correct, since an instance is one modpack). LAN+ reports your modpack only while a player is in their own world (singleplayer or hosting). A guest on someone else's server reports the host's modpack, not their own.
+LAN+ trusts the id the file declares, it does not scan your mod list. The file is per-instance, so it applies to every world in that install. LAN+ reports your modpack only while a player is in their own world. A guest on someone else's server reports the host's modpack.
 
 ### 2. Register the id
 
-LAN+ turns your `modpackId` into a name and link through a curated registry. There's no public write endpoint, the maintainer adds entries so names and links stay trustworthy. Send the maintainer the following (links and text only, never files):
+LAN+ turns your `modpackId` into a name and link through a curated registry. The maintainer adds entries so names and links stay trustworthy. Send the maintainer the following (links and text only, never files):
 
 | Field         | Required    | What it is                                              |
 |---------------|-------------|---------------------------------------------------------|
@@ -54,7 +54,7 @@ LAN+ turns your `modpackId` into a name and link through a curated registry. The
 | `iconUrl`     | optional    | link to an icon (reserved for an upcoming icon display) |
 | `description` | optional    | a short blurb                                           |
 
-LAN+ stores only these references. It never hosts your modpack, and never follows the links itself. A player's client opens the link in a browser only on click.
+LAN+ stores only these references.
 
 ## Checklist
 
