@@ -20,7 +20,7 @@ import dev.bgame.lanplus.client.SkinTextures;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.invites.HostAccessControl;
 import dev.bgame.lanplus.invites.InviteService;
-import dev.bgame.lanplus.network.SvcBridge;
+import dev.bgame.lanplus.network.SVCBridge;
 import dev.bgame.lanplus.presence.PresenceManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -727,7 +727,7 @@ public final class FriendsScreen extends LanPlusScreen {
     private Component connectionLine() {
         MutableComponent line = Component.empty().append(Component.translatable(
                 LanPlusClient.isHostingViaRelay() ? "gui.lanplus.details.internet" : "gui.lanplus.details.lan"));
-        if (Config.voiceEnabled && SvcBridge.installed()) {
+        if (Config.voiceEnabled && SVCBridge.installed()) {
             line.append(Component.literal(" · ")).append(Component.translatable("gui.lanplus.details.voiceon"));
         }
         long since = HostController.hostingSince();

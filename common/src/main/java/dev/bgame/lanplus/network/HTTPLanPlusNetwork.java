@@ -52,7 +52,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
-public final class HttpLanPlusNetwork implements LanPlusNetwork {
+public final class HTTPLanPlusNetwork implements LanPlusNetwork {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new Gson();
@@ -83,7 +83,7 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     private volatile java.util.function.BiConsumer<UUID, String> profileBodySink;
 
-    public HttpLanPlusNetwork(Supplier<String> baseUrl, Supplier<PlayerIdentity> identity, MinecraftAuth auth) {
+    public HTTPLanPlusNetwork(Supplier<String> baseUrl, Supplier<PlayerIdentity> identity, MinecraftAuth auth) {
         this.baseUrl = baseUrl;
         this.identity = identity;
         this.auth = auth;
@@ -1046,14 +1046,14 @@ public final class HttpLanPlusNetwork implements LanPlusNetwork {
         public void onError(WebSocket webSocket, Throwable error) {
             LOGGER.warn("LAN+ WebSocket error: {}", error.toString());
             reachable = false;
-            HttpLanPlusNetwork.this.webSocket = null;
+            HTTPLanPlusNetwork.this.webSocket = null;
             scheduleReconnect();
         }
 
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
             reachable = false;
-            HttpLanPlusNetwork.this.webSocket = null;
+            HTTPLanPlusNetwork.this.webSocket = null;
             scheduleReconnect();
             return null;
         }

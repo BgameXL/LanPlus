@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-final class DiscordIpc implements Closeable {
+final class DiscordIPC implements Closeable {
 
     static final int OP_HANDSHAKE = 0;
     static final int OP_FRAME = 1;
@@ -27,14 +27,14 @@ final class DiscordIpc implements Closeable {
 
     private final Transport transport;
 
-    private DiscordIpc(Transport transport) {
+    private DiscordIPC(Transport transport) {
         this.transport = transport;
     }
 
-    static DiscordIpc open() throws IOException {
+    static DiscordIPC open() throws IOException {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         Transport t = os.contains("win") ? openWindows() : openUnix();
-        return new DiscordIpc(t);
+        return new DiscordIPC(t);
     }
 
     void send(int opcode, byte[] payload) throws IOException {

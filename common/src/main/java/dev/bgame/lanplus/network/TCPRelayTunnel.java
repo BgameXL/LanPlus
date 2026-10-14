@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public final class TcpRelayTunnel implements RelayTunnel {
+public final class TCPRelayTunnel implements RelayTunnel {
 
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new Gson();
@@ -36,7 +36,7 @@ public final class TcpRelayTunnel implements RelayTunnel {
     private volatile boolean open;
     private volatile VoiceTunnel voice;
 
-    public TcpRelayTunnel(boolean plaintext) {
+    public TCPRelayTunnel(boolean plaintext) {
         this.plaintext = plaintext;
     }
 
@@ -148,9 +148,9 @@ public final class TcpRelayTunnel implements RelayTunnel {
                 Config.voiceHost = voiceHost;
                 Config.save();
             }
-            SvcBridge.applyVoiceHost(voiceHost);
+            SVCBridge.applyVoiceHost(voiceHost);
         }
-        if (!Config.voiceEnabled || voiceKey == null || voiceKey.isBlank() || !SvcBridge.installed()) {
+        if (!Config.voiceEnabled || voiceKey == null || voiceKey.isBlank() || !SVCBridge.installed()) {
             return;
         }
         pool.execute(() -> startVoice(ticket, voiceKey, localPort));

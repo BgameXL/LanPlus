@@ -6,7 +6,7 @@ import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.invites.HostAccessControl;
-import dev.bgame.lanplus.network.SvcBridge;
+import dev.bgame.lanplus.network.SVCBridge;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.util.HttpUtil;
@@ -110,7 +110,7 @@ public final class HostController {
 
     private static int hostLanPort() {
         int port = 24454;
-        if (Config.voiceEnabled && SvcBridge.installed() && portAvailable(port)) {
+        if (Config.voiceEnabled && SVCBridge.installed() && portAvailable(port)) {
             return port;
         }
         return HttpUtil.getAvailablePort();

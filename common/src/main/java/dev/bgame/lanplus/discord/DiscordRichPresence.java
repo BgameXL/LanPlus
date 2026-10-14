@@ -35,7 +35,7 @@ public final class DiscordRichPresence implements DiscordPresence {
     private final Supplier<int[]> partySize;
     private final Consumer<String> joinHandler;
     private final Object writeLock = new Object();
-    private DiscordIpc ipc;
+    private DiscordIPC ipc;
     private volatile boolean connected;
     private long lastAttempt;
     private volatile PresenceSnapshot last;
@@ -138,7 +138,7 @@ public final class DiscordRichPresence implements DiscordPresence {
         }
         lastAttempt = now;
         try {
-            ipc = DiscordIpc.open();
+            ipc = DiscordIPC.open();
             handshake();
             connected = true;
             subscribe("ACTIVITY_JOIN");
@@ -159,9 +159,9 @@ public final class DiscordRichPresence implements DiscordPresence {
         JsonObject hello = new JsonObject();
         hello.addProperty("v", 1);
         hello.addProperty("client_id", appId);
-        sendFrame(DiscordIpc.OP_HANDSHAKE, hello.toString());
-        DiscordIpc.Frame ready = ipc.read();
-        if (ready.opcode() == DiscordIpc.OP_CLOSE) {
+        sendFrame(DiscordIPC.OP_HANDSHAKE, hello.toString());
+        DiscordIPC.Frame ready = ipc.read();
+        if (ready.opcode() == DiscordIPC.OP_CLOSE) {
             throw new IOException("discord rejected the handshake");
         }
     }
@@ -172,22 +172,22 @@ public final class DiscordRichPresence implements DiscordPresence {
         payload.addProperty("evt", event);
         payload.addProperty("nonce", UUID.randomUUID().toString());
         try {
-            sendFrame(DiscordIpc.OP_FRAME, payload.toString());
+            sendFrame(DiscordIPC.OP_FRAME, payload.toString());
         } catch (IOException e) {
             LOGGER.debug("LAN+ Discord subscribe {} failed: {}", event, e.toString());
         }
     }
 
     private void readLoop() {
-        DiscordIpc mine = ipc;
+        DiscordIPC mine = ipc;
         try {
             while (connected && mine == ipc) {
-                DiscordIpc.Frame frame = mine.read();
+                DiscordIPC.Frame frame = mine.read();
                 switch (frame.opcode()) {
-                    case DiscordIpc.OP_PING ->
-                            sendFrame(DiscordIpc.OP_PONG, new String(frame.data(), StandardCharsets.UTF_8));
-                    case DiscordIpc.OP_CLOSE -> throw new IOException("discord closed the connection");
-                    case DiscordIpc.OP_FRAME -> handleEvent(new String(frame.data(), StandardCharsets.UTF_8));
+                    case DiscordIPC.OP_PING ->
+                            sendFrame(DiscordIPC.OP_PONG, new String(frame.data(), StandardCharsets.UTF_8));
+                    case DiscordIPC.OP_CLOSE -> throw new IOException("discord closed the connection");
+                    case DiscordIPC.OP_FRAME -> handleEvent(new String(frame.data(), StandardCharsets.UTF_8));
                     default -> {
                     }
                 }
@@ -237,7 +237,7 @@ public final class DiscordRichPresence implements DiscordPresence {
                     args.addProperty("user_id", userId);
                     reply.add("args", args);
                     try {
-                        sendFrame(DiscordIpc.OP_FRAME, reply.toString());
+                        sendFrame(DiscordIPC.OP_FRAME, reply.toString());
                     } catch (IOException e) {
                         LOGGER.debug("LAN+ Discord join-invite reply failed: {}", e.toString());
                     }
@@ -250,7 +250,7 @@ public final class DiscordRichPresence implements DiscordPresence {
 
     private void trySend(PresenceSnapshot snapshot) {
         try {
-            sendFrame(DiscordIpc.OP_FRAME, activityFrame(snapshot));
+            sendFrame(DiscordIPC.OP_FRAME, activityFrame(snapshot));
         } catch (IOException e) {
             LOGGER.debug("LAN+ Discord push failed, dropping connection: {}", e.toString());
             connected = false;
@@ -259,7 +259,7 @@ public final class DiscordRichPresence implements DiscordPresence {
     }
 
     private void sendFrame(int opcode, String json) throws IOException {
-        DiscordIpc target = ipc;
+        DiscordIPC target = ipc;
         if (target == null) {
             throw new IOException("not connected");
         }

@@ -1,6 +1,5 @@
 package dev.bgame.lanplus.skins;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -13,12 +12,12 @@ import java.time.Duration;
 
 import static dev.bgame.lanplus.profiles.DefaultProfilesService.getBytes;
 
-final class SkinUrlGuard {
+final class SkinURLGuard {
 
     static final int MAX_BYTES = 256 * 1024;
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
 
-    private SkinUrlGuard() {
+    private SkinURLGuard() {
     }
 
     static boolean isSafe(String url) {

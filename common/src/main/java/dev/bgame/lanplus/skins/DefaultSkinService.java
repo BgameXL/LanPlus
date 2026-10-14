@@ -109,7 +109,7 @@ public final class DefaultSkinService implements SkinService {
     }
 
     private UUID fetchMojangUuid(String name) {
-        byte[] body = SkinUrlGuard.fetch(http,
+        byte[] body = SkinURLGuard.fetch(http,
                 MOJANG_NAME_API + URLEncoder.encode(name, StandardCharsets.UTF_8));
         if (body == null) {
             return null;
@@ -144,7 +144,7 @@ public final class DefaultSkinService implements SkinService {
     }
 
     private Loaded loadMojang(SkinRef ref) {
-        byte[] body = SkinUrlGuard.fetch(http, PROFILE_API + ref.id().replace("-", ""));
+        byte[] body = SkinURLGuard.fetch(http, PROFILE_API + ref.id().replace("-", ""));
         if (body == null) {
             return null;
         }
@@ -196,7 +196,7 @@ public final class DefaultSkinService implements SkinService {
         if (cached != null) {
             return cached;
         }
-        byte[] png = SkinUrlGuard.fetch(http, url);
+        byte[] png = SkinURLGuard.fetch(http, url);
         if (png != null && cache != null) {
             cache.put(key, png);
         }

@@ -24,12 +24,12 @@ import dev.bgame.lanplus.friends.DefaultFriendsService;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.invites.DefaultInviteService;
 import dev.bgame.lanplus.invites.InviteService;
-import dev.bgame.lanplus.network.HttpLanPlusNetwork;
+import dev.bgame.lanplus.network.HTTPLanPlusNetwork;
 import dev.bgame.lanplus.network.LanPlusNetwork;
 import dev.bgame.lanplus.network.RelayHostingCoordinator;
 import dev.bgame.lanplus.network.RelayTunnel;
-import dev.bgame.lanplus.network.SvcBridge;
-import dev.bgame.lanplus.network.TcpRelayTunnel;
+import dev.bgame.lanplus.network.SVCBridge;
+import dev.bgame.lanplus.network.TCPRelayTunnel;
 import dev.bgame.lanplus.presence.DefaultPresenceManager;
 import dev.bgame.lanplus.presence.PresenceManager;
 import dev.bgame.lanplus.profiles.DefaultProfilesService;
@@ -82,7 +82,7 @@ public final class LanPlusClient {
         if (presence != null) {
             return;
         }
-        network = new HttpLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity, new ClientMinecraftAuth());
+        network = new HTTPLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity, new ClientMinecraftAuth());
         AssetCache assetCache = new AssetCache(PlatformHolder.get().getGameDir().resolve("lanplus/cache/assets"));
         ProfileCache profileCache = new ProfileCache(PlatformHolder.get().getGameDir().resolve("lanplus/cache/profiles"));
         presence = new DefaultPresenceManager(network);
@@ -102,11 +102,11 @@ public final class LanPlusClient {
         discord.update(presence.current());
 
         boolean relayDev = !Config.relayDevAddress.isBlank();
-        relayTunnel = new TcpRelayTunnel(Config.relayDevPlaintext);
+        relayTunnel = new TCPRelayTunnel(Config.relayDevPlaintext);
         new RelayHostingCoordinator(presence, relayTunnel, network, () -> Config.relayEnabled, HostController::isOfflineHosting, relayDev ? LanPlusClient::devRelayTicket : null);
 
         if (Config.voiceEnabled) {
-            SvcBridge.applyVoiceHost(Config.voiceHost);
+            SVCBridge.applyVoiceHost(Config.voiceHost);
         }
 
         invites = new DefaultInviteService(network, presence, LanPlusClient::localIdentity, () -> Config.relayEnabled, HostController::isOfflineHosting);
