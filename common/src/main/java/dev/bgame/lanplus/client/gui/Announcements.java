@@ -136,8 +136,7 @@ public final class Announcements extends LanPlusScreen {
         g.drawString(this.font, this.title, wx + 8, cardY + PAD, LanPlusUI.MUTED, false);
         g.fill(cardX + PAD, cardY + 26, cardX + cardW - PAD, cardY + 27, LanPlusUI.DIVIDER);
         g.fill(listX - 8, sidebarTop, listX - 6, listBottom, LanPlusUI.DIVIDER);
-        g.fill(cardX + PAD, cardY + cardH - FOOTER_H + 4, cardX + cardW - PAD, cardY + cardH - FOOTER_H + 5,
-                LanPlusUI.DIVIDER);
+        g.fill(cardX + PAD, cardY + cardH - FOOTER_H + 4, cardX + cardW - PAD, cardY + cardH - FOOTER_H + 5, LanPlusUI.DIVIDER);
 
         AnnouncementsService service = LanPlusClient.announcements();
         List<Announcement> all = service == null ? List.of() : service.announcements();
