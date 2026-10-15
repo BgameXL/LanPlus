@@ -2,8 +2,10 @@ plugins {
     id 'dev.architectury.loom'
 }
 
+version = rootProject.mod_version + '+' + rootProject.minecraft_version + '-neoforge'
+
 base {
-    archivesName = rootProject.name + '-neoforge'
+    archivesName = rootProject.name
 }
 
 repositories {

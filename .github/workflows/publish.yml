@@ -67,8 +67,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload "${{ github.event.release.tag_name }}" \
-            "fabric/build/libs/LanPlus-fabric-${{ steps.version.outputs.version }}.jar" \
-            "neoforge/build/libs/LanPlus-neoforge-${{ steps.version.outputs.version }}.jar" \
+            "fabric/build/libs/LanPlus-${{ steps.version.outputs.version }}+${{ steps.mc.outputs.mc }}-fabric.jar" \
+            "neoforge/build/libs/LanPlus-${{ steps.version.outputs.version }}+${{ steps.mc.outputs.mc }}-neoforge.jar" \
             --clobber
 
   publish-fabric:
@@ -93,7 +93,7 @@ jobs:
           name: ${{ github.event.release.name || format('LAN+ {0} for {1}', needs.build.outputs.version, needs.build.outputs.mc) }} (Fabric/Quilt)
           changelog: ${{ github.event.release.body }}
 
-          files: fabric/build/libs/LanPlus-fabric-${{ needs.build.outputs.version }}.jar
+          files: fabric/build/libs/LanPlus-${{ needs.build.outputs.version }}+${{ needs.build.outputs.mc }}-fabric.jar
           loaders: |
             fabric
             quilt
@@ -130,7 +130,7 @@ jobs:
           name: ${{ github.event.release.name || format('LAN+ {0} for {1}', needs.build.outputs.version, needs.build.outputs.mc) }} (NeoForge)
           changelog: ${{ github.event.release.body }}
 
-          files: neoforge/build/libs/LanPlus-neoforge-${{ needs.build.outputs.version }}.jar
+          files: neoforge/build/libs/LanPlus-${{ needs.build.outputs.version }}+${{ needs.build.outputs.mc }}-neoforge.jar
           loaders: neoforge
           environment: client
           version: ${{ needs.build.outputs.version }}+${{ needs.build.outputs.mc }}-neoforge

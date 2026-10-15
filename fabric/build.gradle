@@ -2,8 +2,10 @@ plugins {
     id 'dev.architectury.loom'
 }
 
+version = rootProject.mod_version + '+' + rootProject.minecraft_version + '-fabric'
+
 base {
-    archivesName = rootProject.name + '-fabric'
+    archivesName = rootProject.name
 }
 
 loom {
