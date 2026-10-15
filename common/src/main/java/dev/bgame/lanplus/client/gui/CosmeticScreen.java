@@ -362,8 +362,8 @@ public final class CosmeticScreen extends LanPlusScreen {
             g.fill(bx, by, bx + w, by + 24, LanPlusUI.SURFACE_DISABLED);
             LanPlusUI.textCentered(g, this.font, Component.translatable("gui.lanplus.cosmetics.buy", format(price)), bx, by + 8, w, LanPlusUI.FAINT);
             int wallet = LanPlusClient.cosmetics() == null ? 0 : LanPlusClient.cosmetics().wallet();
-            g.drawString(this.font, Component.translatable("gui.lanplus.cosmetics.short", format(price - wallet)),
-                    bx, by - 12, LanPlusUI.AMBER, false);
+            LanPlusUI.textCentered(g, this.font, Component.translatable("gui.lanplus.cosmetics.short", format(price - wallet)),
+                    bx, by - 12, w, LanPlusUI.AMBER);
         }
     }
 
