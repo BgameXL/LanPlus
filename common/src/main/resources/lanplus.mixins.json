@@ -9,6 +9,7 @@
   ],
   "client": [
     "client.AbstractClientPlayerMixin",
+    "client.PauseScreenMixin",
     "client.PlayerRendererMixin"
   ],
   "injectors": {

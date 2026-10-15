@@ -324,7 +324,7 @@
   "gui.lanplus.settings.discord": "Discord Rich Presence",
   "gui.lanplus.settings.discord.desc": "Show your LAN+ activity on your Discord profile.",
   "gui.lanplus.settings.relay": "Relay (internet hosting)",
-  "gui.lanplus.settings.relay.desc": "Let friends join over the internet through the LAN+ relay.",
+  "gui.lanplus.settings.relay.desc": "Routes internet joins through the relay to hide your IP. Turn off to host directly (shares your IP).",
   "gui.lanplus.settings.theme.desc": "Colour theme for LAN+ screens.",
   "gui.lanplus.settings.domain": "Your IP domain",
   "gui.lanplus.settings.domain.loading": "Loading...",
