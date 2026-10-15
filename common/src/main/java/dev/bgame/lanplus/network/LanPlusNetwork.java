@@ -111,7 +111,7 @@ public interface LanPlusNetwork {
 
     CompletableFuture<Invite> resolveInvite(String code);
 
-    CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);
+    CompletableFuture<RelayTicket> requestRelayTicket(boolean gated, String mode);
 
     CompletableFuture<DomainStatus> getDomainStatus();
 

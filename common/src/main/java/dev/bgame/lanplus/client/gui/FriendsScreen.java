@@ -718,9 +718,6 @@ public final class FriendsScreen extends LanPlusScreen {
         }
         line.append(Component.literal(" · "));
         line.append(Component.translatable(info.offline() ? "gui.lanplus.details.offline" : "gui.lanplus.details.premium"));
-        if (info.vanilla()) {
-            line.append(Component.literal(" · ")).append(Component.translatable("gui.lanplus.details.vanillaon"));
-        }
         return line;
     }
 
@@ -1467,7 +1464,7 @@ public final class FriendsScreen extends LanPlusScreen {
 
     private record HostInfo(String world, HostAccessMode mode, String address, String code,
                             String gameMode, String difficulty, boolean cheats, String modpack,
-                            int maxPlayers, int invited, boolean offline, boolean vanilla) {
+                            int maxPlayers, int invited, boolean offline) {
     }
 
     private HostInfo hostInfo() {
@@ -1482,7 +1479,7 @@ public final class FriendsScreen extends LanPlusScreen {
         return new HostInfo(s.worldName(), HostAccessControl.mode(), s.address(), s.joinCode(),
                 s.gameMode(), s.difficulty(), s.allowCommands(), s.modpackId(),
                 HostAccessControl.maxPlayers(), HostAccessControl.allowedSnapshot().size(),
-                HostController.isOfflineHosting(), HostAccessControl.allowVanillaJoin());
+                HostController.isOfflineHosting());
     }
 
     private record GuestInfo(String host, String world, String gameMode, String difficulty, boolean cheats) {

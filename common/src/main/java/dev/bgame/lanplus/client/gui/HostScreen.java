@@ -63,7 +63,6 @@ public final class HostScreen extends LanPlusScreen {
     private String hoverTip;
     private long hoverStart;
     private boolean allowNonPremium;
-    private boolean allowVanillaJoin;
     private GameType gameType = GameType.SURVIVAL;
     private Difficulty difficulty = Difficulty.NORMAL;
     private boolean allowCheats;
@@ -344,28 +343,18 @@ public final class HostScreen extends LanPlusScreen {
         renderModeChip(g, mouseX, mouseY, HostAccessMode.INVITED, "gui.lanplus.host.access.invited",
                 cardX + PAD + 3 * (chipW + 6), cardW - 2 * PAD - 3 * (chipW + 6));
 
-        int halfW = (cardW - 2 * PAD - 6) / 2;
-        int premiumX = cardX + PAD;
-        int vanillaX = cardX + PAD + halfW + 6;
-        int vanillaW = cardX + cardW - PAD - vanillaX;
+        int premiumW = (cardW - 2 * PAD) / 2;
+        int premiumX = cardX + (cardW - premiumW) / 2;
 
         Component premium = Component.translatable("gui.lanplus.host.nonpremium", Component.translatable(
                 allowNonPremium ? "gui.lanplus.host.nonpremium.on" : "gui.lanplus.host.nonpremium.off"));
-        boolean hover = in(mouseX, mouseY, premiumX, premiumRowY, halfW, DROPDOWN_H);
-        LanPlusUI.chip(g, this.font, premium, premiumX, premiumRowY, halfW, DROPDOWN_H,
+        boolean hover = in(mouseX, mouseY, premiumX, premiumRowY, premiumW, DROPDOWN_H);
+        LanPlusUI.chip(g, this.font, premium, premiumX, premiumRowY, premiumW, DROPDOWN_H,
                 allowNonPremium, true, hover);
-
-        Component vanilla = Component.translatable("gui.lanplus.host.vanilla", Component.translatable(
-                allowVanillaJoin ? "gui.lanplus.host.vanilla.on" : "gui.lanplus.host.vanilla.off"));
-        boolean vanillaHover = in(mouseX, mouseY, vanillaX, premiumRowY, vanillaW, DROPDOWN_H);
-        LanPlusUI.chip(g, this.font, vanilla, vanillaX, premiumRowY, vanillaW, DROPDOWN_H,
-                allowVanillaJoin, true, vanillaHover);
 
         String tip;
         if (hover) {
             tip = "gui.lanplus.host.nonpremium.tip";
-        } else if (vanillaHover) {
-            tip = "gui.lanplus.host.vanilla.tip";
         } else {
             HostAccessMode hovered = accessModeAt(mouseX, mouseY);
             tip = hovered == null ? null : accessTipKey(hovered);
@@ -559,14 +548,9 @@ public final class HostScreen extends LanPlusScreen {
                 accessMode = picked;
                 return true;
             }
-            int halfW = (cardW - 2 * PAD - 6) / 2;
-            int vanillaX = cardX + PAD + halfW + 6;
-            if (in(mouseX, mouseY, cardX + PAD, premiumRowY, halfW, DROPDOWN_H)) {
+            int premiumW = (cardW - 2 * PAD) * 4 / 5;
+            if (in(mouseX, mouseY, cardX + (cardW - premiumW) / 2, premiumRowY, premiumW, DROPDOWN_H)) {
                 allowNonPremium = !allowNonPremium;
-                return true;
-            }
-            if (in(mouseX, mouseY, vanillaX, premiumRowY, cardX + cardW - PAD - vanillaX, DROPDOWN_H)) {
-                allowVanillaJoin = !allowVanillaJoin;
                 return true;
             }
         }
@@ -659,7 +643,7 @@ public final class HostScreen extends LanPlusScreen {
         HostController.HostSettings settings = new HostController.HostSettings(
                 accessMode, Set.of(), allowNonPremium,
                 hc ? GameType.SURVIVAL : gameType, hc ? Difficulty.HARD : difficulty,
-                !hc && allowCheats, maxPlayers, allowVanillaJoin);
+                !hc && allowCheats, maxPlayers);
         if (inWorld) {
             if (accessMode == HostAccessMode.INVITED) {
                 minecraft.setScreen(new InviteOverlay(this, settings));

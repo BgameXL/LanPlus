@@ -708,12 +708,12 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
-    public CompletableFuture<RelayTicket> requestRelayTicket(boolean gated) {
+    public CompletableFuture<RelayTicket> requestRelayTicket(boolean gated, String mode) {
         PlayerIdentity id = identity.get();
         if (!configured() || id == null) {
             return CompletableFuture.completedFuture(null);
         }
-        return post("/relay/ticket", new Wire.RelayTicketRequest(id.uuid().toString(), gated)).thenApply(resp -> {
+        return post("/relay/ticket", new Wire.RelayTicketRequest(id.uuid().toString(), gated, mode)).thenApply(resp -> {
             Wire.RelayTicketDto dto = GSON.fromJson(resp.body(), Wire.RelayTicketDto.class);
             return dto == null || dto.ticket() == null ? null : dto.toApi();
         }).exceptionally(err -> {

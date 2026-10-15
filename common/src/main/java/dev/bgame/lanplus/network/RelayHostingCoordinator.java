@@ -98,7 +98,8 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
     private CompletableFuture<RelayTicket> ticket() {
         return devTicket != null
                 ? CompletableFuture.completedFuture(devTicket.get())
-                : network.requestRelayTicket(HostAccessControl.gated(offlineHosting.getAsBoolean()));
+                : network.requestRelayTicket(HostAccessControl.gated(offlineHosting.getAsBoolean()),
+                        HostAccessControl.mode().name());
     }
 
     private static int loopbackPort(String address) {

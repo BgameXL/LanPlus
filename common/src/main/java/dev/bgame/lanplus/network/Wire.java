@@ -103,7 +103,7 @@ final class Wire {
     record InviteResolved(String address, String worldName) {
     }
 
-    record RelayTicketRequest(String uuid, boolean gated) {
+    record RelayTicketRequest(String uuid, boolean gated, String mode) {
     }
 
     record RelayTicketDto(String ticket, String relayHost, int relayPort, String domain, int expiresIn) {
