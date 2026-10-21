@@ -196,8 +196,8 @@ public final class SkinScreen extends LanPlusScreen {
         LanPlusUI.outline1(g, x, y, x + TILE, y + TILE, active ? LanPlusUI.ACCENT : LanPlusUI.EDGE_DARK);
         if (!t.isDefault() && hover) {
             int dx = x + TILE - 9;
-            g.fill(dx, y + 1, dx + 8, y + 9, 0xCCB00020);
-            g.drawString(this.font, "x", dx + 2, y + 1, 0xFFFFFFFF, false);
+            g.fill(dx, y + 1, dx + 8, y + 9, (0xCC << 24) | (LanPlusUI.RED & 0xFFFFFF));
+            g.drawString(this.font, "x", dx + 2, y + 1, LanPlusUI.ON_ACCENT, false);
         }
     }
 

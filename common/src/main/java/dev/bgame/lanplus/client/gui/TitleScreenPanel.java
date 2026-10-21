@@ -36,7 +36,7 @@ public final class TitleScreenPanel {
     private TitleScreenPanel() {
     }
 
-    private record Btn(ResourceLocation ic, String glyph, int glyphColor, boolean primary,
+    private record Btn(ResourceLocation ic, String glyph, boolean primary,
                        Component label, int badge, Runnable action) {
     }
 
@@ -85,40 +85,45 @@ public final class TitleScreenPanel {
         int unseen = LanPlusClient.announcements() == null ? 0 : LanPlusClient.announcements().unseenCount();
         List<Btn> out = new ArrayList<>(6);
         if (!pause) {
-            out.add(new Btn(null, "+", LanPlusUI.LIME, true, Component.translatable("gui.lanplus.menu.hostworld"), 0,
+            out.add(new Btn(null, "+", true, Component.translatable("gui.lanplus.menu.hostworld"), 0,
                     () -> open(new HostScreen(parent()))));
         } else if (mc.hasSingleplayerServer() && !PauseMenuButtons.isHostingInWorld()) {
-            out.add(new Btn(null, "+", LanPlusUI.LIME, true, Component.translatable("gui.lanplus.menu.hostworld"), 0,
+            out.add(new Btn(null, "+", true, Component.translatable("gui.lanplus.menu.hostworld"), 0,
                     () -> open(new HostScreen(parent(), true))));
         }
-        out.add(new Btn(FRIENDS_ICON, null, 0, false, Component.translatable("gui.lanplus.friends.word"), 0,
+        out.add(new Btn(FRIENDS_ICON, null, false, Component.translatable("gui.lanplus.friends.word"), 0,
                 () -> open(new FriendsScreen(parent()))));
-        out.add(new Btn(PROFILE_ICON, null, 0, false, Component.translatable("gui.lanplus.profile.word"), 0, () -> {
+        out.add(new Btn(PROFILE_ICON, null, false, Component.translatable("gui.lanplus.profile.word"), 0, () -> {
             UUID id = LanPlusClient.selfUuid();
             if (id != null) {
                 open(new ProfileScreen(parent(), id));
             }
         }));
-        out.add(new Btn(COSMETICS_ICON, null, 0, false, Component.translatable("gui.lanplus.menu.cosmetics"), 0,
+        out.add(new Btn(COSMETICS_ICON, null, false, Component.translatable("gui.lanplus.menu.cosmetics"), 0,
                 () -> open(new CosmeticScreen(parent()))));
-        out.add(new Btn(ANNOUNCEMENTS_ICON, null, 0, false, Component.translatable("gui.lanplus.menu.news"), unseen,
+        out.add(new Btn(ANNOUNCEMENTS_ICON, null, false, Component.translatable("gui.lanplus.menu.news"), unseen,
                 () -> open(new Announcements(parent()))));
-        out.add(new Btn(SETTINGS_ICON, null, 0, false, Component.translatable("gui.lanplus.settings.word"), 0,
+        out.add(new Btn(SETTINGS_ICON, null, false, Component.translatable("gui.lanplus.settings.word"), 0,
                 () -> open(new SettingsScreen(parent()))));
         return out;
     }
 
     private static void drawButton(GuiGraphics g, Font font, int x, int y, int w, Btn b, boolean hover) {
-        LanPlusUI.button3D(g, x, y, x + w, y + BTN, hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
+        int fill = hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
+        LanPlusUI.button3D(g, x, y, x + w, y + BTN, fill);
         if (b.primary()) {
-            LanPlusUI.outline1(g, x, y, x + w, y + BTN, LanPlusUI.LIME);
+            LanPlusUI.outline1(g, x, y, x + w, y + BTN, LanPlusUI.contrastLime(fill));
         }
         if (b.glyph() != null) {
-            g.drawString(font, b.glyph(), x + (BTN - font.width(b.glyph())) / 2, y + (BTN - 8) / 2, b.glyphColor(), true);
+            g.drawString(font, b.glyph(), x + (BTN - font.width(b.glyph())) / 2, y + (BTN - 8) / 2,
+                    LanPlusUI.contrastLime(fill), true);
         } else {
+            int tint = LanPlusUI.TEXT;
+            g.setColor(((tint >> 16) & 0xFF) / 255f, ((tint >> 8) & 0xFF) / 255f, (tint & 0xFF) / 255f, 1f);
             g.blit(b.ic(), x + (BTN - ICON) / 2, y + (BTN - ICON) / 2, 0, 0, ICON, ICON, ICON, ICON);
+            g.setColor(1f, 1f, 1f, 1f);
         }
-        g.drawString(font, b.label(), x + BTN, y + (BTN - 8) / 2, hover ? LanPlusUI.TEXT : LanPlusUI.MUTED, true);
+        g.drawString(font, b.label(), x + BTN, y + (BTN - 8) / 2, LanPlusUI.TEXT, true);
         if (b.badge() > 0) {
             drawBadge(g, font, x + w - 2, y - 2, b.badge());
         }

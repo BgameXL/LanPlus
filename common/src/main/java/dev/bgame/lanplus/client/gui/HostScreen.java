@@ -35,12 +35,12 @@ public final class HostScreen extends LanPlusScreen {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final int CARD_W = 336;
     private static final int ROW_H = 24;
-    private static final int PAD = 10;
+    private static final int PAD = 13;
     private static final int ICON = ROW_H - 4;
     private static final int DROPDOWN_H = 20;
-    private static final int ROW_GAP = 26;
+    private static final int ROW_GAP = 29;
     private static final int HEADER_H = 24;
-    private static final int SECTION_H = 16;
+    private static final int SECTION_H = 18;
     private static final int LABEL_PAD = 12;
     private static final long TOOLTIP_DELAY_MS = 500L;
     private static final int CTRL_W = 110;
@@ -144,11 +144,12 @@ public final class HostScreen extends LanPlusScreen {
         premiumRowY += cardY;
         buttonsY += cardY;
 
-        int labelW = Math.max(Math.max(
+        int labelW = Math.max(Math.max(Math.max(
                         Math.max(this.font.width(Component.translatable("gui.lanplus.host.gamemode")),
                                 this.font.width(Component.translatable("gui.lanplus.host.commands"))),
                         this.font.width(Component.translatable("gui.lanplus.host.difficulty"))),
-                this.font.width(Component.translatable("gui.lanplus.host.maxplayers")));
+                this.font.width(Component.translatable("gui.lanplus.host.maxplayers"))),
+                this.font.width(Component.translatable("gui.lanplus.host.nonpremium.label")));
         ctrlX = cardX + PAD + labelW + LABEL_PAD;
     }
 
@@ -165,7 +166,8 @@ public final class HostScreen extends LanPlusScreen {
         }
         layout();
 
-        hostButton = LanplusButton.create(Component.translatable("gui.lanplus.host.start"), b -> doStart())
+        hostButton = LanplusButton.create(
+                        Component.literal("+ ").append(Component.translatable("gui.lanplus.host.start")), b -> doStart())
                 .height(20).primary().build();
         hostButton.active = inWorld || selected >= 0;
         cancelButton = LanplusButton.create(CommonComponents.GUI_CANCEL, b -> onClose())
@@ -189,7 +191,6 @@ public final class HostScreen extends LanPlusScreen {
         drawBackdrop(g);
 
         LanPlusUI.panel(g, cardX, cardY, cardX + cardW, cardY + cardH);
-        LanPlusUI.rivets(g, cardX, cardY, cardX + cardW, cardY + cardH, LanPlusUI.FAINT);
         renderHeader(g);
 
         boolean anyOpen = gameTypeDd.isOpen() || difficultyDd.isOpen();
@@ -325,10 +326,11 @@ public final class HostScreen extends LanPlusScreen {
         boolean hover = in(mouseX, mouseY, x, y, CTRL_W, DROPDOWN_H);
         int bg = open ? LanPlusUI.ACCENT : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
         LanPlusUI.button3D(g, x, y, x + CTRL_W, y + DROPDOWN_H, bg);
+        int labelColor = open ? LanPlusUI.ON_ACCENT : LanPlusUI.TEXT;
         g.drawString(this.font, label, x + (CTRL_W - this.font.width(label)) / 2, y + (DROPDOWN_H - 8) / 2,
-                LanPlusUI.TEXT, false);
-        Component caret = Component.literal(open ? "▲" : "▼");
-        g.drawString(this.font, caret, x + CTRL_W - 14, y + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
+                labelColor, false);
+        LanPlusUI.caret(g, x + CTRL_W - 11, y + DROPDOWN_H / 2 - 2, open,
+                open ? LanPlusUI.ON_ACCENT : LanPlusUI.MUTED);
     }
 
     private void renderAccess(GuiGraphics g, int mouseX, int mouseY) {
@@ -343,13 +345,12 @@ public final class HostScreen extends LanPlusScreen {
         renderModeChip(g, mouseX, mouseY, HostAccessMode.INVITED, "gui.lanplus.host.access.invited",
                 cardX + PAD + 3 * (chipW + 6), cardW - 2 * PAD - 3 * (chipW + 6));
 
-        int premiumW = (cardW - 2 * PAD) / 2;
-        int premiumX = cardX + (cardW - premiumW) / 2;
-
-        Component premium = Component.translatable("gui.lanplus.host.nonpremium", Component.translatable(
-                allowNonPremium ? "gui.lanplus.host.nonpremium.on" : "gui.lanplus.host.nonpremium.off"));
-        boolean hover = in(mouseX, mouseY, premiumX, premiumRowY, premiumW, DROPDOWN_H);
-        LanPlusUI.chip(g, this.font, premium, premiumX, premiumRowY, premiumW, DROPDOWN_H,
+        g.drawString(this.font, Component.translatable("gui.lanplus.host.nonpremium.label"),
+                cardX + PAD, premiumRowY + (DROPDOWN_H - 8) / 2, LanPlusUI.MUTED, false);
+        Component premium = Component.translatable(
+                allowNonPremium ? "gui.lanplus.host.nonpremium.on" : "gui.lanplus.host.nonpremium.off");
+        boolean hover = in(mouseX, mouseY, ctrlX, premiumRowY, CTRL_W, DROPDOWN_H);
+        LanPlusUI.chip(g, this.font, premium, ctrlX, premiumRowY, CTRL_W, DROPDOWN_H,
                 allowNonPremium, true, hover);
 
         String tip;
@@ -432,16 +433,16 @@ public final class HostScreen extends LanPlusScreen {
                 boolean sel = i == selected;
                 boolean hover = in(mouseX, mouseY, x0, Math.max(y, listTop), x1 - x0,
                         Math.min(y + ROW_H, listBottom) - Math.max(y, listTop));
-                if (sel || hover) {
-                    int rowTop = Math.max(y, listTop + 1);
-                    int rowBottom = Math.min(y + ROW_H, listBottom - 1);
-                    g.fill(x0 + 2, rowTop, x1 - 4, rowBottom,
-                            sel ? LanPlusUI.ACCENT_TINT : LanPlusUI.SURFACE_HOVER);
-                }
+                int rowTop = Math.max(y, listTop + 1);
+                int rowBottom = Math.min(y + ROW_H, listBottom - 1);
                 if (sel) {
-                    int rowTop = Math.max(y, listTop + 1);
-                    int rowBottom = Math.min(y + ROW_H, listBottom - 1);
-                    LanPlusUI.outline1(g, x0 + 2, rowTop, x1 - 4, rowBottom, LanPlusUI.ACCENT);
+                    int selFill = (0xCC << 24) | (LanPlusUI.ACCENT & 0xFFFFFF);
+                    g.fill(x0 + 2, rowTop, x1 - 4, rowBottom, selFill);
+                    LanPlusUI.outline1(g, x0 + 2, rowTop, x1 - 4, rowBottom, LanPlusUI.ACCENT_HOVER);
+                } else if (hover) {
+                    g.fill(x0 + 2, rowTop, x1 - 4, rowBottom, LanPlusUI.SURFACE_HOVER);
+                } else if (y + ROW_H <= listBottom - 1) {
+                    g.fill(x0 + 8, y + ROW_H - 1, x1 - 10, y + ROW_H, LanPlusUI.DIVIDER);
                 }
                 LevelSummary s = worlds.get(i);
                 FaviconTexture icon = icons.get(s.getLevelId());
@@ -449,11 +450,13 @@ public final class HostScreen extends LanPlusScreen {
                     g.blit(icon.textureLocation(), x0 + 4, y + 2, ICON, ICON, 0.0F, 0.0F, 64, 64, 64, 64);
                 }
                 int textX = x0 + 8 + ICON + 6;
+                int nameColor = sel ? LanPlusUI.ON_ACCENT : LanPlusUI.TEXT;
+                int subColor = sel ? 0xFFD9D2EC : LanPlusUI.FAINT;
                 if (y + 4 >= listTop && y + 12 <= listBottom) {
-                    g.drawString(this.font, s.getLevelName(), textX, y + 4, LanPlusUI.TEXT, false);
+                    g.drawString(this.font, s.getLevelName(), textX, y + 4, nameColor, false);
                 }
                 if (y + 14 >= listTop && y + 22 <= listBottom) {
-                    g.drawString(this.font, s.getLevelId(), textX, y + 14, LanPlusUI.FAINT, false);
+                    g.drawString(this.font, s.getLevelId(), textX, y + 14, subColor, false);
                 }
             }
             y += ROW_H;
@@ -548,8 +551,7 @@ public final class HostScreen extends LanPlusScreen {
                 accessMode = picked;
                 return true;
             }
-            int premiumW = (cardW - 2 * PAD) * 4 / 5;
-            if (in(mouseX, mouseY, cardX + (cardW - premiumW) / 2, premiumRowY, premiumW, DROPDOWN_H)) {
+            if (in(mouseX, mouseY, ctrlX, premiumRowY, CTRL_W, DROPDOWN_H)) {
                 allowNonPremium = !allowNonPremium;
                 return true;
             }

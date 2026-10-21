@@ -322,10 +322,10 @@ public final class Announcements extends LanPlusScreen {
 
     private static int typeColor(Announcement.Type type) {
         return switch (type) {
-            case UPDATE -> 0xFF55FF55;
-            case MAINTENANCE -> 0xFFFFFF55;
-            case GENERAL -> 0xFF55FFFF;
-            default -> 0xFFFFFFFF;
+            case UPDATE -> LanPlusUI.ONLINE;
+            case MAINTENANCE -> LanPlusUI.AMBER;
+            case GENERAL -> LanPlusUI.LINK;
+            default -> LanPlusUI.TEXT;
         };
     }
 

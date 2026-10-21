@@ -250,8 +250,8 @@ public final class CosmeticScreen extends LanPlusScreen {
         boolean owned = owns(id);
         if (equipped) {
             Component label = Component.translatable("gui.lanplus.cosmetics.equipped");
-            g.fill(x - 2, y, x + this.font.width(label) + 2, y + 14, 0x2257C07A);
-            g.drawString(this.font, label, x, y + 3, 0xFF8EE06A, false);
+            g.fill(x - 2, y, x + this.font.width(label) + 2, y + 14, (0x22 << 24) | (LanPlusUI.ONLINE & 0xFFFFFF));
+            g.drawString(this.font, label, x, y + 3, LanPlusUI.ONLINE, false);
             return;
         }
         if (owned) {

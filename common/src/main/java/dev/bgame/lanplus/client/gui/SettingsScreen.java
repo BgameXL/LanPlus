@@ -242,7 +242,6 @@ public final class SettingsScreen extends LanPlusScreen {
         drawBackdrop(g);
 
         LanPlusUI.panel(g, px, py, px + pw, py + ph);
-        LanPlusUI.rivets(g, px, py, px + pw, py + ph, LanPlusUI.FAINT);
 
         int wx = LanPlusUI.wordmark(g, this.font, px + 70, py + 12);
         g.drawString(this.font, Component.translatable("gui.lanplus.settings.word"), wx + 6, py + 12, LanPlusUI.MUTED, false);

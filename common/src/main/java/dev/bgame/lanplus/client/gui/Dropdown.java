@@ -52,7 +52,7 @@ public final class Dropdown {
         }
         g.pose().pushPose();
         g.pose().translate(0, 0, 300);
-        LanPlusUI.panel(g, x, top, x + w, top + h);
+        LanPlusUI.popup(g, x, top, x + w, top + h);
         for (int i = 0; i < labels.size(); i++) {
             int iy = top + i * ITEM_H;
             boolean hover = mouseX >= x && mouseX < x + w && mouseY >= iy && mouseY < iy + ITEM_H;

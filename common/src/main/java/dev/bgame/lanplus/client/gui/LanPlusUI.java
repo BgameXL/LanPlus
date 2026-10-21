@@ -9,6 +9,9 @@ final class LanPlusUI {
 
     static final int LAVENDER = 0xFFA070F0;
     static final int LIME = 0xFFBEE85A;
+    static final int LIME_DARK = 0xFF5E7D14;
+    static final int ON_ACCENT = 0xFFFFFFFF;
+
     static int SURFACE;
     static int SURFACE_RAISED;
     static int SURFACE_HOVER;
@@ -81,15 +84,37 @@ final class LanPlusUI {
         return (a << 24) | (argb & 0xFFFFFF);
     }
 
+    private static boolean isLight(int argb) {
+        int r = (argb >> 16) & 0xFF;
+        int g = (argb >> 8) & 0xFF;
+        int b = argb & 0xFF;
+        return (r * 299 + g * 587 + b * 114) / 1000 > 140;
+    }
+
+    static int contrastLime(int bg) {
+        return isLight(bg) ? LIME_DARK : LIME;
+    }
+
     static void background(GuiGraphics g, int width, int height) {
-        int base = 0xFF000000 | (SURFACE & 0xFFFFFF);
-        g.fillGradient(0, 0, width, height, base, shade(base, 0.32f));
+        int rgb = 0xFF000000 | (SURFACE & 0xFFFFFF);
+        g.fillGradient(0, 0, width, height, shade(rgb, 0.22f), shade(rgb, 0.10f));
     }
 
     static void panel(GuiGraphics g, int x0, int y0, int x1, int y1) {
-        outline1(g, x0, y0, x1, y1, EDGE_DARK);
-        g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, SURFACE);
-        outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, shade(SURFACE, 1.6f));
+        int base = 0xFF000000 | (SURFACE & 0xFFFFFF);
+        int frameDark = shade(base, 0.5f);
+        int frameLight = shade(base, 1.25f);
+        g.fill(x0, y0, x1, y1, SURFACE);
+        outline1(g, x0, y0, x1, y1, frameDark);
+        outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, frameLight);
+        g.fill(x0 + 2, y0 + 2, x1 - 2, y0 + 3, ACCENT_LINE);
+    }
+
+    static void popup(GuiGraphics g, int x0, int y0, int x1, int y1) {
+        int base = 0xFF000000 | (SURFACE & 0xFFFFFF);
+        g.fill(x0, y0, x1, y1, SURFACE);
+        outline1(g, x0, y0, x1, y1, shade(base, 0.5f));
+        outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, shade(base, 1.25f));
     }
 
     static void outline(GuiGraphics g, int x0, int y0, int x1, int y1, int color) {
@@ -116,25 +141,31 @@ final class LanPlusUI {
     }
 
     static void button3D(GuiGraphics g, int x0, int y0, int x1, int y1, int fill) {
-        outline1(g, x0, y0, x1, y1, EDGE_DARK);
+        outline1(g, x0, y0, x1, y1, shade(fill, 0.55f));
         g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill);
-        outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, shade(fill, 1.4f));
+        g.fill(x0 + 1, y0 + 1, x1 - 1, y0 + 2, shade(fill, 1.18f));
+        g.fill(x0 + 1, y1 - 2, x1 - 1, y1 - 1, shade(fill, 0.82f));
     }
 
     static void primaryButton(GuiGraphics g, int x0, int y0, int x1, int y1, boolean hover, boolean active) {
-        int fill = !active ? SURFACE_DISABLED : hover ? shade(ACCENT_STRONG, 0.4f) : SURFACE_RAISED;
-        outline1(g, x0, y0, x1, y1, EDGE_DARK);
+        int fill = !active ? SURFACE_DISABLED : hover ? ACCENT_HOVER : ACCENT_STRONG;
+        outline1(g, x0, y0, x1, y1, shade(fill, 0.6f));
         g.fill(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill);
-        int accent = !active ? BORDER : hover ? ACCENT_HOVER : ACCENT;
-        outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, accent);
-        g.fill(x0 + 2, y0 + 1, x1 - 2, y0 + 2, accent);
-        g.fill(x0 + 2, y1 - 2, x1 - 2, y1 - 1, accent);
-        if (hover && active) {
-            int glow = 0x55000000 | (ACCENT & 0xFFFFFF);
-            g.fill(x0 - 1, y0 - 1, x1 + 1, y0, glow);
-            g.fill(x0 - 1, y1, x1 + 1, y1 + 1, glow);
-            g.fill(x0 - 1, y0, x0, y1, glow);
-            g.fill(x1, y0, x1 + 1, y1, glow);
+        g.fill(x0 + 1, y0 + 1, x1 - 1, y0 + 2, shade(fill, 1.2f));
+        g.fill(x0 + 1, y1 - 2, x1 - 1, y1 - 1, shade(fill, 0.75f));
+    }
+
+    static void caret(GuiGraphics g, int cx, int cy, boolean up, int color) {
+        if (up) {
+            g.fill(cx, cy, cx + 1, cy + 1, color);
+            g.fill(cx - 1, cy + 1, cx + 2, cy + 2, color);
+            g.fill(cx - 2, cy + 2, cx + 3, cy + 3, color);
+            g.fill(cx - 3, cy + 3, cx + 4, cy + 4, color);
+        } else {
+            g.fill(cx - 3, cy, cx + 4, cy + 1, color);
+            g.fill(cx - 2, cy + 1, cx + 3, cy + 2, color);
+            g.fill(cx - 1, cy + 2, cx + 2, cy + 3, color);
+            g.fill(cx, cy + 3, cx + 1, cy + 4, color);
         }
     }
 
@@ -145,30 +176,21 @@ final class LanPlusUI {
         int c = x1 - 1;
         int d = y1 - 1;
         g.fill(a, b, c, d, SLOT);
-        g.fill(a, b, c, b + 1, shade(SLOT, 0.4f));
-        g.fill(a, b, a + 1, d, shade(SLOT, 0.4f));
-        g.fill(a, d - 1, c, d, shade(SLOT, 2.2f));
-        g.fill(c - 1, b, c, d, shade(SLOT, 2.2f));
-    }
-
-    static void rivets(GuiGraphics g, int x0, int y0, int x1, int y1, int color) {
-        g.fill(x0 + 3, y0 + 3, x0 + 5, y0 + 5, color);
-        g.fill(x1 - 5, y0 + 3, x1 - 3, y0 + 5, color);
-        g.fill(x0 + 3, y1 - 5, x0 + 5, y1 - 3, color);
-        g.fill(x1 - 5, y1 - 5, x1 - 3, y1 - 3, color);
+        g.fill(a, b, c, b + 1, shade(SLOT, 0.82f));
+        g.fill(a, b, a + 1, d, shade(SLOT, 0.82f));
+        g.fill(a, d - 1, c, d, shade(SLOT, 1.12f));
+        g.fill(c - 1, b, c, d, shade(SLOT, 1.12f));
     }
 
     static void sectionHeader(GuiGraphics g, Font font, Component label, int x, int y, int right) {
-        g.drawString(font, "+", x, y, LIME, false);
-        int labelX = x + font.width("+") + 4;
-        g.drawString(font, label, labelX, y, TEXT, false);
+        g.drawString(font, label, x, y, TEXT, false);
         g.fill(x, y + 11, right, y + 12, BORDER);
     }
 
     static int wordmark(GuiGraphics g, Font font, int x, int y) {
         g.drawString(font, "LAN", x, y, LAVENDER, false);
         x += font.width("LAN");
-        g.drawString(font, "+", x, y, LIME, false);
+        g.drawString(font, "+", x, y, contrastLime(SURFACE), false);
         return x + font.width("+");
     }
 
@@ -198,7 +220,7 @@ final class LanPlusUI {
                      boolean selected, boolean enabled, boolean hover) {
         int bg = !enabled ? SURFACE_DISABLED : selected ? ACCENT_STRONG : (hover ? SURFACE_HOVER : SURFACE_RAISED);
         button3D(g, x, y, x + w, y + h, bg);
-        int color = !enabled ? FAINT : selected ? TEXT : hover ? MUTED : TEXT;
+        int color = !enabled ? FAINT : selected ? ON_ACCENT : hover ? MUTED : TEXT;
         textCentered(g, font, label, x, y + (h - 8) / 2, w, color);
     }
 

@@ -28,7 +28,7 @@ public final class LanplusButton extends Button {
         int color;
         if (primary) {
             LanPlusUI.primaryButton(g, x, y, x + w, y + h, isHovered(), isActive());
-            color = isActive() ? LanPlusUI.TEXT : LanPlusUI.FAINT;
+            color = isActive() ? LanPlusUI.ON_ACCENT : LanPlusUI.FAINT;
         } else {
             int bg = !isActive() ? LanPlusUI.SURFACE_DISABLED
                     : isHovered() ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
