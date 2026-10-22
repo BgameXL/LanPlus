@@ -41,14 +41,14 @@
 ### Free
 
 > Lan+ is hosted on a VPS that i pay for, and Lan+ will remain free because of my love for this project. If you'd like,
-> you can donate to this mod it's your decision after all, but i appreciate it.
+> you can donate to this mod, but i appreciate it.
 
 <p align="center"> <img src="https://raw.githubusercontent.com/BgameXL/LanPlus/main/assets/divider.png" alt="Decorative divider" width="800"> </p>
 
-## FAQ
+## FAQ (tbh, nobody asked me anything, but here it is)
 
 **Do my friends need LAN+ to join?**
-Nope. Anyone can connect with the address, like a normal server.
+Nope. Anyone can connect with the IP address/Invite Code, like a normal server.
 
 **How does XP work?**
 You earn it three ways: unlocking advancements, time spent playing modpacks, and time spent playing with friends. It
@@ -56,14 +56,14 @@ fills up profile tiers and doesn't touch gameplay at all. There's nothing to spe
 way (see below).
 
 **Do I need a premium (paid) Minecraft account?**
-The social features work with offline accounts too. Joining someone's Hosted world usually needs a premium
-account, unless the host turns on offline support.
+The social features work with non-premium accounts too. Joining someone's Hosted world usually needs a premium
+account, unless the hoster turns on offline support.
 
 **Do I have to port-forward to host over the internet?**
 No. The relay gives you a public address without touching your router (Your IP gets masked).
 
-**Is it free? Any cash shop?**
-Free, and no monetization. Cosmetics are unlockable, there's no store or currency.
+**Is it free?**
+Free, and no monetization. Cosmetics are unlockable by spending XP.
 
 **Is my profile safe?**
 Your profile don't hold private stuff. LAN+ signs in through your existing Minecraft session, so there's no
@@ -93,7 +93,7 @@ our [Discord](https://discord.gg/kAKk3wRAVh).
 ## A note from Dev
 
 LAN+ is built with help from an AI coding tool (Claude). I use it, but every feature is designed, reviewed, and tested
-in-game by me before it ships. Over 70% is made by a human, 30% was made with AI.
+in-game by me before it ships. Over 65% is made by a human, 35% was made with AI.
 
 ## License
 

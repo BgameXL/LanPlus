@@ -143,6 +143,7 @@ public final class FriendsScreen extends LanPlusScreen {
         if (fs != null) {
             fs.removeListener(changeListener);
         }
+        super.removed();
     }
 
     public FriendsScreen(Screen parent, UUID focus) {

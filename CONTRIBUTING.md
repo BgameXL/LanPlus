@@ -25,10 +25,9 @@ Features are organized into domains inside `common/`: `presence`, `friends`,
 `invites`, `skins`, `network`, `discord`, `profiles`, and `cosmetics`. `core`,
 `client`, and `api` are support packages. When adding something, fit it into an existing domain rather than inventing a new one.
 
-The online backend and relay do not live on `main`. They are keep on the
-`backend-relay` branch.
+The online backend and relay do not live on this repo. Check in [here](https://github.com/BgameXL/lanplus-backend-relay) instead.
 
-`common/src/main/java/dev/bgame/lanplus/cosmetics/geckolib` is vendored
+`common/src/main/java/dev/bgame/lanplus/cosmetics/geckolib` is a vendored
 third-party code (GeckoLib, MIT). Please keep it as close to upstream as
 possible. See [THIRD_PARTY.md](THIRD_PARTY.md).
 
@@ -63,8 +62,7 @@ Changes are verified in-game, so please test it and confirm your change works be
 - Follow the existing structure and naming and please keep changes small and focused,
   reuse and extend before creating new classes or helpers, and do not refactor
   unrelated code.
-- For UI, use the existing `LanPlusUI` helpers and theme tokens rather than
-  introducing a separate visual language.
+- For UI, use the existing `LanPlusUI` helpers and theme tokens rather than introducing a separate visual.
 
 ## Pull requests
 

@@ -47,7 +47,7 @@ public final class InviteOverlay extends LanPlusScreen {
         fitGuiScale();
         panelX = centerX(PANEL_W);
         panelY = centerY(PANEL_H);
-        addRenderableWidget(LanplusButton.create(Component.literal("X"), b -> hostNow())
+        addRenderableWidget(LanplusButton.create(Component.literal("X"), b -> onClose())
                 .bounds(panelX + PANEL_W - 18, panelY + 4, 14, 14).build());
         addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.invite.hostnow"), b -> hostNow())
                 .bounds(panelX + PANEL_W / 2 - 50, panelY + PANEL_H - 26, 100, 20).primary().build());
@@ -111,7 +111,7 @@ public final class InviteOverlay extends LanPlusScreen {
 
     @Override
     public void onClose() {
-        hostNow();
+        Minecraft.getInstance().setScreen(parent);
     }
 
     private void hostNow() {

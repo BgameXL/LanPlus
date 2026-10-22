@@ -637,6 +637,7 @@ public final class HostScreen extends LanPlusScreen {
         }
         icons.clear();
         iconsLoaded = false;
+        super.removed();
     }
 
     private void doStart() {
