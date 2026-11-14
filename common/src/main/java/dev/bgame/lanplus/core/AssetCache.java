@@ -26,7 +26,7 @@ public final class AssetCache {
         }
         byte[] cached = memory.get(key);
         if (cached != null) {
-            return cached;
+            return cached.clone();
         }
         try {
             Path file = fileOf(key);
@@ -35,7 +35,7 @@ public final class AssetCache {
             }
             byte[] bytes = Files.readAllBytes(file);
             memory.put(key, bytes);
-            return bytes;
+            return bytes.clone();
         } catch (IOException | RuntimeException e) {
             return null;
         }
@@ -45,12 +45,13 @@ public final class AssetCache {
         if (key == null || data == null) {
             return;
         }
-        memory.put(key, data);
+        byte[] copy = data.clone();
+        memory.put(key, copy);
         try {
             Files.createDirectories(dir);
             Path file = fileOf(key);
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-            Files.write(tmp, data);
+            Files.write(tmp, copy);
             try {
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException e) {
