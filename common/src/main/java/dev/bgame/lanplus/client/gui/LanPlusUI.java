@@ -107,7 +107,6 @@ final class LanPlusUI {
         g.fill(x0, y0, x1, y1, SURFACE);
         outline1(g, x0, y0, x1, y1, frameDark);
         outline1(g, x0 + 1, y0 + 1, x1 - 1, y1 - 1, frameLight);
-        g.fill(x0 + 2, y0 + 2, x1 - 2, y0 + 3, ACCENT_LINE);
     }
 
     static void popup(GuiGraphics g, int x0, int y0, int x1, int y1) {

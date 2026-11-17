@@ -30,10 +30,12 @@ public record PolyMesh(@Nullable Boolean normalizedUVs, double[] normals, @Nulla
 		return (json, type, context) -> {
 			JsonObject obj = json.getAsJsonObject();
 			Boolean normalizedUVs = JsonUtil.getOptionalBoolean(obj, "normalized_uvs");
-			double[] normals = JsonUtil.jsonArrayToDoubleArray(GsonHelper.getAsJsonArray(obj, "normals", null));
+			double[] normals = obj.has("normals")
+					? JsonUtil.jsonArrayToDoubleArray(GsonHelper.getAsJsonArray(obj, "normals")) : new double[0];
 			PolysUnion polysUnion = GsonHelper.getAsObject(obj, "polys", null, context, PolysUnion.class);
-			double[] positions = JsonUtil.jsonArrayToDoubleArray(GsonHelper.getAsJsonArray(obj, "positions", null));
-			double[] uvs = JsonUtil.jsonArrayToDoubleArray(GsonHelper.getAsJsonArray(obj, "uvs", null));
+			double[] positions = JsonUtil.jsonArrayToDoubleArray(GsonHelper.getAsJsonArray(obj, "positions"));
+			double[] uvs = obj.has("uvs")
+					? JsonUtil.jsonArrayToDoubleArray(GsonHelper.getAsJsonArray(obj, "uvs")) : new double[0];
 
 			return new PolyMesh(normalizedUVs, normals, polysUnion, positions, uvs);
 		};

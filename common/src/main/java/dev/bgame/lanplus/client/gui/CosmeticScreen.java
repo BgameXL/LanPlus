@@ -32,7 +32,6 @@ public final class CosmeticScreen extends LanPlusScreen {
     private static final int CARD_MIN_W = 148;
     private static final int CARD_H = 152;
     private static final int CARD_GAP = 12;
-    private static final int PREVIEW_LIFT = 4;
     private static final int ACTION_W = 100;
     private static final CosmeticSlot[] SLOTS = CosmeticSlot.values();
 
@@ -198,18 +197,19 @@ public final class CosmeticScreen extends LanPlusScreen {
             int row = i / cols;
             int x = gridX + col * (cardWidth + CARD_GAP);
             int y = gridTop + row * (CARD_H + CARD_GAP) - gridScroll;
-            if (y + CARD_H < gridTop || y > gridBottom) {
+            if (y + CARD_H <= gridTop || y >= gridBottom) {
                 continue;
             }
-            boolean clickable = y >= gridTop && y + CARD_H <= gridBottom;
-            renderCard(g, mouseX, mouseY, x, y, ids.get(i), clickable);
+            renderCard(g, mouseX, mouseY, x, y, ids.get(i));
         }
         g.disableScissor();
     }
 
-    private void renderCard(GuiGraphics g, int mouseX, int mouseY, int x, int y, String id, boolean clickable) {
+    private void renderCard(GuiGraphics g, int mouseX, int mouseY, int x, int y, String id) {
+        int hitY = Math.max(y, gridTop);
+        int hitBottom = Math.min(y + CARD_H, gridBottom);
         boolean sel = id.equals(selectedId);
-        boolean hover = clickable && inside(mouseX, mouseY, x, y, cardWidth, CARD_H);
+        boolean hover = inside(mouseX, mouseY, x, hitY, cardWidth, hitBottom - hitY);
         int fill = sel ? LanPlusUI.ACCENT_TINT : hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
         LanPlusUI.button3D(g, x, y, x + cardWidth, y + CARD_H, fill);
 
@@ -225,7 +225,7 @@ public final class CosmeticScreen extends LanPlusScreen {
                 int tcx = x + cardWidth / 2;
                 int tcy = (y + 12 + thumbBottom) / 2;
                 g.enableScissor(x + 4, y + 8, x + cardWidth - 4, thumbBottom);
-                LanPlusClient.cosmetics().animate(id, uuid, 0f, 0f, 0f);
+                LanPlusClient.cosmetics().animate(id, uuid, "idle", 0f, 0f, 0f);
                 CosmeticGeoRender.renderThumb(g, model, LanPlusClient.cosmetics().bounds(id), tcx, tcy, thumb, spin());
                 g.disableScissor();
             }
@@ -240,9 +240,8 @@ public final class CosmeticScreen extends LanPlusScreen {
         if (sel) {
             LanPlusUI.outline(g, x, y, x + cardWidth, y + CARD_H, LanPlusUI.ACCENT);
         }
-        if (clickable) {
-            rows.add(new Row(x, y, cardWidth, CARD_H, () -> selectedId = id.equals(selectedId) ? null : id));
-        }
+        rows.add(new Row(x, hitY, cardWidth, hitBottom - hitY,
+                () -> selectedId = id.equals(selectedId) ? null : id));
     }
 
     private void drawState(GuiGraphics g, int x, int y, int w, String id, CosmeticMeta m) {
@@ -298,7 +297,7 @@ public final class CosmeticScreen extends LanPlusScreen {
 
         float base = Math.min(84f, (clipBottom - clipTop) * 0.34f);
         float scale = base * view.zoom();
-        int feetY = (clipTop + clipBottom) / 2 + Math.round(scale * 0.92f) - PREVIEW_LIFT;
+        int feetY = (clipTop + clipBottom) / 2 + Math.round(scale * 0.92f) + 12;
         g.enableScissor(clipL, clipTop, clipR, clipBottom);
         g.fill(cx - 28, feetY - 1, cx + 28, feetY, 0x44000000);
         PlayerPreview.render(g, cx, feetY, scale, view.yaw(), view.pitch(), skin, slim, uuid, previewOverride());

@@ -26,6 +26,7 @@ import dev.bgame.lanplus.cosmetics.geckolib.cache.object.*;
 import dev.bgame.lanplus.cosmetics.geckolib.loading.json.raw.*;
 import dev.bgame.lanplus.cosmetics.geckolib.util.GeckoLibUtil;
 import dev.bgame.lanplus.cosmetics.geckolib.util.RenderUtil;
+import org.joml.Vector3f;
 
 import java.util.List;
 import java.util.Map;
@@ -61,6 +62,8 @@ public interface BakedModelFactory {
 	 * @param bone The bone this cube belongs to
 	 */
 	GeoCube constructCube(Cube cube, ModelProperties properties, GeoBone bone);
+
+	GeoMesh constructMesh(PolyMesh mesh, ModelProperties properties);
 
 	/**
 	 * Builtin method to construct the quad list from the various vertices and related data, to make it easier
@@ -170,6 +173,9 @@ public interface BakedModelFactory {
 			for (Cube cube : bone.cubes()) {
 				newBone.getCubes().add(constructCube(cube, properties, newBone));
 			}
+			if (bone.polyMesh() != null) {
+				newBone.getMeshes().add(constructMesh(bone.polyMesh(), properties));
+			}
 
 			for (BoneStructure child : boneStructure.children().values()) {
 				newBone.getChildBones().add(constructBone(child, properties, newBone));
@@ -194,6 +200,93 @@ public interface BakedModelFactory {
 			GeoQuad[] quads = buildQuads(cube.uv(), new VertexSet(origin, vertexSize, inflate), cube, (float)properties.textureWidth(), (float)properties.textureHeight(), mirror);
 
 			return new GeoCube(quads, pivot, rotation, size, inflate, mirror);
+		}
+
+		@Override
+		public GeoMesh constructMesh(PolyMesh mesh, ModelProperties properties) {
+			if (mesh.positions().length % 3 != 0 || mesh.normals().length % 3 != 0 || mesh.uvs().length % 2 != 0) {
+				throw new IllegalArgumentException("Invalid poly mesh coordinate arrays");
+			}
+
+			double[][][] polygons = mesh.polysUnion() == null ? new double[0][][] : mesh.polysUnion().union();
+			if (polygons.length == 0 && mesh.polysUnion() != null && mesh.polysUnion().type() != null) {
+				polygons = sequentialPolygons(mesh);
+			}
+
+			GeoFace[] faces = new GeoFace[polygons.length];
+			for (int i = 0; i < polygons.length; i++) {
+				faces[i] = constructFace(mesh, properties, polygons[i]);
+			}
+			return new GeoMesh(faces);
+		}
+
+		private static double[][][] sequentialPolygons(PolyMesh mesh) {
+			int verticesPerFace = mesh.polysUnion().type() == PolysUnion.Type.TRI ? 3 : 4;
+			int vertexCount = mesh.positions().length / 3;
+			if (vertexCount % verticesPerFace != 0) {
+				throw new IllegalArgumentException("Poly mesh vertex count does not match its primitive type");
+			}
+
+			double[][][] polygons = new double[vertexCount / verticesPerFace][verticesPerFace][3];
+			for (int face = 0; face < polygons.length; face++) {
+				for (int vertex = 0; vertex < verticesPerFace; vertex++) {
+					int index = face * verticesPerFace + vertex;
+					polygons[face][vertex] = new double[]{index, index, index};
+				}
+			}
+			return polygons;
+		}
+
+		private static GeoFace constructFace(PolyMesh mesh, ModelProperties properties, double[][] polygon) {
+			if (polygon.length < 3 || polygon.length > 4) {
+				throw new IllegalArgumentException("Poly mesh faces must contain three or four vertices");
+			}
+
+			GeoVertex[] vertices = new GeoVertex[polygon.length];
+			Vector3f[] normals = new Vector3f[polygon.length];
+			for (int i = 0; i < polygon.length; i++) {
+				double[] indices = polygon[i];
+				if (indices.length == 0) {
+					throw new IllegalArgumentException("Poly mesh vertex is missing its position index");
+				}
+
+				int positionIndex = index(indices[0], mesh.positions().length / 3, "position");
+				int uvIndex = mesh.uvs().length == 0 ? -1 : index(indices.length > 2 ? indices[2] : indices[0], mesh.uvs().length / 2, "UV");
+				float u = uvIndex < 0 ? 0 : (float)mesh.uvs()[uvIndex * 2];
+				float v = uvIndex < 0 ? 0 : (float)mesh.uvs()[uvIndex * 2 + 1];
+				if (mesh.normalizedUVs() != Boolean.TRUE) {
+					u /= (float)properties.textureWidth();
+					v /= (float)properties.textureHeight();
+				}
+
+				int p = positionIndex * 3;
+				vertices[i] = new GeoVertex(new Vector3f((float)-mesh.positions()[p] / 16f,
+						(float)mesh.positions()[p + 1] / 16f, (float)mesh.positions()[p + 2] / 16f), u, v);
+
+				if (mesh.normals().length != 0) {
+					int normalIndex = index(indices.length > 1 ? indices[1] : indices[0], mesh.normals().length / 3, "normal");
+					int n = normalIndex * 3;
+					normals[i] = new Vector3f((float)-mesh.normals()[n], (float)mesh.normals()[n + 1],
+							(float)mesh.normals()[n + 2]).normalize();
+				}
+			}
+
+			if (mesh.normals().length == 0) {
+				Vector3f edgeA = new Vector3f(vertices[1].position()).sub(vertices[0].position());
+				Vector3f normal = edgeA.cross(new Vector3f(vertices[2].position()).sub(vertices[0].position())).normalize();
+				for (int i = 0; i < normals.length; i++) {
+					normals[i] = new Vector3f(normal);
+				}
+			}
+			return new GeoFace(vertices, normals);
+		}
+
+		private static int index(double raw, int size, String kind) {
+			int index = (int)raw;
+			if (!Double.isFinite(raw) || raw != index || index < 0 || index >= size) {
+				throw new IllegalArgumentException("Invalid poly mesh " + kind + " index: " + raw);
+			}
+			return index;
 		}
 	}
 

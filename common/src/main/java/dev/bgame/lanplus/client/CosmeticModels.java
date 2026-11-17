@@ -156,11 +156,14 @@ public final class CosmeticModels {
         }
     }
 
-    public void animate(String id, UUID player, float limbSwing, float limbSwingAmount, float partialTick) {
+    public void animate(String id, UUID player, String state, float limbSwing, float limbSwingAmount, float partialTick) {
         CosmeticAnimator animator = animators.get(id);
         if (animator != null && player != null) {
+            CosmeticMeta cosmeticMeta = meta.get(id);
+            String requestedClip = cosmeticMeta == null ? null : cosmeticMeta.stateClipMap().get(state);
+            String defaultClip = cosmeticMeta == null ? null : cosmeticMeta.defaultClip();
             animator.apply(player.getMostSignificantBits() ^ player.getLeastSignificantBits(), limbSwing,
-                    limbSwingAmount, partialTick);
+                    limbSwingAmount, partialTick, requestedClip, defaultClip);
         }
     }
 
