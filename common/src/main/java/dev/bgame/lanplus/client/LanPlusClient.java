@@ -16,7 +16,6 @@ import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.client.gui.UpdateScreen;
 import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.core.ProfileCache;
-import dev.bgame.lanplus.cosmetics.BlockbenchImporter;
 import dev.bgame.lanplus.cosmetics.CosmeticMeta;
 import dev.bgame.lanplus.cosmetics.CosmeticSlot;
 import dev.bgame.lanplus.discord.DiscordPresence;
@@ -335,24 +334,6 @@ public final class LanPlusClient {
                         compiled.add(id);
                     } catch (Exception e) {
                         LOGGER.warn("Failed to load local cosmetic {}", name, e);
-                    }
-                }
-            }
-            try (Stream<Path> files = Files.list(dir)) {
-                for (Path file : files.filter(p -> p.getFileName().toString().endsWith(".bbmodel")).sorted().toList()) {
-                    String name = file.getFileName().toString();
-                    String id = name.substring(0, name.length() - ".bbmodel".length());
-                    if (compiled.contains(id)) {
-                        continue;
-                    }
-                    try {
-                        BlockbenchImporter.ImportedModel imported = BlockbenchImporter.read(id, file);
-                        Path texture = dir.resolve(id + ".png");
-                        registerLocalCosmetic(dir, id, imported.geometry(), imported.animations(),
-                                imported.texture() != null ? imported.texture()
-                                        : Files.isRegularFile(texture) ? Files.readAllBytes(texture) : null);
-                    } catch (Exception e) {
-                        LOGGER.warn("Failed to import Blockbench cosmetic {}", name, e);
                     }
                 }
             }

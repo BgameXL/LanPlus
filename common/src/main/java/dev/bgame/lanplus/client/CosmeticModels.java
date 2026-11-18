@@ -2,7 +2,6 @@ package dev.bgame.lanplus.client;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.bgame.lanplus.LanplusCommon;
-import dev.bgame.lanplus.cosmetics.BlockbenchImporter;
 import dev.bgame.lanplus.cosmetics.CosmeticLoader;
 import dev.bgame.lanplus.cosmetics.CosmeticMeta;
 import dev.bgame.lanplus.cosmetics.CosmeticModel;
@@ -220,9 +219,6 @@ public final class CosmeticModels {
         if (animator != null && player != null) {
             CosmeticMeta cosmeticMeta = meta.get(id);
             String requestedClip = cosmeticMeta == null ? null : cosmeticMeta.stateClipMap().get(state);
-            if ((requestedClip == null || requestedClip.isBlank()) && state != null && !state.isBlank()) {
-                requestedClip = BlockbenchImporter.clipName(id, state);
-            }
             String defaultClip = cosmeticMeta == null ? null : cosmeticMeta.defaultClip();
             animator.apply(player.getMostSignificantBits() ^ player.getLeastSignificantBits(), limbSwing,
                     limbSwingAmount, partialTick, requestedClip, defaultClip);
