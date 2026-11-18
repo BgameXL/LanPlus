@@ -15,6 +15,9 @@ import dev.bgame.lanplus.cosmetics.geckolib.util.RenderUtil;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashMap;
+import java.util.Map;
+
 final class CosmeticAnimator {
     private static final ResourceLocation DYNAMIC_RESOURCE =
             new ResourceLocation(LanplusCommon.MODID, "cosmetics/dynamic");
@@ -22,8 +25,8 @@ final class CosmeticAnimator {
     private final DynamicAnimatable animatable;
     private final DynamicModel model;
 
-    private CosmeticAnimator(CosmeticModel cosmetic, String animationName) {
-        this.animatable = new DynamicAnimatable(animationName);
+    private CosmeticAnimator(CosmeticModel cosmetic) {
+        this.animatable = new DynamicAnimatable(cosmetic.animations().animations().keySet());
         this.model = new DynamicModel(cosmetic);
         this.model.getAnimationProcessor().setActiveModel(cosmetic.geometry());
     }
@@ -33,29 +36,53 @@ final class CosmeticAnimator {
         if (cosmetic.animations() == null || cosmetic.animations().animations().isEmpty()) {
             return null;
         }
-        String animationName = cosmetic.animations().animations().keySet().iterator().next();
-        return new CosmeticAnimator(cosmetic, animationName);
+        return new CosmeticAnimator(cosmetic);
     }
 
-    void apply(long instanceId, float limbSwing, float limbSwingAmount, float partialTick) {
+    void apply(long instanceId, float limbSwing, float limbSwingAmount, float partialTick,
+               String requestedClip, String defaultClip) {
+        this.animatable.selectAnimation(requestedClip, defaultClip);
         AnimationState<DynamicAnimatable> state = new AnimationState<>(this.animatable, limbSwing, limbSwingAmount,
                 partialTick, limbSwingAmount > 0.01f);
         this.model.handleAnimations(this.animatable, instanceId, state, partialTick);
     }
 
     private static final class DynamicAnimatable implements GeoAnimatable {
-        private final RawAnimation idleAnimation;
+        private final Map<String, RawAnimation> animations = new HashMap<>();
+        private final RawAnimation fallbackAnimation;
         private final AnimatableInstanceCache cache;
+        private RawAnimation currentAnimation;
 
-        private DynamicAnimatable(String animationName) {
-            this.idleAnimation = RawAnimation.begin().thenLoop(animationName);
+        private DynamicAnimatable(Iterable<String> animationNames) {
+            RawAnimation first = null;
+            RawAnimation idle = null;
+            for (String name : animationNames) {
+                RawAnimation animation = RawAnimation.begin().thenLoop(name);
+                this.animations.put(name, animation);
+                if (first == null) {
+                    first = animation;
+                }
+                if (name.endsWith(".idle")) {
+                    idle = animation;
+                }
+            }
+            this.fallbackAnimation = idle != null ? idle : first;
+            this.currentAnimation = this.fallbackAnimation;
             this.cache = GeckoLibUtil.createInstanceCache(this);
+        }
+
+        private void selectAnimation(String requestedClip, String defaultClip) {
+            RawAnimation animation = this.animations.get(requestedClip);
+            if (animation == null) {
+                animation = this.animations.get(defaultClip);
+            }
+            this.currentAnimation = animation != null ? animation : this.fallbackAnimation;
         }
 
         @Override
         public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-            controllers.add(new AnimationController<>(this, "cosmetic_idle", 0,
-                    state -> state.setAndContinue(this.idleAnimation)));
+            controllers.add(new AnimationController<>(this, "cosmetic", 3,
+                    state -> state.setAndContinue(this.currentAnimation)));
         }
 
         @Override

@@ -33,10 +33,11 @@ public record PolysUnion(double[][][] union, @Nullable Type type) {
 			}
 			else if (json.isJsonArray()) {
 				JsonArray array = json.getAsJsonArray();
-				double[][][] matrix = makeSizedMatrix(array);
+				double[][][] matrix = new double[array.size()][][];
 
 				for (int x = 0; x < array.size(); x++) {
 					JsonArray xArray = array.get(x).getAsJsonArray();
+					matrix[x] = new double[xArray.size()][];
 
 					for (int y = 0; y < xArray.size(); y++) {
 						JsonArray yArray = xArray.get(y).getAsJsonArray();
@@ -51,15 +52,6 @@ public record PolysUnion(double[][][] union, @Nullable Type type) {
 				throw new JsonParseException("Invalid format for PolysUnion, must be either string or array");
 			}
 		};
-	}
-
-	private static double[][][] makeSizedMatrix(JsonArray array) {
-		JsonArray subArray = array.size() > 0 ? array.get(0).getAsJsonArray() : null;
-		JsonArray subSubArray = subArray != null && subArray.size() > 0 ? subArray.get(0).getAsJsonArray() : null;
-		int ySize = subArray != null ? subArray.size() : 0;
-		int zSize = subSubArray != null ? subSubArray.size() : 0;
-
-		return new double[array.size()][ySize][zSize];
 	}
 
 	public enum Type {

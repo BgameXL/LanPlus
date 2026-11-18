@@ -24,6 +24,7 @@ import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
 import dev.bgame.lanplus.api.Suggestion;
 import dev.bgame.lanplus.api.SkinUploadResult;
+import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.UserProfile;
 import org.slf4j.Logger;
 
@@ -71,7 +72,9 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
     private final AtomicReference<UUID> sessionUuid = new AtomicReference<>();
     private final AtomicReference<CompletableFuture<String>> authInFlight = new AtomicReference<>();
 
-    private volatile boolean reachable = false;
+    private volatile boolean eventsConnected = false;
+    private volatile boolean bearerVerified = false;
+    private volatile boolean sessionVerified = false;
     private volatile WebSocket webSocket;
 
     private volatile UUID eventsUuid;
@@ -702,16 +705,23 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
     @Override
     public void disconnect() {
         this.eventsEnabled = false;
+        this.eventsConnected = false;
+        this.sessionVerified = false;
         WebSocket ws = this.webSocket;
+        this.webSocket = null;
         if (ws != null) {
             ws.sendClose(WebSocket.NORMAL_CLOSURE, "client shutdown");
         }
-        this.webSocket = null;
     }
 
     @Override
     public boolean isConnected() {
-        return reachable;
+        return eventsConnected;
+    }
+
+    @Override
+    public boolean isSessionVerified() {
+        return sessionVerified;
     }
 
     @Override
@@ -774,8 +784,7 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
 
     private CompletableFuture<HttpResponse<String>> dispatch(HttpRequest.Builder builder, String token) {
         HttpRequest req = builder.copy().header("Authorization", "Bearer " + token).build();
-        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString())
-                .whenComplete((resp, err) -> reachable = err == null && resp != null);
+        return http.sendAsync(req, HttpResponse.BodyHandlers.ofString());
     }
 
     private CompletableFuture<String> ensureAuth() {
@@ -834,6 +843,7 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
         if (r == null || r.token() == null) {
             throw new IllegalStateException("verify rejected");
         }
+        bearerVerified = r.verified();
         adoptSessionUuid(r.uuid());
         LOGGER.info("LAN+ authenticated (premium) as {}", username);
         return r.token();
@@ -845,6 +855,7 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
         if (r == null || r.token() == null) {
             throw new IllegalStateException("offline auth rejected");
         }
+        bearerVerified = r.verified();
         adoptSessionUuid(r.uuid());
         LOGGER.info("LAN+ authenticated (offline) as {}", username);
         return r.token();
@@ -935,6 +946,21 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
     }
 
     @Override
+    public CompletableFuture<SkinRef> getSkinByName(String name) {
+        if (!configured() || name == null || name.isBlank()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8);
+        return get("/skin?name=" + encoded).thenApply(resp -> {
+            Wire.Skin skin = GSON.fromJson(resp.body(), Wire.Skin.class);
+            return skin == null || skin.type() == null ? null : skin.toApi();
+        }).exceptionally(err -> {
+            LOGGER.debug("LAN+ skin-by-name failed: {}", err.toString());
+            return null;
+        });
+    }
+
+    @Override
     public CompletableFuture<List<Suggestion>> getSuggestions(UUID uuid) {
         if (!configured()) {
             return CompletableFuture.completedFuture(List.of());
@@ -991,12 +1017,10 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
         if (resp.statusCode() != 200) {
             throw new IllegalStateException("auth " + path + " -> " + resp.statusCode());
         }
-        reachable = true;
         return resp.body();
     }
 
     private void onError(Throwable err) {
-        reachable = false;
         LOGGER.debug("LAN+ backend request failed (local-only): {}", err.toString());
     }
 
@@ -1018,6 +1042,10 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
                 scheduleReconnect();
                 return;
             }
+            if (!eventsEnabled) {
+                connecting.set(false);
+                return;
+            }
             URI uri = URI.create(toWebSocketUrl(base()) + "/events");
             http.newWebSocketBuilder()
                     .connectTimeout(Duration.ofSeconds(5))
@@ -1027,9 +1055,8 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
                         if (err != null) {
                             LOGGER.warn("LAN+ WebSocket connect failed: {}", err.toString());
                             scheduleReconnect();
-                        } else {
-                            this.webSocket = ws;
-                            reconnectAttempts.set(0);
+                        } else if (!eventsEnabled) {
+                            ws.sendClose(WebSocket.NORMAL_CLOSURE, "client disabled");
                         }
                     });
         });
@@ -1065,21 +1092,24 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
         return httpBase;
     }
 
-    private final class EventSocketListener implements WebSocket.Listener {
+    final class EventSocketListener implements WebSocket.Listener {
 
         private final String token;
+        private final boolean verified;
         private final StringBuilder buffer = new StringBuilder();
 
         EventSocketListener(String token) {
             this.token = token;
+            this.verified = bearerVerified;
         }
 
         @Override
         public void onOpen(WebSocket webSocket) {
-            reachable = true;
+            HTTPLanPlusNetwork.this.webSocket = webSocket;
+            eventsConnected = false;
+            sessionVerified = false;
             webSocket.sendText(GSON.toJson(Map.of("type", "AUTH", "token", token)), true);
             webSocket.request(1);
-            fanout(BackendEventListener::onConnected);
         }
 
         @Override
@@ -1097,16 +1127,22 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
         @Override
         public void onError(WebSocket webSocket, Throwable error) {
             LOGGER.warn("LAN+ WebSocket error: {}", error.toString());
-            reachable = false;
-            HTTPLanPlusNetwork.this.webSocket = null;
-            scheduleReconnect();
+            if (HTTPLanPlusNetwork.this.webSocket == webSocket) {
+                eventsConnected = false;
+                sessionVerified = false;
+                HTTPLanPlusNetwork.this.webSocket = null;
+                scheduleReconnect();
+            }
         }
 
         @Override
         public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-            reachable = false;
-            HTTPLanPlusNetwork.this.webSocket = null;
-            scheduleReconnect();
+            if (HTTPLanPlusNetwork.this.webSocket == webSocket) {
+                eventsConnected = false;
+                sessionVerified = false;
+                HTTPLanPlusNetwork.this.webSocket = null;
+                scheduleReconnect();
+            }
             return null;
         }
 
@@ -1115,6 +1151,14 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
                 JsonObject obj = JsonParser.parseString(message).getAsJsonObject();
                 String type = obj.has("type") ? obj.get("type").getAsString() : "";
                 switch (type) {
+                    case "AUTH_OK" -> {
+                        if (HTTPLanPlusNetwork.this.webSocket == webSocket && !eventsConnected) {
+                            eventsConnected = true;
+                            sessionVerified = verified;
+                            reconnectAttempts.set(0);
+                            fanout(BackendEventListener::onConnected);
+                        }
+                    }
                     case "PRESENCE_UPDATE" -> {
                         JsonObject d = obj.getAsJsonObject("data");
                         PresenceUpdate update = new PresenceUpdate(
@@ -1132,6 +1176,11 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
                         UUID uuid = UUID.fromString(obj.get("uuid").getAsString());
                         String joinCode = optionalString(obj, "joinCode");
                         fanout(l -> l.onFriendStartedHosting(uuid, joinCode));
+                    }
+                    case "DISCOVERABLE_HOST_STARTED" -> {
+                        UUID uuid = UUID.fromString(obj.get("uuid").getAsString());
+                        String joinCode = optionalString(obj, "joinCode");
+                        fanout(l -> l.onDiscoverableHostStarted(uuid, joinCode));
                     }
                     case "FRIEND_REQUEST" -> {
                         UUID fromUuid = UUID.fromString(obj.get("fromUuid").getAsString());

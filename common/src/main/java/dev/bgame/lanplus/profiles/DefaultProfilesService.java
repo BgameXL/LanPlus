@@ -67,7 +67,8 @@ public final class DefaultProfilesService implements ProfilesService {
         PlayerIdentity id = identity.get();
         UUID viewer = id == null ? null : id.uuid();
         boolean ownProfile = viewer != null && viewer.equals(uuid);
-        return network.getProfile(uuid, viewer).exceptionally(err -> cachedFallback(uuid, ownProfile));
+        return network.getProfile(uuid, viewer)
+                .handle((profile, err) -> profile == null ? cachedFallback(uuid, ownProfile) : profile);
     }
 
     private Profile cachedFallback(UUID uuid, boolean ownProfile) {
@@ -75,6 +76,9 @@ public final class DefaultProfilesService implements ProfilesService {
             return null;
         }
         String body = profileCache.get(uuid);
+        if (body == null) {
+            return null;
+        }
         Profile parsed = network.parseProfileJson(body);
         return parsed == null ? null : parsed.withCached(true);
     }

@@ -29,7 +29,9 @@ public abstract class AbstractClientPlayerMixin {
     }
 
     private SkinTextures.Resolved lanplus$resolved() {
+        AbstractClientPlayer player = (AbstractClientPlayer) (Object) this;
+        LanPlusClient.ensureSkin(player.getUUID(), player.getGameProfile().getName());
         SkinTextures textures = LanPlusClient.skinTextures();
-        return textures == null ? null : textures.get(((AbstractClientPlayer) (Object) this).getUUID());
+        return textures == null ? null : textures.get(player.getUUID());
     }
 }

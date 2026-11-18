@@ -210,6 +210,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
         fetchProfile();
         refreshRequests();
         refreshActivity();
+        refreshDiscoverableHosts();
         network.connectEvents(uuid, this);
         LOGGER.info("LAN+ friends realtime channel requested");
     }
@@ -259,6 +260,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
         fetchProfile();
         refreshRequests();
         refreshActivity();
+        refreshDiscoverableHosts();
     }
 
     @Override
@@ -311,6 +313,11 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
                 LOGGER.warn("LAN+ friends listener error", e);
             }
         }
+    }
+
+    @Override
+    public void onDiscoverableHostStarted(UUID uuid, String joinCode) {
+        refreshDiscoverableHosts();
     }
 
     private void notifyChanged() {

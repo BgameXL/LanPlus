@@ -267,8 +267,14 @@ public final class FriendsScreen extends LanPlusScreen {
         int wx = LanPlusUI.wordmark(g, this.font, leftX + 8, headerTop + 10);
         g.drawString(this.font, Component.translatable("gui.lanplus.friends.word"), wx + 6, headerTop + 10, LanPlusUI.MUTED, false);
         boolean online = isOnline();
-        Component conn = online ? Component.translatable("gui.lanplus.status.connected")
-                : Component.translatable("gui.lanplus.status.local");
+        Component conn;
+        if (!online) {
+            conn = Component.translatable("gui.lanplus.status.local");
+        } else if (LanPlusClient.network().isSessionVerified()) {
+            conn = Component.translatable("gui.lanplus.status.connected");
+        } else {
+            conn = Component.translatable("gui.lanplus.status.connected_offline");
+        }
         g.drawString(this.font, conn, contentRight - 12 - this.font.width(conn),
                 headerTop + (HEADER_H - this.font.lineHeight) - 4,
                 online ? LanPlusUI.LIME : LanPlusUI.FAINT);

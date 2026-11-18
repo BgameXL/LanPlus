@@ -37,6 +37,7 @@ public class GeoBone {
 
 	private final List<GeoBone> children = new ObjectArrayList<>();
 	private final List<GeoCube> cubes = new ObjectArrayList<>();
+	private final List<GeoMesh> meshes = new ObjectArrayList<>();
 	
 	private final Boolean mirror;
 	private final Double inflate;
@@ -317,6 +318,10 @@ public class GeoBone {
 		return this.cubes;
 	}
 
+	public List<GeoMesh> getMeshes() {
+		return this.meshes;
+	}
+
 	public boolean isTrackingMatrices() {
 		return trackingMatrices;
 	}
@@ -441,6 +446,7 @@ public class GeoBone {
 	}
 
 	public int hashCode() {
-		return Objects.hash(getName(), (getParent() != null ? getParent().getName() : 0), getCubes().size(), getChildBones().size());
+		return Objects.hash(getName(), (getParent() != null ? getParent().getName() : 0), getCubes().size(),
+				getMeshes().size(), getChildBones().size());
 	}
 }

@@ -23,11 +23,14 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import dev.bgame.lanplus.cosmetics.CosmeticModel;
 import dev.bgame.lanplus.cosmetics.CosmeticSlot;
+import dev.bgame.lanplus.cosmetics.CosmeticTransform;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.BakedGeoModel;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoBone;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoCube;
+import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoFace;
+import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoMesh;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoQuad;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.GeoVertex;
 import dev.bgame.lanplus.cosmetics.geckolib.util.RenderUtil;
@@ -54,6 +57,24 @@ public final class CosmeticGeoRender {
         };
         part.translateAndRotate(poseStack);
         poseStack.scale(-1f, -1f, 1f);
+    }
+
+    public static void transform(PoseStack poseStack, CosmeticTransform transform) {
+        if (transform.x() != 0 || transform.y() != 0 || transform.z() != 0) {
+            poseStack.translate(-transform.x() / 16f, transform.y() / 16f, transform.z() / 16f);
+        }
+        if (transform.rotationZ() != 0) {
+            poseStack.mulPose(Axis.ZP.rotationDegrees(transform.rotationZ()));
+        }
+        if (transform.rotationY() != 0) {
+            poseStack.mulPose(Axis.YP.rotationDegrees(-transform.rotationY()));
+        }
+        if (transform.rotationX() != 0) {
+            poseStack.mulPose(Axis.XP.rotationDegrees(-transform.rotationX()));
+        }
+        if (transform.scale() != 1) {
+            poseStack.scale(transform.scale(), transform.scale(), transform.scale());
+        }
     }
 
     public static void render(PoseStack poseStack, BakedGeoModel model, VertexConsumer buffer, int packedLight, int packedOverlay, int colour) {
@@ -108,10 +129,29 @@ public final class CosmeticGeoRender {
         for (GeoCube cube : bone.getCubes()) {
             boundsCube(ps, cube, b);
         }
+        for (GeoMesh mesh : bone.getMeshes()) {
+            boundsMesh(ps, mesh, b);
+        }
         for (GeoBone child : bone.getChildBones()) {
             boundsBone(ps, child, b);
         }
         ps.popPose();
+    }
+
+    private static void boundsMesh(PoseStack ps, GeoMesh mesh, float[] b) {
+        Matrix4f pose = ps.last().pose();
+        for (GeoFace face : mesh.faces()) {
+            for (GeoVertex vertex : face.vertices()) {
+                Vector3f p = vertex.position();
+                Vector4f w = pose.transform(new Vector4f(p.x(), p.y(), p.z(), 1.0f));
+                b[0] = Math.min(b[0], w.x());
+                b[1] = Math.min(b[1], w.y());
+                b[2] = Math.min(b[2], w.z());
+                b[3] = Math.max(b[3], w.x());
+                b[4] = Math.max(b[4], w.y());
+                b[5] = Math.max(b[5], w.z());
+            }
+        }
     }
 
     private static void boundsCube(PoseStack ps, GeoCube cube, float[] b) {
@@ -145,6 +185,9 @@ public final class CosmeticGeoRender {
         for (GeoCube cube : bone.getCubes()) {
             renderCube(poseStack, cube, buffer, packedLight, packedOverlay, colour);
         }
+        for (GeoMesh mesh : bone.getMeshes()) {
+            renderMesh(poseStack, mesh, buffer, packedLight, packedOverlay, colour);
+        }
         for (GeoBone child : bone.getChildBones()) {
             renderBone(poseStack, child, buffer, packedLight, packedOverlay, colour);
         }
@@ -174,6 +217,33 @@ public final class CosmeticGeoRender {
                 Vector3f position = vertex.position();
                 Vector4f worldPos = poseState.transform(new Vector4f(position.x(), position.y(), position.z(), 1.0f));
 
+                buffer.vertex(worldPos.x(), worldPos.y(), worldPos.z())
+                        .color(r, g, b, a)
+                        .uv(vertex.texU(), vertex.texV())
+                        .overlayCoords(packedOverlay)
+                        .uv2(packedLight)
+                        .normal(normal.x(), normal.y(), normal.z())
+                        .endVertex();
+            }
+        }
+    }
+
+    private static void renderMesh(PoseStack poseStack, GeoMesh mesh, VertexConsumer buffer, int packedLight,
+                                   int packedOverlay, int colour) {
+        Matrix3f normalState = poseStack.last().normal();
+        Matrix4f poseState = poseStack.last().pose();
+        int a = (colour >> 24) & 0xFF;
+        int r = (colour >> 16) & 0xFF;
+        int g = (colour >> 8) & 0xFF;
+        int b = colour & 0xFF;
+        for (GeoFace face : mesh.faces()) {
+            int outputVertices = face.vertices().length == 3 ? 4 : face.vertices().length;
+            for (int i = 0; i < outputVertices; i++) {
+                int source = Math.min(i, face.vertices().length - 1);
+                GeoVertex vertex = face.vertices()[source];
+                Vector3f position = vertex.position();
+                Vector4f worldPos = poseState.transform(new Vector4f(position.x(), position.y(), position.z(), 1));
+                Vector3f normal = normalState.transform(new Vector3f(face.normals()[source])).normalize();
                 buffer.vertex(worldPos.x(), worldPos.y(), worldPos.z())
                         .color(r, g, b, a)
                         .uv(vertex.texU(), vertex.texV())

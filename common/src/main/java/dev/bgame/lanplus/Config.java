@@ -2,6 +2,7 @@ package dev.bgame.lanplus;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
@@ -14,6 +15,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import net.minecraft.util.Mth;
 
 public final class Config {
@@ -41,11 +44,13 @@ public final class Config {
     public static boolean voiceEnabled = true;
     public static String voiceHost = "";
     public static String seenUpdateVersion = "";
+    private static final Map<String, String> LOCAL_COSMETIC_LOADOUT = new LinkedHashMap<>();
 
     private Config() {
     }
 
     public static void load() {
+        LOCAL_COSMETIC_LOADOUT.clear();
         Path file = PlatformHolder.get().getConfigDir().resolve(FILE_NAME);
         if (Files.isRegularFile(file)) {
             try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
@@ -70,6 +75,14 @@ public final class Config {
                 voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
                 voiceHost = getString(json, "voiceHost", voiceHost);
                 seenUpdateVersion = getString(json, "seenUpdateVersion", seenUpdateVersion);
+                if (json.has("localCosmeticLoadout") && json.get("localCosmeticLoadout").isJsonObject()) {
+                    for (Map.Entry<String, JsonElement> entry
+                            : json.getAsJsonObject("localCosmeticLoadout").entrySet()) {
+                        if (entry.getValue().isJsonPrimitive()) {
+                            LOCAL_COSMETIC_LOADOUT.put(entry.getKey(), entry.getValue().getAsString());
+                        }
+                    }
+                }
             } catch (Exception ignored) {
             }
         }
@@ -99,6 +112,9 @@ public final class Config {
         json.addProperty("voiceEnabled", voiceEnabled);
         json.addProperty("voiceHost", voiceHost);
         json.addProperty("seenUpdateVersion", seenUpdateVersion);
+        JsonObject localCosmetics = new JsonObject();
+        LOCAL_COSMETIC_LOADOUT.forEach(localCosmetics::addProperty);
+        json.add("localCosmeticLoadout", localCosmetics);
 
         try {
             Files.createDirectories(file.getParent());
@@ -127,6 +143,19 @@ public final class Config {
     public static boolean setTheme(String id) {
         theme = id;
         return save();
+    }
+
+    public static Map<String, String> localCosmeticLoadout() {
+        return Map.copyOf(LOCAL_COSMETIC_LOADOUT);
+    }
+
+    public static void setLocalCosmetic(String slot, String id) {
+        if (id == null) {
+            LOCAL_COSMETIC_LOADOUT.remove(slot);
+        } else {
+            LOCAL_COSMETIC_LOADOUT.put(slot, id);
+        }
+        save();
     }
 
     private static boolean getBool(JsonObject json, String key, boolean fallback) {

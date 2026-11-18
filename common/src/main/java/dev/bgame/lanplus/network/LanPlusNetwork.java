@@ -15,6 +15,7 @@ import dev.bgame.lanplus.api.PresenceUpdate;
 import dev.bgame.lanplus.api.Profile;
 import dev.bgame.lanplus.api.RelayTicket;
 import dev.bgame.lanplus.api.ResolvedUser;
+import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.api.SkinUploadResult;
 import dev.bgame.lanplus.api.UserProfile;
 
@@ -77,6 +78,10 @@ public interface LanPlusNetwork {
     void disconnect();
     boolean isConnected();
 
+    default boolean isSessionVerified() {
+        return false;
+    }
+
     String baseUrl();
 
     Profile parseProfileJson(String body);
@@ -99,12 +104,17 @@ public interface LanPlusNetwork {
 
     CompletableFuture<List<ResolvedUser>> searchUsers(String query);
 
+    CompletableFuture<SkinRef> getSkinByName(String name);
+
     interface BackendEventListener {
 
         default void onPresenceUpdate(PresenceUpdate update) {
         }
 
         default void onFriendStartedHosting(UUID uuid, String joinCode) {
+        }
+
+        default void onDiscoverableHostStarted(UUID uuid, String joinCode) {
         }
 
         default void onFriendRequest(UUID fromUuid, String fromUsername) {

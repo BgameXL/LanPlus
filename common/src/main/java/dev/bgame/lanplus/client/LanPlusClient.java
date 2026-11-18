@@ -56,6 +56,7 @@ import java.util.stream.Stream;
 public final class LanPlusClient {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final long SKIN_RETRY_DELAY_MS = 10_000L;
 
     private static LanPlusNetwork network;
     private static PresenceManager presence;
@@ -71,6 +72,7 @@ public final class LanPlusClient {
     private static AnnouncementsService announcements;
     private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
     private static final Set<UUID> requestedLoadouts = ConcurrentHashMap.newKeySet();
+    private static final Map<UUID, Long> skinRetryAfter = new ConcurrentHashMap<>();
     private static volatile String pendingUpdateVersion;
     private static volatile String pendingUpdateUrl;
 
@@ -324,23 +326,30 @@ public final class LanPlusClient {
             if (!Files.isDirectory(dir)) {
                 return;
             }
-            List<Path> geoFiles;
             try (Stream<Path> files = Files.list(dir)) {
-                geoFiles = files.filter(p -> p.getFileName().toString().endsWith(".geo.json")).toList();
+                for (Path geo : files.filter(path -> path.getFileName().toString().endsWith(".geo.json")).toList()) {
+                    String name = geo.getFileName().toString();
+                    String id = name.substring(0, name.length() - ".geo.json".length());
+                    try {
+                        Path animation = dir.resolve(id + ".animation.json");
+                        Path texture = dir.resolve(id + ".png");
+                        registerLocalCosmetic(dir, id, Files.readAllBytes(geo),
+                                Files.isRegularFile(animation) ? Files.readAllBytes(animation) : null,
+                                Files.isRegularFile(texture) ? Files.readAllBytes(texture) : null);
+                    } catch (Exception e) {
+                        LOGGER.warn("Failed to load local cosmetic {}", name, e);
+                    }
+                }
             }
             UUID self = selfUuid();
-            for (Path geo : geoFiles) {
-                String id = geo.getFileName().toString().replace(".geo.json", "");
-                Path anim = dir.resolve(id + ".animation.json");
-                Path png = dir.resolve(id + ".png");
-                Path metaFile = dir.resolve(id + ".cosmetic.json");
-                cosmetics.register(id, Files.readAllBytes(geo), Files.isRegularFile(anim) ? Files.readAllBytes(anim) : null, Files.isRegularFile(png) ? Files.readAllBytes(png) : null);
-                CosmeticMeta meta = CosmeticMeta.parse(id, Files.isRegularFile(metaFile) ? Files.readString(metaFile) : null);
-                cosmetics.putMeta(meta);
-                if (meta.price() <= 0) {
-                    cosmetics.markOwned(id);
-                    if (self != null) {
-                        cosmetics.equip(self, meta.slot(), id);
+            if (self != null) {
+                for (Map.Entry<String, String> entry : Config.localCosmeticLoadout().entrySet()) {
+                    try {
+                        CosmeticSlot slot = CosmeticSlot.valueOf(entry.getKey());
+                        if (cosmetics.isLocal(entry.getValue()) && cosmetics.slotOf(entry.getValue()) == slot) {
+                            cosmetics.equip(self, slot, entry.getValue());
+                        }
+                    } catch (IllegalArgumentException ignored) {
                     }
                 }
             }
@@ -348,6 +357,15 @@ public final class LanPlusClient {
         } catch (Exception e) {
             LOGGER.warn("cosmetic failed", e);
         }
+    }
+
+    private static void registerLocalCosmetic(Path directory, String id, byte[] geometry, byte[] animation,
+                                              byte[] texture) throws java.io.IOException {
+        cosmetics.register(id, geometry, animation, texture);
+        Path metaFile = directory.resolve(id + ".cosmetic.json");
+        cosmetics.putMeta(CosmeticMeta.parse(id,
+                Files.isRegularFile(metaFile) ? Files.readString(metaFile) : null));
+        cosmetics.markLocal(id);
     }
 
     public static DiscordPresence discord() {
@@ -392,8 +410,29 @@ public final class LanPlusClient {
             SkinRef ref = f.skin();
             if (ref != null && !ref.equals(resolvedSkinRefs.put(f.uuid(), ref))) {
                 skins.resolve(f.uuid(), ref);
+                skins.resolve(HostController.offlineUuid(f.username()), ref);
             }
         }
+    }
+
+    public static void ensureSkin(UUID uuid, String name) {
+        if (uuid == null || name == null || name.isBlank() || skins == null || network == null
+                || skinTextures == null || skinTextures.get(uuid) != null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long retryAfter = skinRetryAfter.get(uuid);
+        if (retryAfter != null && retryAfter > now) {
+            return;
+        }
+        skinRetryAfter.put(uuid, now + SKIN_RETRY_DELAY_MS);
+        network.getSkinByName(name).whenComplete((ref, err) -> {
+            if (err == null && ref != null) {
+                skins.resolve(uuid, ref);
+            } else {
+                skins.resolveByName(uuid, name);
+            }
+        });
     }
 
     public static LanPlusNetwork network() {

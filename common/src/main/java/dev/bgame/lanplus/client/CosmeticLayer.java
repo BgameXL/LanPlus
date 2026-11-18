@@ -32,6 +32,7 @@ public final class CosmeticLayer extends RenderLayer<AbstractClientPlayer, Playe
         if (equipped == null || equipped.isEmpty()) {
             return;
         }
+        String animationState = !player.onGround() ? "jump" : limbSwingAmount > 0.01f ? "walk" : "idle";
         for (Map.Entry<CosmeticSlot, String> entry : equipped.entrySet()) {
             LanPlusClient.ensureCosmeticModel(entry.getValue());
             CosmeticModel model = models.model(entry.getValue());
@@ -40,7 +41,8 @@ public final class CosmeticLayer extends RenderLayer<AbstractClientPlayer, Playe
             }
             poseStack.pushPose();
             CosmeticGeoRender.anchor(getParentModel(), entry.getKey(), poseStack);
-            models.animate(entry.getValue(), player.getUUID(), limbSwing, limbSwingAmount, partialTick);
+            CosmeticGeoRender.transform(poseStack, models.transformOf(entry.getValue()));
+            models.animate(entry.getValue(), player.getUUID(), animationState, limbSwing, limbSwingAmount, partialTick);
             VertexConsumer buffer = bufferSource.getBuffer(RenderType.entityCutoutNoCull(model.texture()));
             CosmeticGeoRender.render(poseStack, model.geometry(), buffer, packedLight, OverlayTexture.NO_OVERLAY,
                     model.colour());
