@@ -33,6 +33,19 @@ allprojects {
 subprojects {
     apply plugin: 'dev.architectury.loom'
 
+    tasks.withType(Jar).configureEach {
+        from(rootProject.file('LICENSE')) {
+            into 'META-INF/licenses/lanplus'
+            rename { 'LGPL-3.0.txt' }
+        }
+        from(rootProject.file('THIRD_PARTY.md')) {
+            into 'META-INF'
+        }
+        from(rootProject.file('licenses/geckolib-MIT.txt')) {
+            into 'META-INF/licenses/geckolib'
+        }
+    }
+
     loom {
         silentMojangMappingsLicense()
     }
