@@ -56,6 +56,7 @@ import java.util.stream.Stream;
 public final class LanPlusClient {
 
     private static final Logger LOGGER = LogUtils.getLogger();
+    private static final long SKIN_RETRY_DELAY_MS = 10_000L;
 
     private static LanPlusNetwork network;
     private static PresenceManager presence;
@@ -71,7 +72,7 @@ public final class LanPlusClient {
     private static AnnouncementsService announcements;
     private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
     private static final Set<UUID> requestedLoadouts = ConcurrentHashMap.newKeySet();
-    private static final Set<UUID> requestedSkins = ConcurrentHashMap.newKeySet();
+    private static final Map<UUID, Long> skinRetryAfter = new ConcurrentHashMap<>();
     private static volatile String pendingUpdateVersion;
     private static volatile String pendingUpdateUrl;
 
@@ -413,9 +414,15 @@ public final class LanPlusClient {
 
     public static void ensureSkin(UUID uuid, String name) {
         if (uuid == null || name == null || name.isBlank() || skins == null || network == null
-                || skinTextures == null || skinTextures.get(uuid) != null || !requestedSkins.add(uuid)) {
+                || skinTextures == null || skinTextures.get(uuid) != null) {
             return;
         }
+        long now = System.currentTimeMillis();
+        Long retryAfter = skinRetryAfter.get(uuid);
+        if (retryAfter != null && retryAfter > now) {
+            return;
+        }
+        skinRetryAfter.put(uuid, now + SKIN_RETRY_DELAY_MS);
         network.getSkinByName(name).whenComplete((ref, err) -> {
             if (err == null && ref != null) {
                 skins.resolve(uuid, ref);

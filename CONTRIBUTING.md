@@ -38,7 +38,7 @@ Requirements:
 - JDK 21
 - Git
 - IntelliJ IDEA is recommended but others IDEs are fine.
-- Knowledge of Java of course.
+- Knowledge in Java of course.
 
 ```bash
 ./gradlew build
