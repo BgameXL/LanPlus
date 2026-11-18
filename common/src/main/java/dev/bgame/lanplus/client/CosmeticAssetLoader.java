@@ -49,6 +49,7 @@ public final class CosmeticAssetLoader {
             }
             for (CosmeticCatalogEntry e : list) {
                 catalog.put(e.id(), e);
+                models.markOfficial(e.id());
                 models.putMeta(CosmeticMeta.parse(e.id(), e.meta()));
             }
         });

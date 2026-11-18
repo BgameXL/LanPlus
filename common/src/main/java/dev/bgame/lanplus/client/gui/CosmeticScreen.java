@@ -1,5 +1,6 @@
 package dev.bgame.lanplus.client.gui;
 
+import dev.bgame.lanplus.Config;
 import dev.bgame.lanplus.client.CosmeticGeoRender;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.SkinTextures;
@@ -402,8 +403,10 @@ public final class CosmeticScreen extends LanPlusScreen {
             return;
         }
         CosmeticSlot slot = LanPlusClient.cosmetics().slotOf(selectedId);
+        boolean local = LanPlusClient.cosmetics().isLocal(selectedId);
         LanPlusClient.cosmetics().equip(uuid, slot, selectedId);
-        if (LanPlusClient.network() != null) {
+        Config.setLocalCosmetic(slot.name(), local ? selectedId : null);
+        if (!local && LanPlusClient.network() != null) {
             LanPlusClient.network().equipCosmetic(slot.name(), selectedId);
         }
     }
@@ -413,8 +416,11 @@ public final class CosmeticScreen extends LanPlusScreen {
             return;
         }
         CosmeticSlot slot = LanPlusClient.cosmetics().slotOf(selectedId);
+        boolean local = LanPlusClient.cosmetics().isLocal(selectedId);
         LanPlusClient.cosmetics().unequip(uuid, slot);
-        if (LanPlusClient.network() != null) {
+        if (local) {
+            Config.setLocalCosmetic(slot.name(), null);
+        } else if (LanPlusClient.network() != null) {
             LanPlusClient.network().equipCosmetic(slot.name(), null);
         }
     }
@@ -429,7 +435,9 @@ public final class CosmeticScreen extends LanPlusScreen {
             return;
         }
         LanPlusClient.cosmetics().markOwned(selectedId);
-        LanPlusClient.cosmetics().equip(uuid, LanPlusClient.cosmetics().slotOf(selectedId), selectedId);
+        CosmeticSlot slot = LanPlusClient.cosmetics().slotOf(selectedId);
+        LanPlusClient.cosmetics().equip(uuid, slot, selectedId);
+        Config.setLocalCosmetic(slot.name(), null);
         LanPlusClient.completePurchase(uuid, selectedId);
     }
 

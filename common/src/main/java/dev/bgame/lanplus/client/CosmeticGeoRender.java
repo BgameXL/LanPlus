@@ -23,6 +23,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import dev.bgame.lanplus.cosmetics.CosmeticModel;
 import dev.bgame.lanplus.cosmetics.CosmeticSlot;
+import dev.bgame.lanplus.cosmetics.CosmeticTransform;
 import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelPart;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.BakedGeoModel;
@@ -56,6 +57,24 @@ public final class CosmeticGeoRender {
         };
         part.translateAndRotate(poseStack);
         poseStack.scale(-1f, -1f, 1f);
+    }
+
+    public static void transform(PoseStack poseStack, CosmeticTransform transform) {
+        if (transform.x() != 0 || transform.y() != 0 || transform.z() != 0) {
+            poseStack.translate(-transform.x() / 16f, transform.y() / 16f, transform.z() / 16f);
+        }
+        if (transform.rotationZ() != 0) {
+            poseStack.mulPose(Axis.ZP.rotationDegrees(transform.rotationZ()));
+        }
+        if (transform.rotationY() != 0) {
+            poseStack.mulPose(Axis.YP.rotationDegrees(-transform.rotationY()));
+        }
+        if (transform.rotationX() != 0) {
+            poseStack.mulPose(Axis.XP.rotationDegrees(-transform.rotationX()));
+        }
+        if (transform.scale() != 1) {
+            poseStack.scale(transform.scale(), transform.scale(), transform.scale());
+        }
     }
 
     public static void render(PoseStack poseStack, BakedGeoModel model, VertexConsumer buffer, int packedLight, int packedOverlay, int colour) {

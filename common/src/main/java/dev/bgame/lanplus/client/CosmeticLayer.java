@@ -41,6 +41,7 @@ public final class CosmeticLayer extends RenderLayer<AbstractClientPlayer, Playe
             }
             poseStack.pushPose();
             CosmeticGeoRender.anchor(getParentModel(), entry.getKey(), poseStack);
+            CosmeticGeoRender.transform(poseStack, models.transformOf(entry.getValue()));
             models.animate(entry.getValue(), player.getUUID(), animationState, limbSwing, limbSwingAmount, partialTick);
             VertexConsumer buffer = bufferSource.getBuffer(RenderType.entityCutoutNoCull(model.texture()));
             CosmeticGeoRender.render(poseStack, model.geometry(), buffer, packedLight, OverlayTexture.NO_OVERLAY,

@@ -16,6 +16,7 @@ import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.client.gui.UpdateScreen;
 import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.core.ProfileCache;
+import dev.bgame.lanplus.cosmetics.BlockbenchImporter;
 import dev.bgame.lanplus.cosmetics.CosmeticMeta;
 import dev.bgame.lanplus.cosmetics.CosmeticSlot;
 import dev.bgame.lanplus.discord.DiscordPresence;
@@ -320,23 +321,50 @@ public final class LanPlusClient {
             if (!Files.isDirectory(dir)) {
                 return;
             }
-            List<Path> geoFiles;
+            Set<String> compiled = new HashSet<>();
             try (Stream<Path> files = Files.list(dir)) {
-                geoFiles = files.filter(p -> p.getFileName().toString().endsWith(".geo.json")).toList();
+                for (Path geo : files.filter(p -> p.getFileName().toString().endsWith(".geo.json")).sorted().toList()) {
+                    String name = geo.getFileName().toString();
+                    String id = name.substring(0, name.length() - ".geo.json".length());
+                    try {
+                        Path animation = dir.resolve(id + ".animation.json");
+                        Path texture = dir.resolve(id + ".png");
+                        registerLocalCosmetic(dir, id, Files.readAllBytes(geo),
+                                Files.isRegularFile(animation) ? Files.readAllBytes(animation) : null,
+                                Files.isRegularFile(texture) ? Files.readAllBytes(texture) : null);
+                        compiled.add(id);
+                    } catch (Exception e) {
+                        LOGGER.warn("Failed to load local cosmetic {}", name, e);
+                    }
+                }
+            }
+            try (Stream<Path> files = Files.list(dir)) {
+                for (Path file : files.filter(p -> p.getFileName().toString().endsWith(".bbmodel")).sorted().toList()) {
+                    String name = file.getFileName().toString();
+                    String id = name.substring(0, name.length() - ".bbmodel".length());
+                    if (compiled.contains(id)) {
+                        continue;
+                    }
+                    try {
+                        BlockbenchImporter.ImportedModel imported = BlockbenchImporter.read(id, file);
+                        Path texture = dir.resolve(id + ".png");
+                        registerLocalCosmetic(dir, id, imported.geometry(), imported.animations(),
+                                imported.texture() != null ? imported.texture()
+                                        : Files.isRegularFile(texture) ? Files.readAllBytes(texture) : null);
+                    } catch (Exception e) {
+                        LOGGER.warn("Failed to import Blockbench cosmetic {}", name, e);
+                    }
+                }
             }
             UUID self = selfUuid();
-            for (Path geo : geoFiles) {
-                String id = geo.getFileName().toString().replace(".geo.json", "");
-                Path anim = dir.resolve(id + ".animation.json");
-                Path png = dir.resolve(id + ".png");
-                Path metaFile = dir.resolve(id + ".cosmetic.json");
-                cosmetics.register(id, Files.readAllBytes(geo), Files.isRegularFile(anim) ? Files.readAllBytes(anim) : null, Files.isRegularFile(png) ? Files.readAllBytes(png) : null);
-                CosmeticMeta meta = CosmeticMeta.parse(id, Files.isRegularFile(metaFile) ? Files.readString(metaFile) : null);
-                cosmetics.putMeta(meta);
-                if (meta.price() <= 0) {
-                    cosmetics.markOwned(id);
-                    if (self != null) {
-                        cosmetics.equip(self, meta.slot(), id);
+            if (self != null) {
+                for (Map.Entry<String, String> entry : Config.localCosmeticLoadout().entrySet()) {
+                    try {
+                        CosmeticSlot slot = CosmeticSlot.valueOf(entry.getKey());
+                        if (cosmetics.isLocal(entry.getValue()) && cosmetics.slotOf(entry.getValue()) == slot) {
+                            cosmetics.equip(self, slot, entry.getValue());
+                        }
+                    } catch (IllegalArgumentException ignored) {
                     }
                 }
             }
@@ -344,6 +372,15 @@ public final class LanPlusClient {
         } catch (Exception e) {
             LOGGER.warn("cosmetic failed", e);
         }
+    }
+
+    private static void registerLocalCosmetic(Path directory, String id, byte[] geometry, byte[] animation,
+                                              byte[] texture) throws java.io.IOException {
+        cosmetics.register(id, geometry, animation, texture);
+        Path metaFile = directory.resolve(id + ".cosmetic.json");
+        cosmetics.putMeta(CosmeticMeta.parse(id,
+                Files.isRegularFile(metaFile) ? Files.readString(metaFile) : null));
+        cosmetics.markLocal(id);
     }
 
     public static DiscordPresence discord() {

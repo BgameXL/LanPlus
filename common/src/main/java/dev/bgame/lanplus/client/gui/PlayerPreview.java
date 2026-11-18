@@ -110,6 +110,7 @@ final class PlayerPreview {
             }
             ps.pushPose();
             CosmeticGeoRender.anchor(model, e.getKey(), ps);
+            CosmeticGeoRender.transform(ps, cm.transformOf(e.getValue()));
             cm.animate(e.getValue(), uuid, "idle", 0f, 0f, 0f);
             VertexConsumer cvc = buffers.getBuffer(RenderType.entityCutoutNoCull(cosmetic.texture()));
             CosmeticGeoRender.render(ps, cosmetic.geometry(), cvc, 0xF000F0, OverlayTexture.NO_OVERLAY, cosmetic.colour());

@@ -2,10 +2,12 @@ package dev.bgame.lanplus.client;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.bgame.lanplus.LanplusCommon;
+import dev.bgame.lanplus.cosmetics.BlockbenchImporter;
 import dev.bgame.lanplus.cosmetics.CosmeticLoader;
 import dev.bgame.lanplus.cosmetics.CosmeticMeta;
 import dev.bgame.lanplus.cosmetics.CosmeticModel;
 import dev.bgame.lanplus.cosmetics.CosmeticSlot;
+import dev.bgame.lanplus.cosmetics.CosmeticTransform;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.BakedGeoModel;
 import dev.bgame.lanplus.cosmetics.geckolib.loading.object.BakedAnimations;
 import net.minecraft.client.Minecraft;
@@ -14,6 +16,7 @@ import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -27,9 +30,11 @@ public final class CosmeticModels {
     private final Map<String, CosmeticModel> models = new ConcurrentHashMap<>();
     private final Map<String, CosmeticAnimator> animators = new ConcurrentHashMap<>();
     private final Map<UUID, Map<CosmeticSlot, String>> loadout = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<CosmeticSlot, String>> localLoadout = new ConcurrentHashMap<>();
     private final Map<String, CosmeticMeta> meta = new ConcurrentHashMap<>();
     private final Map<String, float[]> boundsCache = new ConcurrentHashMap<>();
     private final Set<String> owned = ConcurrentHashMap.newKeySet();
+    private final Set<String> local = ConcurrentHashMap.newKeySet();
     private final AtomicInteger seq = new AtomicInteger();
     private volatile int wallet;
 
@@ -56,6 +61,11 @@ public final class CosmeticModels {
     public CosmeticSlot slotOf(String id) {
         CosmeticMeta m = meta.get(id);
         return m != null ? m.slot() : CosmeticSlot.HEAD;
+    }
+
+    public CosmeticTransform transformOf(String id) {
+        CosmeticMeta m = meta.get(id);
+        return m != null ? m.transform() : CosmeticTransform.IDENTITY;
     }
 
     public List<String> idsForSlot(CosmeticSlot slot) {
@@ -88,7 +98,26 @@ public final class CosmeticModels {
     }
 
     public boolean owns(String id) {
-        return id != null && owned.contains(id);
+        return id != null && (owned.contains(id) || local.contains(id));
+    }
+
+    public boolean isLocal(String id) {
+        return id != null && local.contains(id);
+    }
+
+    public void markLocal(String id) {
+        if (id != null) {
+            local.add(id);
+        }
+    }
+
+    public void markOfficial(String id) {
+        if (id != null) {
+            local.remove(id);
+            for (Map<CosmeticSlot, String> equipped : localLoadout.values()) {
+                equipped.entrySet().removeIf(entry -> id.equals(entry.getValue()));
+            }
+        }
     }
 
     public void setOwned(Set<String> ids) {
@@ -123,22 +152,52 @@ public final class CosmeticModels {
     }
 
     public String equipped(UUID player, CosmeticSlot slot) {
+        Map<CosmeticSlot, String> localEquipped = player == null ? null : localLoadout.get(player);
+        if (localEquipped != null && localEquipped.containsKey(slot)) {
+            return localEquipped.get(slot);
+        }
         Map<CosmeticSlot, String> map = player == null ? null : loadout.get(player);
         return map == null ? null : map.get(slot);
     }
 
     public Map<CosmeticSlot, String> loadout(UUID player) {
-        return player == null ? null : loadout.get(player);
+        if (player == null) {
+            return null;
+        }
+        Map<CosmeticSlot, String> official = loadout.get(player);
+        Map<CosmeticSlot, String> localEquipped = localLoadout.get(player);
+        if (localEquipped == null || localEquipped.isEmpty()) {
+            return official == null || official.isEmpty() ? null : official;
+        }
+        if (official == null || official.isEmpty()) {
+            return localEquipped;
+        }
+        Map<CosmeticSlot, String> merged = new EnumMap<>(CosmeticSlot.class);
+        merged.putAll(official);
+        merged.putAll(localEquipped);
+        return merged;
     }
 
     public void equip(UUID player, CosmeticSlot slot, String id) {
         if (player == null || slot == null || id == null) {
             return;
         }
+        if (local.contains(id)) {
+            localLoadout.computeIfAbsent(player, u -> new ConcurrentHashMap<>()).put(slot, id);
+            return;
+        }
+        Map<CosmeticSlot, String> localEquipped = localLoadout.get(player);
+        if (localEquipped != null) {
+            localEquipped.remove(slot);
+        }
         loadout.computeIfAbsent(player, u -> new ConcurrentHashMap<>()).put(slot, id);
     }
 
     public void unequip(UUID player, CosmeticSlot slot) {
+        Map<CosmeticSlot, String> localEquipped = localLoadout.get(player);
+        if (localEquipped != null && localEquipped.remove(slot) != null) {
+            return;
+        }
         Map<CosmeticSlot, String> equipped = loadout.get(player);
         if (equipped != null) {
             equipped.remove(slot);
@@ -161,6 +220,9 @@ public final class CosmeticModels {
         if (animator != null && player != null) {
             CosmeticMeta cosmeticMeta = meta.get(id);
             String requestedClip = cosmeticMeta == null ? null : cosmeticMeta.stateClipMap().get(state);
+            if ((requestedClip == null || requestedClip.isBlank()) && state != null && !state.isBlank()) {
+                requestedClip = BlockbenchImporter.clipName(id, state);
+            }
             String defaultClip = cosmeticMeta == null ? null : cosmeticMeta.defaultClip();
             animator.apply(player.getMostSignificantBits() ^ player.getLeastSignificantBits(), limbSwing,
                     limbSwingAmount, partialTick, requestedClip, defaultClip);
