@@ -8,6 +8,7 @@
   "gui.lanplus.tab.details": "Details",
   "gui.lanplus.refresh": "Refresh",
   "gui.lanplus.status.connected": "Connected",
+  "gui.lanplus.status.connected_offline": "Connected (offline)",
   "gui.lanplus.status.local": "Local-only",
   "gui.lanplus.friends.empty": "No friends yet",
   "gui.lanplus.friends.offline": "Offline (%s)",

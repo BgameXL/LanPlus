@@ -1513,7 +1513,6 @@ public final class ProfileScreen extends LanPlusScreen {
     private void drawModpackIcon(GuiGraphics g, int x, int y, int size, ModpackRef ref) {
         LanPlusUI.slot(g, x, y, x + size, y + size);
         int strip = Math.max(2, size / 9);
-        g.fill(x, y, x + size, y + strip, LanPlusUI.ACCENT);
         String name = ref.name() == null ? "" : ref.name().trim();
         String letter = name.isEmpty() ? "?" : String.valueOf(Character.toUpperCase(name.charAt(0)));
         float scale = size >= 28 ? 2.0f : 1.0f;

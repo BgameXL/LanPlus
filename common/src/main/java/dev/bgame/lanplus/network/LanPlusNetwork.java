@@ -125,6 +125,10 @@ public interface LanPlusNetwork {
 
     boolean isConnected();
 
+    default boolean isSessionVerified() {
+        return false;
+    }
+
     String baseUrl();
 
     Profile parseProfileJson(String body);

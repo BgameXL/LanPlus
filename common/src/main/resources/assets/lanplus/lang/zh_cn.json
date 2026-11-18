@@ -8,6 +8,7 @@
   "gui.lanplus.tab.details": "详情",
   "gui.lanplus.refresh": "刷新",
   "gui.lanplus.status.connected": "已连接",
+  "gui.lanplus.status.connected_offline": "Connected (offline)",
   "gui.lanplus.status.local": "仅本地",
   "gui.lanplus.friends.empty": "还没有好友",
   "gui.lanplus.friends.offline": "Offline (%s)",
