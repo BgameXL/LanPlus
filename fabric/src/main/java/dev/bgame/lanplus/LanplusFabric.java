@@ -36,5 +36,11 @@ public class LanplusFabric implements ModInitializer {
             return net.fabricmc.loader.api.FabricLoader.getInstance().getEnvironmentType()
                     == net.fabricmc.api.EnvType.CLIENT;
         }
+
+        @Override
+        public String modVersion() {
+            return net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer(LanplusCommon.MODID)
+                    .map(c -> c.getMetadata().getVersion().getFriendlyString()).orElse("");
+        }
     }
 }

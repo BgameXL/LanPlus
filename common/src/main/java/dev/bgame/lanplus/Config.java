@@ -4,7 +4,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.platform.PlatformHolder;
+import org.slf4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -12,9 +14,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import net.minecraft.util.Mth;
 
 public final class Config {
 
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String FILE_NAME = "lanplus.json";
     public static boolean enabled = true;
@@ -33,8 +37,10 @@ public final class Config {
     public static int customBackground = 0x1E1926;
     public static int customText = 0xECEEF2;
     public static int customMuted = 0x8B909A;
+    public static int uiOpacity = 100;
     public static boolean voiceEnabled = true;
     public static String voiceHost = "";
+    public static String seenUpdateVersion = "";
 
     private Config() {
     }
@@ -60,9 +66,11 @@ public final class Config {
                 customBackground = getInt(json, "customBackground", customBackground);
                 customText = getInt(json, "customText", customText);
                 customMuted = getInt(json, "customMuted", customMuted);
+                uiOpacity = Mth.clamp(getInt(json, "uiOpacity", uiOpacity), 0, 100);
                 voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
                 voiceHost = getString(json, "voiceHost", voiceHost);
-            } catch (Exception e) {
+                seenUpdateVersion = getString(json, "seenUpdateVersion", seenUpdateVersion);
+            } catch (Exception ignored) {
             }
         }
         save();
@@ -87,8 +95,10 @@ public final class Config {
         json.addProperty("customBackground", customBackground);
         json.addProperty("customText", customText);
         json.addProperty("customMuted", customMuted);
+        json.addProperty("uiOpacity", uiOpacity);
         json.addProperty("voiceEnabled", voiceEnabled);
         json.addProperty("voiceHost", voiceHost);
+        json.addProperty("seenUpdateVersion", seenUpdateVersion);
 
         try {
             Files.createDirectories(file.getParent());
@@ -97,6 +107,7 @@ public final class Config {
             }
             return true;
         } catch (IOException e) {
+            LOGGER.warn("Failed to save LAN+ configuration to {}", file, e);
             return false;
         }
     }
@@ -113,9 +124,9 @@ public final class Config {
         save();
     }
 
-    public static void setTheme(String id) {
+    public static boolean setTheme(String id) {
         theme = id;
-        save();
+        return save();
     }
 
     private static boolean getBool(JsonObject json, String key, boolean fallback) {

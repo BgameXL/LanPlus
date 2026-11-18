@@ -1,17 +1,25 @@
 package dev.bgame.lanplus.client.gui;
 
 import dev.bgame.lanplus.Config;
+import dev.bgame.lanplus.LanplusCommon;
+import dev.bgame.lanplus.api.DomainStatus;
 import dev.bgame.lanplus.client.LanPlusClient;
+import dev.bgame.lanplus.network.LanPlusNetwork;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -19,13 +27,42 @@ import java.util.function.Consumer;
 public final class SettingsScreen extends LanPlusScreen {
 
     private enum Cat {
-        GENERAL("general"), THEME("theme"), ADVANCED("advanced");
+        GENERAL("general"), THEME("theme"), ADVANCED("advanced"), ABOUT("about");
         final String key;
 
         Cat(String key) {
             this.key = key;
         }
     }
+
+    private record SocialLinks(ResourceLocation icon, int texSize, String url, String label) {
+    }
+
+    private record LinkHit(int x, int y, int size, String url) {
+    }
+
+    private record Credit(String name, String role, List<SocialLinks> socials) {
+    }
+
+    private static final List<Credit> CREDITS = List.of( // Frums - Credits
+            new Credit("Bgame", "Creator & Developer",
+                    List.of(social("github", 16, "https://github.com/BgameXL", "GitHub"))));
+
+    private static final List<SocialLinks> LINKS = List.of(
+            social("discord", 16, "https://discord.gg/kAKk3wRAVh", "Discord"),
+            social("github", 16, "https://github.com/BgameXL/LanPlus", "GitHub"),
+            social("modrinth", 32, "https://modrinth.com/mod/lanplus", "Modrinth"),
+            social("curseforge", 16, "https://www.curseforge.com/minecraft/mc-mods/lan", "CurseForge"),
+            social("ko_fi", 16, "https://ko-fi.com/bgame", "Ko-fi"));
+
+    private static SocialLinks social(String name, int texSize, String url, String label) {
+        return new SocialLinks(
+                new ResourceLocation(LanplusCommon.MODID, "textures/gui/social/" + name + ".png"),
+                texSize, url, label);
+    }
+
+    private final List<LinkHit> linkHits = new ArrayList<>();
+    private Component linkTooltip;
 
     private enum ThemeTarget {
         ACCENT("gui.lanplus.theme.accent"),
@@ -43,6 +80,8 @@ public final class SettingsScreen extends LanPlusScreen {
     private static final int CH_COLS = 2;
     private static final int CH_ROW_H = 20;
     private static final int CH_ROW_GAP = 6;
+    private static final int OPACITY_BLOCK = 20;
+    private static final int OPACITY_MIN = 0;
     private static final int TOGGLE_ROW_STEP = 48;
     private static final int MAX_URL_LENGTH = 2048;
     private static final int MAX_ADDRESS_LENGTH = 260;
@@ -51,6 +90,10 @@ public final class SettingsScreen extends LanPlusScreen {
     private EditBox backendBox;
     private EditBox relayAddrBox;
     private EditBox voiceHostBox;
+    private LanplusButton domainButton;
+    private DomainStatus domainStatus;
+    private boolean domainLoading;
+    private boolean domainRerolling;
     private String backendDraft;
     private String relayAddressDraft;
     private String voiceHostDraft;
@@ -58,7 +101,8 @@ public final class SettingsScreen extends LanPlusScreen {
     private ColorPicker themePicker;
     private ThemeTarget themeTarget = ThemeTarget.ACCENT;
     private int px, py, pw, ph, headerBottom, sidebarX, dividerX, contentX, contentW, contentTop;
-    private int innerX, innerY, innerW, innerH, innerLeftX, leftW, chY, chW, pickerY;
+    private int innerX, innerY, innerW, innerH, innerLeftX, leftW, chY, chW, pickerY, opacityY, opacityW;
+    private boolean opacityDrag;
     private int dividerThemeX, presetX, presetColW, presetTop, resetY;
 
     public SettingsScreen(Screen parent) {
@@ -91,7 +135,7 @@ public final class SettingsScreen extends LanPlusScreen {
         innerX = contentX;
         int chRows = (ThemeTarget.values().length + CH_COLS - 1) / CH_COLS;
         int channelsH = chRows * CH_ROW_H + (chRows - 1) * CH_ROW_GAP;
-        innerH = pad + channelsH + 14 + ColorPicker.preferredHeight() + pad;
+        innerH = pad + channelsH + 14 + ColorPicker.preferredHeight() + 12 + OPACITY_BLOCK + pad;
         innerY = contentTop + 2;
         innerLeftX = innerX + pad;
         leftW = innerW - 2 * pad - presetColW - 2 * gap - 1;
@@ -105,11 +149,14 @@ public final class SettingsScreen extends LanPlusScreen {
         }
         chW = 18 + maxLabel + 10;
         pickerY = chY + channelsH + 14;
+        opacityY = pickerY + ColorPicker.preferredHeight() + 22;
+        opacityW = leftW * 2 / 5;
         resetY = innerY + innerH - pad - 18;
     }
 
     @Override
     protected void init() {
+        fitGuiScale();
         layout();
         addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.settings.back"), b -> onClose())
                 .bounds(px + 8, py + 7, 54, 18).build());
@@ -196,7 +243,6 @@ public final class SettingsScreen extends LanPlusScreen {
         drawBackdrop(g);
 
         LanPlusUI.panel(g, px, py, px + pw, py + ph);
-        LanPlusUI.rivets(g, px, py, px + pw, py + ph, LanPlusUI.FAINT);
 
         int wx = LanPlusUI.wordmark(g, this.font, px + 70, py + 12);
         g.drawString(this.font, Component.translatable("gui.lanplus.settings.word"), wx + 6, py + 12, LanPlusUI.MUTED, false);
@@ -207,6 +253,7 @@ public final class SettingsScreen extends LanPlusScreen {
             case GENERAL -> renderGeneral(g);
             case THEME -> renderTheme(g);
             case ADVANCED -> renderAdvanced(g);
+            case ABOUT -> renderAbout(g, mouseX, mouseY);
         }
 
         if (status != null) {
@@ -214,6 +261,15 @@ public final class SettingsScreen extends LanPlusScreen {
         }
 
         super.render(g, mouseX, mouseY, partialTick);
+
+        if (selected == Cat.ABOUT && linkTooltip != null) {
+            g.renderTooltip(this.font, linkTooltip, mouseX, mouseY);
+        }
+        if (selected == Cat.ADVANCED && domainButton != null && domainButton.isHovered()) {
+            g.renderTooltip(this.font,
+                    this.font.split(Component.translatable("gui.lanplus.settings.domain.tooltip"), 220),
+                    mouseX, mouseY);
+        }
     }
 
     private void renderGeneral(GuiGraphics g) {
@@ -274,7 +330,22 @@ public final class SettingsScreen extends LanPlusScreen {
         if (themePicker != null) {
             themePicker.render(g);
         }
+        renderOpacity(g);
         renderPresets(g);
+    }
+
+    private void renderOpacity(GuiGraphics g) {
+        int tx = innerLeftX;
+        int tw = opacityW;
+        int ty = opacityY;
+        g.drawString(this.font, Component.translatable("gui.lanplus.theme.opacity", Config.uiOpacity),
+                tx, ty - 11, LanPlusUI.MUTED, false);
+        g.fill(tx, ty, tx + tw, ty + 6, LanPlusUI.SLOT);
+        LanPlusUI.outline1(g, tx, ty, tx + tw, ty + 6, LanPlusUI.EDGE_DARK);
+        int fillW = Math.round((Config.uiOpacity - OPACITY_MIN) / (float) (100 - OPACITY_MIN) * tw);
+        g.fill(tx, ty, tx + fillW, ty + 6, LanPlusUI.ACCENT);
+        int knobX = Mth.clamp(tx + fillW - 2, tx, tx + tw - 4);
+        g.fill(knobX, ty - 2, knobX + 4, ty + 8, LanPlusUI.TEXT);
     }
 
     private void renderChannels(GuiGraphics g) {
@@ -284,7 +355,7 @@ public final class SettingsScreen extends LanPlusScreen {
             int tx = innerLeftX + (i % CH_COLS) * (chW + 6);
             int ty = chY + (i / CH_COLS) * (CH_ROW_H + CH_ROW_GAP);
             boolean sel = t == themeTarget;
-            LanPlusUI.button3d(g, tx, ty, tx + chW, ty + CH_ROW_H, sel ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE);
+            LanPlusUI.button3D(g, tx, ty, tx + chW, ty + CH_ROW_H, sel ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE);
             g.fill(tx + 6, ty + 6, tx + 14, ty + 14, 0xFF000000 | (liveSeed(t) & 0xFFFFFF));
             LanPlusUI.outline1(g, tx + 6, ty + 6, tx + 14, ty + 14, LanPlusUI.EDGE_DARK);
             if (sel) {
@@ -349,6 +420,7 @@ public final class SettingsScreen extends LanPlusScreen {
     private void resetTheme() {
         seedCustomFrom(Themes.AMETHYST);
         themePicker.setColor(configSeed(themeTarget));
+        Config.uiOpacity = 100;
         Config.save();
     }
 
@@ -381,14 +453,117 @@ public final class SettingsScreen extends LanPlusScreen {
 
     private void renderAdvanced(GuiGraphics g) {
         int x = contentX;
-        int y = renderToggleRow(g, contentTop + 2, "relay_plain");
+        int y = renderDomainRow(g, contentTop + 2);
+        y = renderToggleRow(g, y, "relay_plain");
         y = fieldRow(g, x, y, "backend", backendBox);
         y = fieldRow(g, x, y, "relay_address", relayAddrBox);
         fieldRow(g, x, y, "voice_host", voiceHostBox);
     }
 
+    private int renderDomainRow(GuiGraphics g, int y) {
+        int x = contentX;
+        int w = contentW;
+        updateDomainButton();
+        g.drawString(this.font, Component.translatable("gui.lanplus.settings.domain"), x, y + 5, LanPlusUI.TEXT, false);
+        Component value;
+        int color;
+        if (domainStatus != null && domainStatus.domain() != null) {
+            value = Component.literal(domainStatus.domain());
+            color = LanPlusUI.ACCENT;
+        } else {
+            value = Component.translatable(domainLoading
+                    ? "gui.lanplus.settings.domain.loading"
+                    : "gui.lanplus.settings.domain.unavailable");
+            color = LanPlusUI.MUTED;
+        }
+        g.drawString(this.font, value, x, y + 18, color, false);
+        g.fill(x, y + 40, x + w, y + 41, LanPlusUI.DIVIDER);
+        return y + TOGGLE_ROW_STEP;
+    }
+
+    private void updateDomainButton() {
+        if (domainButton == null) {
+            return;
+        }
+        if (domainRerolling) {
+            domainButton.active = false;
+            domainButton.setMessage(Component.translatable("gui.lanplus.settings.domain.changing"));
+            return;
+        }
+        if (domainStatus == null || domainStatus.domain() == null) {
+            domainButton.active = false;
+            domainButton.setMessage(Component.translatable("gui.lanplus.settings.domain.change"));
+            return;
+        }
+        long remaining = domainStatus.canRerollAt() - System.currentTimeMillis();
+        if (remaining > 0) {
+            domainButton.active = false;
+            domainButton.setMessage(Component.translatable("gui.lanplus.settings.domain.cooldown",
+                    formatCountdown(remaining)));
+        } else {
+            domainButton.active = true;
+            domainButton.setMessage(Component.translatable("gui.lanplus.settings.domain.change"));
+        }
+    }
+
+    private static String formatCountdown(long ms) {
+        long minutes = ms / 60_000;
+        long days = minutes / (24 * 60);
+        long hours = (minutes / 60) % 24;
+        long mins = minutes % 60;
+        if (days > 0) {
+            return days + "d " + hours + "h";
+        }
+        if (hours > 0) {
+            return hours + "h " + mins + "m";
+        }
+        return Math.max(1, mins) + "m";
+    }
+
+    private void loadDomainStatus() {
+        LanPlusNetwork net = LanPlusClient.network();
+        if (net == null || domainLoading || domainStatus != null) {
+            return;
+        }
+        domainLoading = true;
+        net.getDomainStatus().whenComplete((status, error) ->
+                Minecraft.getInstance().execute(() -> {
+                    if (Minecraft.getInstance().screen != this) {
+                        return;
+                    }
+                    domainLoading = false;
+                    if (error == null && status != null) {
+                        domainStatus = status;
+                    }
+                }));
+    }
+
+    private void rerollDomain() {
+        LanPlusNetwork net = LanPlusClient.network();
+        if (net == null || domainRerolling) {
+            return;
+        }
+        domainRerolling = true;
+        net.rerollDomain().whenComplete((status, error) ->
+                Minecraft.getInstance().execute(() -> {
+                    if (Minecraft.getInstance().screen != this) {
+                        return;
+                    }
+                    domainRerolling = false;
+                    if (error == null && status != null) {
+                        domainStatus = status;
+                    }
+                }));
+    }
+
     private void addAdvancedWidgets() {
-        addToggle(contentTop + 2, "relay_plain", () -> Config.relayDevPlaintext,
+        int bw = 150;
+        domainButton = LanplusButton.create(
+                        Component.translatable("gui.lanplus.settings.domain.change"), b -> rerollDomain())
+                .bounds(contentX + contentW - bw, contentTop + 13, bw, 18).build();
+        addRenderableWidget(domainButton);
+        loadDomainStatus();
+        addToggle(contentTop + 2 + TOGGLE_ROW_STEP, "relay_plain", () -> Config.relayDevPlaintext,
                 () -> Config.relayDevPlaintext = !Config.relayDevPlaintext);
         backendBox = advancedBox(backendDraft, MAX_URL_LENGTH,
                 "gui.lanplus.settings.backend", "gui.lanplus.settings.backend", value -> {
@@ -455,8 +630,73 @@ public final class SettingsScreen extends LanPlusScreen {
         }
     }
 
+    private void renderAbout(GuiGraphics g, int mouseX, int mouseY) {
+        linkHits.clear();
+        linkTooltip = null;
+        int x = contentX;
+        int y = contentTop + 4;
+
+        LanPlusUI.wordmark(g, this.font, x, y);
+        y += 18;
+
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.settings.credits"),
+                x, y, contentX + contentW);
+        y += 17;
+        for (Credit c : CREDITS) {
+            g.fill(x + 1, y + 2, x + 4, y + 5, LanPlusUI.ACCENT);
+            g.drawString(this.font, c.name(), x + 10, y, LanPlusUI.TEXT, false);
+            int rx = x + 10 + this.font.width(c.name()) + 8;
+            g.drawString(this.font, c.role(), rx, y, LanPlusUI.MUTED, false);
+            int sx = rx + this.font.width(c.role()) + 8;
+            for (SocialLinks s : c.socials()) {
+                sx = iconButton(g, sx, y - 3, 14, s, mouseX, mouseY) + 3;
+            }
+            y += 15;
+        }
+        y += 8;
+
+        LanPlusUI.sectionHeader(g, this.font, Component.translatable("gui.lanplus.settings.links"),
+                x, y, contentX + contentW);
+        y += 20;
+        int bx = x;
+        for (SocialLinks link : LINKS) {
+            bx = iconButton(g, bx, y, 22, link, mouseX, mouseY) + 5;
+        }
+    }
+
+    private int iconButton(GuiGraphics g, int bx, int y, int bs, SocialLinks link, int mouseX, int mouseY) {
+        boolean hover = mouseX >= bx && mouseX < bx + bs && mouseY >= y && mouseY < y + bs;
+        LanPlusUI.button3D(g, bx, y, bx + bs, y + bs, hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
+        if (hover) {
+            LanPlusUI.outline1(g, bx, y, bx + bs, y + bs, LanPlusUI.ACCENT);
+            linkTooltip = Component.literal(link.label());
+        }
+        int ic = bs - 6;
+        g.blit(link.icon(), bx + (bs - ic) / 2, y + (bs - ic) / 2, ic, ic, 0f, 0f,
+                link.texSize(), link.texSize(), link.texSize(), link.texSize());
+        linkHits.add(new LinkHit(bx, y, bs, link.url()));
+        return bx + bs;
+    }
+
+    private void openLink(String url) {
+        Minecraft.getInstance().setScreen(new ConfirmLinkScreen(yes -> {
+            if (yes) {
+                Util.getPlatform().openUri(url);
+            }
+            Minecraft.getInstance().setScreen(this);
+        }, url, false));
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (selected == Cat.ABOUT && button == 0) {
+            for (LinkHit h : linkHits) {
+                if (mouseX >= h.x() && mouseX < h.x() + h.size() && mouseY >= h.y() && mouseY < h.y() + h.size()) {
+                    openLink(h.url());
+                    return true;
+                }
+            }
+        }
         if (selected == Cat.THEME && button == 0 && themePicker != null) {
             int preset = presetAt(mouseX, mouseY);
             if (preset >= 0) {
@@ -468,6 +708,11 @@ public final class SettingsScreen extends LanPlusScreen {
                 selectThemeTarget(target);
                 return true;
             }
+            if (inOpacity(mouseX, mouseY)) {
+                opacityDrag = true;
+                setOpacityFromMouse(mouseX);
+                return true;
+            }
             if (themePicker.mouseClicked(mouseX, mouseY, button)) {
                 return true;
             }
@@ -477,6 +722,10 @@ public final class SettingsScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+        if (opacityDrag) {
+            setOpacityFromMouse(mouseX);
+            return true;
+        }
         if (themePicker != null && themePicker.mouseDragged(mouseX, mouseY)) {
             return true;
         }
@@ -485,6 +734,7 @@ public final class SettingsScreen extends LanPlusScreen {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        opacityDrag = false;
         if (themePicker != null) {
             themePicker.mouseReleased();
             persistTheme();
@@ -503,6 +753,16 @@ public final class SettingsScreen extends LanPlusScreen {
             }
         }
         return -1;
+    }
+
+    private boolean inOpacity(double mouseX, double mouseY) {
+        return mouseX >= innerLeftX && mouseX <= innerLeftX + opacityW
+                && mouseY >= opacityY - 4 && mouseY <= opacityY + 10;
+    }
+
+    private void setOpacityFromMouse(double mouseX) {
+        float f = (float) (mouseX - innerLeftX) / opacityW;
+        Config.uiOpacity = Mth.clamp(OPACITY_MIN + Math.round(f * (100 - OPACITY_MIN)), OPACITY_MIN, 100);
     }
 
     private ThemeTarget targetAt(double mouseX, double mouseY) {
@@ -573,7 +833,7 @@ public final class SettingsScreen extends LanPlusScreen {
             boolean selected = category == SettingsScreen.this.selected;
             boolean highlighted = isHoveredOrFocused();
             if (selected) {
-                LanPlusUI.button3d(g, x, y, x + getWidth(), y + getHeight(), LanPlusUI.SURFACE_RAISED);
+                LanPlusUI.button3D(g, x, y, x + getWidth(), y + getHeight(), LanPlusUI.SURFACE_RAISED);
             } else if (highlighted) {
                 g.fill(x, y, x + getWidth(), y + getHeight(), LanPlusUI.SURFACE_HOVER);
             }

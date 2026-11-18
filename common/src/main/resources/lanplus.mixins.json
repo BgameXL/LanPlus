@@ -10,7 +10,7 @@
   "client": [
     "client.AbstractClientPlayerMixin",
     "client.PlayerRendererMixin",
-    "client.ScreenAccessor"
+    "client.PauseScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

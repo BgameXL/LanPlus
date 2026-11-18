@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.PresenceSnapshot;
 import dev.bgame.lanplus.api.RelayTicket;
+import dev.bgame.lanplus.invites.HostAccessControl;
 import dev.bgame.lanplus.presence.PresenceManager;
 import org.slf4j.Logger;
 
@@ -97,7 +98,8 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
     private CompletableFuture<RelayTicket> ticket() {
         return devTicket != null
                 ? CompletableFuture.completedFuture(devTicket.get())
-                : network.requestRelayTicket(offlineHosting.getAsBoolean());
+                : network.requestRelayTicket(HostAccessControl.gated(offlineHosting.getAsBoolean()),
+                        HostAccessControl.mode().name());
     }
 
     private static int loopbackPort(String address) {

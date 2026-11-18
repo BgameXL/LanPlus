@@ -1,11 +1,11 @@
 package dev.bgame.lanplus.client.gui;
 
 import dev.bgame.lanplus.api.CatalogImage;
-import net.minecraft.util.Mth;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +56,7 @@ public final class ImagePicker extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         contentW = fitWidth(MAX_W);
         boxX = centerX(contentW);
         int panelTop = 36;

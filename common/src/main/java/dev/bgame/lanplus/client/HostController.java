@@ -6,7 +6,7 @@ import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.HostAccessMode;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.invites.HostAccessControl;
-import dev.bgame.lanplus.network.SvcBridge;
+import dev.bgame.lanplus.network.SVCBridge;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.util.HttpUtil;
@@ -29,22 +29,26 @@ public final class HostController {
     private static volatile HostSettings pending;
     private static volatile long pendingAt;
     private static volatile boolean offlineHosting;
+    private static volatile long hostingSince;
 
     private HostController() {
     }
 
     public record HostSettings(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium,
-                               GameType gameType, Difficulty difficulty, boolean allowCommands, int maxPlayers,
-                               boolean allowVanillaJoin) {
+                               GameType gameType, Difficulty difficulty, boolean allowCommands, int maxPlayers) {
 
         public static HostSettings defaults(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium) {
             return new HostSettings(mode, preInvited, allowNonPremium, null, null, true,
-                    HostAccessControl.DEFAULT_MAX_PLAYERS, false);
+                    HostAccessControl.DEFAULT_MAX_PLAYERS);
         }
     }
 
     public static boolean isOfflineHosting() {
         return offlineHosting;
+    }
+
+    public static long hostingSince() {
+        return hostingSince;
     }
 
     public static void requestHost(HostAccessMode mode, Set<UUID> preInvited, boolean allowNonPremium) {
@@ -64,6 +68,7 @@ public final class HostController {
                 HostAccessControl.clear();
             }
             offlineHosting = false;
+            hostingSince = 0L;
             PauseMenuButtons.resetHostedInWorld();
         }
 
@@ -88,7 +93,10 @@ public final class HostController {
         Set<UUID> initial = allowlistFor(s.mode(), s.preInvited(), s.allowNonPremium());
         offlineHosting = s.allowNonPremium();
         server.execute(() -> {
-            HostAccessControl.set(s.mode(), host, initial, s.maxPlayers(), s.allowVanillaJoin());
+            HostAccessControl.set(s.mode(), host, initial, s.maxPlayers());
+            if (hostingSince == 0L) {
+                hostingSince = System.currentTimeMillis();
+            }
             if (s.allowNonPremium()) {
                 server.setUsesAuthentication(false);
             }
@@ -110,7 +118,7 @@ public final class HostController {
 
     private static int hostLanPort() {
         int port = 24454;
-        if (Config.voiceEnabled && SvcBridge.installed() && portAvailable(port)) {
+        if (Config.voiceEnabled && SVCBridge.installed() && portAvailable(port)) {
             return port;
         }
         return HttpUtil.getAvailablePort();

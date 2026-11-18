@@ -31,8 +31,16 @@ final class Themes {
             0xFFF3EEE6, 0xFFC9BFAF, 0xFF9A8F7D,
             0xFF33302A, 0x14FFFFFF);
 
-    static final List<Theme> ALL = List.of(AMETHYST, PERIWINKLE, EMBER);
-    static final Theme DEFAULT = AMETHYST;
+    static final Theme GRAPHITE = new Theme("graphite", Component.translatable("gui.lanplus.theme.graphite"),
+            0xF2353332, 0xFF504C48, 0xFF615C57, 0xFF3C3936, 0xFF252321,
+            0xFF5A554F, 0xFF1A1816,
+            0xFFB087DF, 0xFF9A6FD0, 0xFFC6A8EE, 0x40B087DF, 0xFFB087DF, 0xFFC6A8EE,
+            0xFF6FBF7E, 0xFFD8A43C, 0xFFD05656,
+            0xFFEEE8DD, 0xFFCAC2B4, 0xFF938A7D,
+            0xFF7F7970, 0x14FFFFFF);
+
+    static final List<Theme> ALL = List.of(GRAPHITE, AMETHYST, PERIWINKLE, EMBER);
+    static final Theme DEFAULT = GRAPHITE;
 
     static Theme byId(String id) {
         for (Theme t : ALL) {

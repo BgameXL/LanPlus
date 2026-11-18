@@ -6,7 +6,6 @@ import dev.bgame.lanplus.client.ClientPresenceDetector;
 import dev.bgame.lanplus.client.HostController;
 import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.LanPlusKeybinds;
-import dev.bgame.lanplus.client.PauseMenuButtons;
 import dev.bgame.lanplus.client.gui.TitleScreenPanel;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.platform.LanplusPlatform;
@@ -59,6 +58,7 @@ public class LanplusForge {
                 LanPlusKeybinds.onClientTick();
                 ClientPresenceDetector.onClientTick();
                 HostController.onClientTick();
+                LanPlusClient.onClientTick();
             }
         }
 
@@ -79,11 +79,6 @@ public class LanplusForge {
                     || LanPlusNotifications.onMouseClick(event.getMouseX(), event.getMouseY(), event.getButton())) {
                 event.setCanceled(true);
             }
-        }
-
-        @SubscribeEvent
-        public static void onScreenInit(ScreenEvent.Init.Post event) {
-            PauseMenuButtons.tryAddHostButton(event.getScreen());
         }
 
         @SubscribeEvent
@@ -117,6 +112,13 @@ public class LanplusForge {
         @Override
         public boolean isClient() {
             return true;
+        }
+
+        @Override
+        public String modVersion() {
+            return net.minecraftforge.fml.ModList.get().getModContainerById(LanplusCommon.MODID)
+                    .map(c -> c.getModInfo().getVersion().toString())
+                    .orElse("");
         }
     }
 }

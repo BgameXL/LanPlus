@@ -24,6 +24,7 @@ public record Profile(
         boolean currentlyPlayingVisible,
         boolean recentlyPlayedVisible,
         boolean discoverable,
+        boolean profilePublic,
         int tier,
         int advancements,
         int xp,
@@ -45,7 +46,7 @@ public record Profile(
         return cached == this.cached ? this
                 : new Profile(uuid, username, friendCode, skin, pronouns, bio, links, prompts,
                 online, lastSeen, invisible, currentlyPlaying, lastPlayed, favorite, recentlyPlayed,
-                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible, discoverable,
+                favoriteVisible, currentlyPlayingVisible, recentlyPlayedVisible, discoverable, profilePublic,
                 tier, advancements, xp, xpSources, background, banner, playedTogether, cached);
     }
 

@@ -91,6 +91,7 @@ public final class SkinScreen extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         layout();
         addRenderableWidget(LanplusButton.create(Component.translatable("gui.lanplus.profile.skin.browse"),
                         b -> openFilePicker())
@@ -143,11 +144,9 @@ public final class SkinScreen extends LanPlusScreen {
         LanPlusUI.slot(g, mx0, my0, mx1, my1);
         int cx = (mx0 + mx1) / 2;
         int feetY = my1 - 40;
-        SkinTextures st = LanPlusClient.skinTextures();
-        SkinTextures.Resolved res = st == null || uuid == null ? null : st.get(uuid);
-        ResourceLocation skin = res != null ? res.texture()
-                : DefaultPlayerSkin.getDefaultSkin(uuid == null ? UUID.randomUUID() : uuid);
-        boolean modelSlim = res != null ? res.slim() : slim;
+        SkinTextures.Resolved res = SkinTextures.resolveOrDefault(LanPlusClient.skinTextures(), uuid, slim);
+        ResourceLocation skin = res.texture();
+        boolean modelSlim = res.slim();
         float scale = Math.min(79f, (feetY - my0 - 14) * 0.5f) * view.zoom();
         g.enableScissor(mx0 + 1, my0 + 1, mx1 - 1, my1 - 1);
         g.fill(cx - 22, feetY - 1, cx + 22, feetY, 0x44000000);
@@ -198,8 +197,8 @@ public final class SkinScreen extends LanPlusScreen {
         LanPlusUI.outline1(g, x, y, x + TILE, y + TILE, active ? LanPlusUI.ACCENT : LanPlusUI.EDGE_DARK);
         if (!t.isDefault() && hover) {
             int dx = x + TILE - 9;
-            g.fill(dx, y + 1, dx + 8, y + 9, 0xCCB00020);
-            g.drawString(this.font, "x", dx + 2, y + 1, 0xFFFFFFFF, false);
+            g.fill(dx, y + 1, dx + 8, y + 9, (0xCC << 24) | (LanPlusUI.RED & 0xFFFFFF));
+            g.drawString(this.font, "x", dx + 2, y + 1, LanPlusUI.ON_ACCENT, false);
         }
     }
 

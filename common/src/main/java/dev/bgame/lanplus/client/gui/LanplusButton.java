@@ -28,15 +28,14 @@ public final class LanplusButton extends Button {
         int color;
         if (primary) {
             LanPlusUI.primaryButton(g, x, y, x + w, y + h, isHovered(), isActive());
-            color = isActive() ? LanPlusUI.TEXT : LanPlusUI.FAINT;
+            color = isActive() ? LanPlusUI.ON_ACCENT : LanPlusUI.FAINT;
         } else {
             int bg = !isActive() ? LanPlusUI.SURFACE_DISABLED
                     : isHovered() ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
-            LanPlusUI.button3d(g, x, y, x + w, y + h, bg);
+            LanPlusUI.button3D(g, x, y, x + w, y + h, bg);
             color = !isActive() ? LanPlusUI.FAINT : isHovered() ? LanPlusUI.MUTED : LanPlusUI.TEXT;
         }
-        int tx = x + (w - Minecraft.getInstance().font.width(getMessage())) / 2;
-        g.drawString(Minecraft.getInstance().font, getMessage(), tx, y + (h - 8) / 2, color, false);
+        LanPlusUI.textCentered(g, Minecraft.getInstance().font, getMessage(), x, y + (h - 8) / 2, w, color);
     }
 
     public static final class Builder {

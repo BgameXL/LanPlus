@@ -7,8 +7,9 @@
       "getModelName": "Lnet/minecraft/client/player/AbstractClientPlayer;m_108564_()Ljava/lang/String;",
       "getSkinTextureLocation": "Lnet/minecraft/client/player/AbstractClientPlayer;m_108560_()Lnet/minecraft/resources/ResourceLocation;"
     },
-    "dev/bgame/lanplus/mixin/client/ScreenAccessor": {
-      "addRenderableWidget": "Lnet/minecraft/client/gui/screens/Screen;m_142416_(Lnet/minecraft/client/gui/components/events/GuiEventListener;)Lnet/minecraft/client/gui/components/events/GuiEventListener;"
+    "dev/bgame/lanplus/mixin/client/PauseScreenMixin": {
+      "onDisconnect": "Lnet/minecraft/client/gui/screens/PauseScreen;m_261092_()V",
+      "Lnet/minecraft/client/Minecraft;setScreen(Lnet/minecraft/client/gui/screens/Screen;)V": "Lnet/minecraft/client/Minecraft;m_91152_(Lnet/minecraft/client/gui/screens/Screen;)V"
     }
   }
 }

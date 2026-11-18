@@ -3,7 +3,6 @@ package dev.bgame.lanplus.client.gui;
 import dev.bgame.lanplus.announcements.AnnouncementsService;
 import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.client.LanPlusClient;
-import net.minecraft.util.Mth;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -14,6 +13,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -73,12 +73,16 @@ public final class Announcements extends LanPlusScreen {
 
     @Override
     protected void init() {
+        fitGuiScale();
         layout();
         addRenderableWidget(LanplusButton.create(CommonComponents.GUI_DONE, b -> onClose())
                 .bounds(cardX + cardW - 90 - PAD, cardY + cardH - 26, 90, 20).build());
         AnnouncementsService svc = LanPlusClient.announcements();
-        if (svc != null && newIds.isEmpty()) {
-            newIds = Set.copyOf(svc.unseenIds());
+        if (svc != null) {
+            svc.refresh();
+            if (newIds.isEmpty()) {
+                newIds = Set.copyOf(svc.unseenIds());
+            }
         }
         markSeen();
     }
@@ -133,8 +137,7 @@ public final class Announcements extends LanPlusScreen {
         g.drawString(this.font, this.title, wx + 8, cardY + PAD, LanPlusUI.MUTED, false);
         g.fill(cardX + PAD, cardY + 26, cardX + cardW - PAD, cardY + 27, LanPlusUI.DIVIDER);
         g.fill(listX - 8, sidebarTop, listX - 6, listBottom, LanPlusUI.DIVIDER);
-        g.fill(cardX + PAD, cardY + cardH - FOOTER_H + 4, cardX + cardW - PAD, cardY + cardH - FOOTER_H + 5,
-                LanPlusUI.DIVIDER);
+        g.fill(cardX + PAD, cardY + cardH - FOOTER_H + 4, cardX + cardW - PAD, cardY + cardH - FOOTER_H + 5, LanPlusUI.DIVIDER);
 
         AnnouncementsService service = LanPlusClient.announcements();
         List<Announcement> all = service == null ? List.of() : service.announcements();
@@ -186,7 +189,7 @@ public final class Announcements extends LanPlusScreen {
             boolean hover = mouseX >= sidebarX && mouseX < sidebarX + SIDEBAR_W
                     && mouseY >= y && mouseY < y + SB_ROW_H;
             if (sel) {
-                LanPlusUI.button3d(g, sidebarX, y, sidebarX + SIDEBAR_W, rowBottom, LanPlusUI.SURFACE_RAISED);
+                LanPlusUI.button3D(g, sidebarX, y, sidebarX + SIDEBAR_W, rowBottom, LanPlusUI.SURFACE_RAISED);
             } else if (hover) {
                 g.fill(sidebarX, y, sidebarX + SIDEBAR_W, rowBottom, LanPlusUI.SURFACE_HOVER);
             }
@@ -272,7 +275,7 @@ public final class Announcements extends LanPlusScreen {
         if (announcement.image() != null) {
             imageHeight = image == null || image.width() <= 0
                     ? MAX_IMG_H
-                    : (int) Mth.clamp((long) contentW * image.height() / image.width(), MIN_IMG_H, MAX_IMG_H);
+                    : (int) Mth.clamp((long) contentW * image.height() / image.width(), (long) MIN_IMG_H, (long) MAX_IMG_H);
         }
         int h = BODY_DY;
         for (Line line : body) {
@@ -320,10 +323,10 @@ public final class Announcements extends LanPlusScreen {
 
     private static int typeColor(Announcement.Type type) {
         return switch (type) {
-            case UPDATE -> 0xFF55FF55;
-            case MAINTENANCE -> 0xFFFFFF55;
-            case GENERAL -> 0xFF55FFFF;
-            default -> 0xFFFFFFFF;
+            case UPDATE -> LanPlusUI.ONLINE;
+            case MAINTENANCE -> LanPlusUI.AMBER;
+            case GENERAL -> LanPlusUI.LINK;
+            default -> LanPlusUI.TEXT;
         };
     }
 

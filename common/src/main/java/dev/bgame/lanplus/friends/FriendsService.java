@@ -26,6 +26,10 @@ public interface FriendsService {
 
     CompletableFuture<List<ActivityEntry>> refreshActivity();
 
+    List<Friend> discoverableHosts();
+
+    CompletableFuture<List<Friend>> refreshDiscoverableHosts();
+
     CompletableFuture<Boolean> add(UUID friendUuid);
 
     CompletableFuture<Boolean> addByQuery(String query);

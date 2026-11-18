@@ -5,6 +5,7 @@ import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.Connectivity;
 import dev.bgame.lanplus.api.CosmeticCatalogEntry;
+import dev.bgame.lanplus.api.DomainStatus;
 import dev.bgame.lanplus.api.GameplayState;
 import dev.bgame.lanplus.api.ModpackRef;
 import dev.bgame.lanplus.api.PlayedTogether;
@@ -130,12 +131,28 @@ final class Wire {
     record InviteResolved(String address, String worldName) {
     }
 
-    record RelayTicketRequest(String uuid, boolean gated) {
+    record RelayTicketRequest(String uuid, boolean gated, String mode) {
     }
 
     record RelayTicketDto(String ticket, String relayHost, int relayPort, String domain, int expiresIn) {
         RelayTicket toApi() {
             return new RelayTicket(ticket, relayHost, relayPort, domain, expiresIn);
+        }
+    }
+
+    record DomainStatusDto(boolean ok, String domain, long changedAt, long cooldownMs, long canRerollAt) {
+        DomainStatus toApi() {
+            return new DomainStatus(ok, domain, changedAt, cooldownMs, canRerollAt);
+        }
+    }
+
+    record DiscoverableHostDto(String uuid, String username, String worldName, String joinCode,
+                               String gameMode, String difficulty, Skin skin,
+                               int mutualCount, List<String> mutualNames) {
+        dev.bgame.lanplus.api.Friend toApi() {
+            return new dev.bgame.lanplus.api.Friend(UUID.fromString(uuid), username,
+                    Connectivity.ONLINE, GameplayState.HOSTING, worldName, joinCode,
+                    skin == null ? null : skin.toApi(), false, false, 0, gameMode, difficulty, false);
         }
     }
 
@@ -166,7 +183,7 @@ final class Wire {
                       SettingsDto settings, ProgressionDto progression,
                       PlayedTogetherDto playedTogether) {
         Profile toApi(String base) {
-            SettingsDto s = settings == null ? new SettingsDto(true, true, true, true) : settings;
+            SettingsDto s = settings == null ? new SettingsDto(true, true, true, true, false) : settings;
             ProgressionDto p = progression == null ? new ProgressionDto(0, 0, null, null) : progression;
             return new Profile(UUID.fromString(uuid), username, friendCode,
                     skin == null ? null : skin.toApi(), pronouns, bio,
@@ -183,6 +200,7 @@ final class Wire {
                     !Boolean.FALSE.equals(s.currentlyPlayingVisible()),
                     !Boolean.FALSE.equals(s.recentlyPlayedVisible()),
                     !Boolean.FALSE.equals(s.discoverable()),
+                    Boolean.TRUE.equals(s.profilePublic()),
                     p.tier() == null ? 0 : p.tier(),
                     p.advancements() == null ? 0 : p.advancements(),
                     p.xp() == null ? -1 : p.xp(),
@@ -303,13 +321,13 @@ final class Wire {
     record BannerUpdate(String uuid, String bannerId) {
     }
 
-    record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable) {
+    record SettingsDto(Boolean favoriteVisible, Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable, Boolean profilePublic) {
     }
 
     record ProfileUpdate(String uuid, String bio, String pronouns, Map<String, String> links,
                          Map<String, String> prompts, Boolean invisible,
                          Boolean favoriteVisible,
-                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable) {
+                         Boolean currentlyPlayingVisible, Boolean recentlyPlayedVisible, Boolean discoverable, Boolean profilePublic) {
     }
 
     record FavoriteUpdate(String uuid, String favoriteModpackId) {

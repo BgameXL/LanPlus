@@ -5,6 +5,7 @@ import dev.bgame.lanplus.api.Announcement;
 import dev.bgame.lanplus.api.CatalogImage;
 import dev.bgame.lanplus.api.CosmeticCatalogEntry;
 import dev.bgame.lanplus.api.CosmeticShop;
+import dev.bgame.lanplus.api.DomainStatus;
 import dev.bgame.lanplus.api.Friend;
 import dev.bgame.lanplus.api.LibrarySkin;
 import dev.bgame.lanplus.api.Suggestion;
@@ -26,6 +27,8 @@ public interface LanPlusNetwork {
 
     CompletableFuture<Void> pushPresence(PresenceSnapshot snapshot);
     CompletableFuture<List<Friend>> getFriends(UUID uuid);
+
+    CompletableFuture<List<Friend>> getDiscoverableHosts();
     CompletableFuture<Boolean> addFriend(UUID uuid, UUID friendUuid);
     CompletableFuture<Boolean> removeFriend(UUID uuid, UUID friendUuid);
     CompletableFuture<Boolean> acceptFriend(UUID uuid, UUID friendUuid);
@@ -45,7 +48,7 @@ public interface LanPlusNetwork {
     CompletableFuture<String> updateProfile(UUID uuid, String bio, String pronouns, Map<String, String> links,
                                             Map<String, String> prompts, Boolean invisible,
                                             Boolean favoriteVisible, Boolean currentlyPlayingVisible,
-                                            Boolean recentlyPlayedVisible, Boolean discoverable);
+                                            Boolean recentlyPlayedVisible, Boolean discoverable, Boolean profilePublic);
     CompletableFuture<String> setFavoriteModpack(UUID uuid, String modpackId);
     CompletableFuture<String> setBackground(UUID uuid, String style, int color, int opacity, String imageId);
     CompletableFuture<String> setBanner(UUID uuid, String bannerId);
@@ -62,9 +65,15 @@ public interface LanPlusNetwork {
     CompletableFuture<Boolean> deleteLibrarySkin(String skinId);
     CompletableFuture<Invite> createInvite(UUID hostUuid, String address, String worldName, boolean gated);
     CompletableFuture<Invite> resolveInvite(String code);
-    CompletableFuture<RelayTicket> requestRelayTicket(boolean gated);
+    CompletableFuture<RelayTicket> requestRelayTicket(boolean gated, String mode);
+
+    CompletableFuture<DomainStatus> getDomainStatus();
+
+    CompletableFuture<DomainStatus> rerollDomain();
 
     void connectEvents(UUID uuid, BackendEventListener listener);
+
+    void addEventListener(BackendEventListener listener);
     void disconnect();
     boolean isConnected();
 
@@ -108,6 +117,12 @@ public interface LanPlusNetwork {
         }
 
         default void onAnnouncementDeleted(int id) {
+        }
+
+        default void onTestNotification(String title, String body) {
+        }
+
+        default void onVersionInfo(String latest, String url) {
         }
 
         default void onConnected() {

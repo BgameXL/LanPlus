@@ -21,6 +21,11 @@ public abstract class LanPlusScreen extends Screen {
 
     @Override
     protected void rebuildWidgets() {
+        fitGuiScale();
+        super.rebuildWidgets();
+    }
+
+    protected void fitGuiScale() {
         Minecraft mc = Minecraft.getInstance();
         Window window = mc.getWindow();
         if (originalScale < 0) {
@@ -31,7 +36,6 @@ public abstract class LanPlusScreen extends Screen {
         window.setGuiScale(Math.max(1.0, fit));
         this.width = window.getGuiScaledWidth();
         this.height = window.getGuiScaledHeight();
-        super.rebuildWidgets();
     }
 
     @Override

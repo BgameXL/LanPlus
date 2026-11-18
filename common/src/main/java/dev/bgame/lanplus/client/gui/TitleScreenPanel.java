@@ -2,9 +2,11 @@ package dev.bgame.lanplus.client.gui;
 
 import dev.bgame.lanplus.LanplusCommon;
 import dev.bgame.lanplus.client.LanPlusClient;
+import dev.bgame.lanplus.client.PauseMenuButtons;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;
@@ -34,7 +36,7 @@ public final class TitleScreenPanel {
     private TitleScreenPanel() {
     }
 
-    private record Btn(ResourceLocation ic, String glyph, int glyphColor, boolean primary,
+    private record Btn(ResourceLocation ic, String glyph, boolean primary,
                        Component label, int badge, Runnable action) {
     }
 
@@ -43,9 +45,13 @@ public final class TitleScreenPanel {
     }
 
     public static void onScreenRender(GuiGraphics g, int mouseX, int mouseY) {
-        if (Minecraft.getInstance().screen instanceof TitleScreen) {
+        if (shows(Minecraft.getInstance().screen)) {
             render(g, mouseX, mouseY);
         }
+    }
+
+    private static boolean shows(Screen screen) {
+        return screen instanceof TitleScreen || screen instanceof PauseScreen;
     }
 
     static void render(GuiGraphics g, int mouseX, int mouseY) {
@@ -74,45 +80,57 @@ public final class TitleScreenPanel {
     }
 
     private static List<Btn> buttons() {
+        Minecraft mc = Minecraft.getInstance();
+        boolean pause = mc.screen instanceof PauseScreen;
         int unseen = LanPlusClient.announcements() == null ? 0 : LanPlusClient.announcements().unseenCount();
         List<Btn> out = new ArrayList<>(6);
-        out.add(new Btn(null, "+", LanPlusUI.LIME, true, Component.translatable("gui.lanplus.menu.hostworld"), 0,
-                () -> open(new HostScreen(title()))));
-        out.add(new Btn(FRIENDS_ICON, null, 0, false, Component.translatable("gui.lanplus.friends.word"), 0,
-                () -> open(new FriendsScreen(title()))));
-        out.add(new Btn(PROFILE_ICON, null, 0, false, Component.translatable("gui.lanplus.profile.word"), 0, () -> {
+        if (!pause) {
+            out.add(new Btn(null, "+", true, Component.translatable("gui.lanplus.menu.hostworld"), 0,
+                    () -> open(new HostScreen(parent()))));
+        } else if (mc.hasSingleplayerServer() && !PauseMenuButtons.isHostingInWorld()) {
+            out.add(new Btn(null, "+", true, Component.translatable("gui.lanplus.menu.hostworld"), 0,
+                    () -> open(new HostScreen(parent(), true))));
+        }
+        out.add(new Btn(FRIENDS_ICON, null, false, Component.translatable("gui.lanplus.friends.word"), 0,
+                () -> open(new FriendsScreen(parent()))));
+        out.add(new Btn(PROFILE_ICON, null, false, Component.translatable("gui.lanplus.profile.word"), 0, () -> {
             UUID id = LanPlusClient.selfUuid();
             if (id != null) {
-                open(new ProfileScreen(title(), id));
+                open(new ProfileScreen(parent(), id));
             }
         }));
-        out.add(new Btn(COSMETICS_ICON, null, 0, false, Component.translatable("gui.lanplus.menu.cosmetics"), 0,
-                () -> open(new CosmeticScreen(title()))));
-        out.add(new Btn(ANNOUNCEMENTS_ICON, null, 0, false, Component.translatable("gui.lanplus.menu.news"), unseen,
-                () -> open(new Announcements(title()))));
-        out.add(new Btn(SETTINGS_ICON, null, 0, false, Component.translatable("gui.lanplus.settings.word"), 0,
-                () -> open(new SettingsScreen(title()))));
+        out.add(new Btn(COSMETICS_ICON, null, false, Component.translatable("gui.lanplus.menu.cosmetics"), 0,
+                () -> open(new CosmeticScreen(parent()))));
+        out.add(new Btn(ANNOUNCEMENTS_ICON, null, false, Component.translatable("gui.lanplus.menu.news"), unseen,
+                () -> open(new Announcements(parent()))));
+        out.add(new Btn(SETTINGS_ICON, null, false, Component.translatable("gui.lanplus.settings.word"), 0,
+                () -> open(new SettingsScreen(parent()))));
         return out;
     }
 
     private static void drawButton(GuiGraphics g, Font font, int x, int y, int w, Btn b, boolean hover) {
-        LanPlusUI.button3d(g, x, y, x + w, y + BTN, hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED);
+        int fill = hover ? LanPlusUI.SURFACE_HOVER : LanPlusUI.SURFACE_RAISED;
+        LanPlusUI.button3D(g, x, y, x + w, y + BTN, fill);
         if (b.primary()) {
-            LanPlusUI.outline1(g, x, y, x + w, y + BTN, LanPlusUI.LIME);
+            LanPlusUI.outline1(g, x, y, x + w, y + BTN, LanPlusUI.contrastLime(fill));
         }
         if (b.glyph() != null) {
-            g.drawString(font, b.glyph(), x + (BTN - font.width(b.glyph())) / 2, y + (BTN - 8) / 2, b.glyphColor(), true);
+            g.drawString(font, b.glyph(), x + (BTN - font.width(b.glyph())) / 2, y + (BTN - 8) / 2,
+                    LanPlusUI.contrastLime(fill), true);
         } else {
+            int tint = LanPlusUI.TEXT;
+            g.setColor(((tint >> 16) & 0xFF) / 255f, ((tint >> 8) & 0xFF) / 255f, (tint & 0xFF) / 255f, 1f);
             g.blit(b.ic(), x + (BTN - ICON) / 2, y + (BTN - ICON) / 2, 0, 0, ICON, ICON, ICON, ICON);
+            g.setColor(1f, 1f, 1f, 1f);
         }
-        g.drawString(font, b.label(), x + BTN, y + (BTN - 8) / 2, hover ? LanPlusUI.TEXT : LanPlusUI.MUTED, true);
+        g.drawString(font, b.label(), x + BTN, y + (BTN - 8) / 2, LanPlusUI.TEXT, true);
         if (b.badge() > 0) {
             drawBadge(g, font, x + w - 2, y - 2, b.badge());
         }
     }
 
     public static boolean onMouseClick(double mx, double my, int button) {
-        if (button != 0 || !(Minecraft.getInstance().screen instanceof TitleScreen)) {
+        if (button != 0 || !shows(Minecraft.getInstance().screen)) {
             return false;
         }
         for (Hit h : hits) {
@@ -143,8 +161,8 @@ public final class TitleScreenPanel {
         return mx >= x && mx < x + w && my >= y && my < y + h;
     }
 
-    private static TitleScreen title() {
-        return (TitleScreen) Minecraft.getInstance().screen;
+    private static Screen parent() {
+        return Minecraft.getInstance().screen;
     }
 
     private static void open(Screen screen) {

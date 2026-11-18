@@ -15,6 +15,7 @@ import dev.bgame.lanplus.cosmetics.CosmeticMeta;
 import dev.bgame.lanplus.cosmetics.CosmeticSlot;
 import dev.bgame.lanplus.client.gui.FriendsScreen;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
+import dev.bgame.lanplus.client.gui.UpdateScreen;
 import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.core.ProfileCache;
 import dev.bgame.lanplus.discord.DiscordPresence;
@@ -23,12 +24,12 @@ import dev.bgame.lanplus.friends.DefaultFriendsService;
 import dev.bgame.lanplus.friends.FriendsService;
 import dev.bgame.lanplus.invites.DefaultInviteService;
 import dev.bgame.lanplus.invites.InviteService;
-import dev.bgame.lanplus.network.HttpLanPlusNetwork;
+import dev.bgame.lanplus.network.HTTPLanPlusNetwork;
 import dev.bgame.lanplus.network.LanPlusNetwork;
 import dev.bgame.lanplus.network.RelayHostingCoordinator;
 import dev.bgame.lanplus.network.RelayTunnel;
-import dev.bgame.lanplus.network.SvcBridge;
-import dev.bgame.lanplus.network.TcpRelayTunnel;
+import dev.bgame.lanplus.network.SVCBridge;
+import dev.bgame.lanplus.network.TCPRelayTunnel;
 import dev.bgame.lanplus.presence.DefaultPresenceManager;
 import dev.bgame.lanplus.presence.PresenceManager;
 import dev.bgame.lanplus.profiles.DefaultProfilesService;
@@ -70,6 +71,8 @@ public final class LanPlusClient {
     private static AnnouncementsService announcements;
     private static final Map<UUID, SkinRef> resolvedSkinRefs = new ConcurrentHashMap<>();
     private static final Set<UUID> requestedLoadouts = ConcurrentHashMap.newKeySet();
+    private static volatile String pendingUpdateVersion;
+    private static volatile String pendingUpdateUrl;
 
     private LanPlusClient() {
     }
@@ -78,7 +81,7 @@ public final class LanPlusClient {
         if (presence != null) {
             return;
         }
-        network = new HttpLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity,
+        network = new HTTPLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity,
                 new ClientMinecraftAuth());
         AssetCache assetCache = new AssetCache(PlatformHolder.get().getGameDir().resolve("lanplus/cache/assets"));
         ProfileCache profileCache = new ProfileCache(PlatformHolder.get().getGameDir().resolve("lanplus/cache/profiles"));
@@ -100,13 +103,13 @@ public final class LanPlusClient {
         discord.update(presence.current());
 
         boolean relayDev = !Config.relayDevAddress.isBlank();
-        relayTunnel = new TcpRelayTunnel(Config.relayDevPlaintext);
+        relayTunnel = new TCPRelayTunnel(Config.relayDevPlaintext);
         new RelayHostingCoordinator(presence, relayTunnel, network,
                 () -> Config.relayEnabled, HostController::isOfflineHosting,
                 relayDev ? LanPlusClient::devRelayTicket : null);
 
         if (Config.voiceEnabled) {
-            SvcBridge.applyVoiceHost(Config.voiceHost);
+            SVCBridge.applyVoiceHost(Config.voiceHost);
         }
 
         invites = new DefaultInviteService(network, presence, LanPlusClient::localIdentity,
@@ -124,6 +127,23 @@ public final class LanPlusClient {
             }
         });
 
+        network.addEventListener(new LanPlusNetwork.BackendEventListener() {
+            @Override
+            public void onTestNotification(String title, String body) {
+                LanPlusNotifications.test(title, body);
+            }
+
+            @Override
+            public void onVersionInfo(String latest, String versionUrl) {
+                if (!isOutdated(PlatformHolder.get().modVersion(), latest)
+                        || latest.equals(Config.seenUpdateVersion)) {
+                    return;
+                }
+                pendingUpdateVersion = latest;
+                pendingUpdateUrl = versionUrl;
+            }
+        });
+
         String url = backendUrl();
         LOGGER.info("LAN+ client initialised (backend: {})", url.isBlank() ? "local-only" : url);
 
@@ -131,6 +151,53 @@ public final class LanPlusClient {
         announcements.connect();
         ensureCosmeticLoadout(selfUuid());
         cosmeticAssets.refreshCatalog();
+    }
+
+    private static boolean isOutdated(String current, String latest) {
+        if (current == null || current.isBlank() || latest == null || latest.isBlank()) {
+            return false;
+        }
+        String[] pa = current.split("[.\\-+]");
+        String[] pb = latest.split("[.\\-+]");
+        for (int i = 0; i < Math.max(pa.length, pb.length); i++) {
+            int va = i < pa.length ? leadingInt(pa[i]) : 0;
+            int vb = i < pb.length ? leadingInt(pb[i]) : 0;
+            if (va != vb) {
+                return va < vb;
+            }
+        }
+        return false;
+    }
+
+    private static int leadingInt(String s) {
+        int i = 0;
+        while (i < s.length() && Character.isDigit(s.charAt(i))) {
+            i++;
+        }
+        return i == 0 ? 0 : Integer.parseInt(s.substring(0, i));
+    }
+
+    public static void onClientTick() {
+        String version = pendingUpdateVersion;
+        if (version == null) {
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        boolean atMenu = mc.level == null && mc.screen != null;
+        boolean inWorld = mc.level != null;
+        if (!atMenu && !inWorld) {
+            return;
+        }
+        String url = pendingUpdateUrl;
+        pendingUpdateVersion = null;
+        pendingUpdateUrl = null;
+        Config.seenUpdateVersion = version;
+        Config.save();
+        if (atMenu) {
+            mc.setScreen(new UpdateScreen(mc.screen, version, url));
+        } else {
+            LanPlusNotifications.updateAvailable(version, url);
+        }
     }
 
     public static PresenceManager presence() {
@@ -147,6 +214,20 @@ public final class LanPlusClient {
 
     public static InviteService invites() {
         return invites;
+    }
+
+    public static boolean isHostingViaRelay() {
+        return relayTunnel != null && relayTunnel.isOpen();
+    }
+
+    private static volatile UUID joinedHost;
+
+    public static void setJoinedHost(UUID uuid) {
+        joinedHost = uuid;
+    }
+
+    public static UUID joinedHost() {
+        return joinedHost;
     }
 
     public static SkinService skins() {
@@ -195,6 +276,18 @@ public final class LanPlusClient {
                 applyShop(shop);
             }
         });
+    }
+
+    public static void refreshCosmetics() {
+        if (cosmeticAssets != null) {
+            cosmeticAssets.refreshCatalog();
+        }
+        ensureCosmeticShop();
+        UUID self = selfUuid();
+        if (self != null) {
+            requestedLoadouts.remove(self);
+            ensureCosmeticLoadout(self);
+        }
     }
 
     public static void completePurchase(UUID player, String id) {

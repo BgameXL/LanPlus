@@ -32,6 +32,7 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
     private volatile UserProfile localProfile;
     private volatile List<ResolvedUser> requestCache = List.of();
     private volatile List<ActivityEntry> activityCache = List.of();
+    private volatile List<Friend> discoverableCache = List.of();
 
     public DefaultFriendsService(LanPlusNetwork network, Supplier<PlayerIdentity> identity) {
         this.network = network;
@@ -69,6 +70,23 @@ public final class DefaultFriendsService implements FriendsService, LanPlusNetwo
         }
         return network.getActivity().thenApply(list -> {
             activityCache = list;
+            notifyChanged();
+            return list;
+        });
+    }
+
+    @Override
+    public List<Friend> discoverableHosts() {
+        return discoverableCache;
+    }
+
+    @Override
+    public CompletableFuture<List<Friend>> refreshDiscoverableHosts() {
+        if (localUuid() == null) {
+            return CompletableFuture.completedFuture(discoverableCache);
+        }
+        return network.getDiscoverableHosts().thenApply(list -> {
+            discoverableCache = list;
             notifyChanged();
             return list;
         });
