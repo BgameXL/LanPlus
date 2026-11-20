@@ -18,6 +18,7 @@ import dev.bgame.lanplus.core.AssetCache;
 import dev.bgame.lanplus.core.ProfileCache;
 import dev.bgame.lanplus.cosmetics.CosmeticMeta;
 import dev.bgame.lanplus.cosmetics.CosmeticSlot;
+import dev.bgame.lanplus.cosmetics.blockbench.BlockbenchImporter;
 import dev.bgame.lanplus.discord.DiscordPresence;
 import dev.bgame.lanplus.discord.DiscordRichPresence;
 import dev.bgame.lanplus.friends.DefaultFriendsService;
@@ -329,12 +330,36 @@ public final class LanPlusClient {
                     try {
                         Path animation = dir.resolve(id + ".animation.json");
                         Path texture = dir.resolve(id + ".png");
-                        registerLocalCosmetic(dir, id, Files.readAllBytes(geo),
+                        boolean loaded = registerLocalCosmetic(dir, id, Files.readAllBytes(geo),
                                 Files.isRegularFile(animation) ? Files.readAllBytes(animation) : null,
                                 Files.isRegularFile(texture) ? Files.readAllBytes(texture) : null);
-                        compiled.add(id);
+                        if (loaded) {
+                            compiled.add(id);
+                        } else {
+                            LOGGER.warn("Failed to bake local cosmetic {}; trying .bbmodel fallback if available", name);
+                        }
                     } catch (Exception e) {
                         LOGGER.warn("Failed to load local cosmetic {}", name, e);
+                    }
+                }
+            }
+            try (Stream<Path> files = Files.list(dir)) {
+                for (Path file : files.filter(p -> p.getFileName().toString().endsWith(".bbmodel")).sorted().toList()) {
+                    String name = file.getFileName().toString();
+                    String id = name.substring(0, name.length() - ".bbmodel".length());
+                    if (compiled.contains(id)) {
+                        continue;
+                    }
+                    try {
+                        BlockbenchImporter.ImportedModel imported = BlockbenchImporter.read(id, file);
+                        Path texture = dir.resolve(id + ".png");
+                        if (!registerLocalCosmetic(dir, id, imported.geometry(), imported.animations(),
+                                imported.texture() != null ? imported.texture()
+                                        : Files.isRegularFile(texture) ? Files.readAllBytes(texture) : null)) {
+                            LOGGER.warn("Failed to bake imported Blockbench cosmetic {}", name);
+                        }
+                    } catch (Exception e) {
+                        LOGGER.warn("Failed to import Blockbench cosmetic {}", name, e);
                     }
                 }
             }
@@ -356,13 +381,16 @@ public final class LanPlusClient {
         }
     }
 
-    private static void registerLocalCosmetic(Path directory, String id, byte[] geometry, byte[] animation,
-                                              byte[] texture) throws java.io.IOException {
-        cosmetics.register(id, geometry, animation, texture);
+    private static boolean registerLocalCosmetic(Path directory, String id, byte[] geometry, byte[] animation,
+                                                 byte[] texture) throws java.io.IOException {
+        if (!cosmetics.register(id, geometry, animation, texture)) {
+            return false;
+        }
         Path metaFile = directory.resolve(id + ".cosmetic.json");
         cosmetics.putMeta(CosmeticMeta.parse(id,
                 Files.isRegularFile(metaFile) ? Files.readString(metaFile) : null));
         cosmetics.markLocal(id);
+        return true;
     }
 
     public static DiscordPresence discord() {

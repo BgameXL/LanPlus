@@ -7,6 +7,7 @@ import dev.bgame.lanplus.cosmetics.CosmeticMeta;
 import dev.bgame.lanplus.cosmetics.CosmeticModel;
 import dev.bgame.lanplus.cosmetics.CosmeticSlot;
 import dev.bgame.lanplus.cosmetics.CosmeticTransform;
+import dev.bgame.lanplus.cosmetics.blockbench.BlockbenchImporter;
 import dev.bgame.lanplus.cosmetics.geckolib.cache.object.BakedGeoModel;
 import dev.bgame.lanplus.cosmetics.geckolib.loading.object.BakedAnimations;
 import net.minecraft.client.Minecraft;
@@ -219,15 +220,18 @@ public final class CosmeticModels {
         if (animator != null && player != null) {
             CosmeticMeta cosmeticMeta = meta.get(id);
             String requestedClip = cosmeticMeta == null ? null : cosmeticMeta.stateClipMap().get(state);
+            if ((requestedClip == null || requestedClip.isBlank()) && state != null && !state.isBlank()) {
+                requestedClip = BlockbenchImporter.clipName(id, state);
+            }
             String defaultClip = cosmeticMeta == null ? null : cosmeticMeta.defaultClip();
             animator.apply(player.getMostSignificantBits() ^ player.getLeastSignificantBits(), limbSwing,
                     limbSwingAmount, partialTick, requestedClip, defaultClip);
         }
     }
 
-    public void register(String id, byte[] geoJson, byte[] animJson, byte[] png) {
+    public boolean register(String id, byte[] geoJson, byte[] animJson, byte[] png) {
         if (id == null || geoJson == null) {
-            return;
+            return false;
         }
         BakedGeoModel geometry;
         BakedAnimations animations = null;
@@ -237,7 +241,7 @@ public final class CosmeticModels {
                 animations = CosmeticLoader.animations(animJson);
             }
         } catch (RuntimeException e) {
-            return;
+            return false;
         }
         Minecraft mc = Minecraft.getInstance();
         BakedAnimations bakedAnimations = animations;
@@ -245,6 +249,7 @@ public final class CosmeticModels {
             CosmeticModel model = new CosmeticModel(geometry, bakedAnimations, registerTexture(mc, png),
                     png == null ? 0xFF101010 : -1);
             models.put(id, model);
+            boundsCache.remove(id);
 
             CosmeticAnimator animator = CosmeticAnimator.create(model);
             if (animator != null) {
@@ -253,6 +258,7 @@ public final class CosmeticModels {
                 animators.remove(id);
             }
         });
+        return true;
     }
 
     private ResourceLocation registerTexture(Minecraft mc, byte[] png) {

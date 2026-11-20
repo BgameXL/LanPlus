@@ -31,10 +31,13 @@ public final class TCPRelayTunnel implements RelayTunnel {
     private static final long DRAIN_MS = 5000;
     private final boolean plaintext;
     private final ExecutorService pool = Executors.newCachedThreadPool(daemon("lanplus-relay"));
+    private final ConcurrentMap<Socket, Long> sessions = new ConcurrentHashMap<>();
+    private final Object lifecycleLock = new Object();
     private volatile Socket control;
-    private volatile int localPort;
     private volatile boolean open;
     private volatile VoiceTunnel voice;
+    private volatile long generation;
+    private long voiceGeneration = -1;
 
     public TCPRelayTunnel(boolean plaintext) {
         this.plaintext = plaintext;
@@ -42,27 +45,39 @@ public final class TCPRelayTunnel implements RelayTunnel {
 
     @Override
     public CompletableFuture<String> open(int localPort, RelayTicket ticket) {
-        close();
+        long session = reset();
         if (ticket == null || ticket.relayHost() == null || ticket.relayHost().isBlank()) {
             return CompletableFuture.completedFuture(null);
         }
-        this.localPort = localPort;
         CompletableFuture<String> result = new CompletableFuture<>();
-        pool.execute(() -> runControl(ticket, result));
+        pool.execute(() -> runControl(ticket, localPort, session, result));
         return result;
     }
 
     @Override
     public void close() {
-        open = false;
-        Socket c = control;
-        control = null;
-        VoiceTunnel v = voice;
-        voice = null;
+        reset();
+    }
+
+    private long reset() {
+        Socket c;
+        VoiceTunnel v;
+        long session;
+        synchronized (lifecycleLock) {
+            session = ++generation;
+            open = false;
+            c = control;
+            control = null;
+            v = voice;
+            voice = null;
+            voiceGeneration = -1;
+        }
         if (v != null) {
             v.close();
         }
         closeQuietly(c);
+        closeSessionsBefore(session);
+        return session;
     }
 
     @Override
@@ -71,78 +86,88 @@ public final class TCPRelayTunnel implements RelayTunnel {
         return open && c != null && !c.isClosed();
     }
 
-    private void runControl(RelayTicket ticket, CompletableFuture<String> result) {
+    private void runControl(RelayTicket ticket, int localPort, long session, CompletableFuture<String> result) {
+        Socket c = null;
         try {
-            Socket c = connect(ticket.relayHost(), ticket.relayPort());
-            this.control = c;
+            c = connect(ticket.relayHost(), ticket.relayPort());
+            if (!installControl(session, c)) {
+                return;
+            }
             OutputStream out = c.getOutputStream();
             writeLine(out, GSON.toJson(Map.of("type", "HELLO", "ticket", nullToEmpty(ticket.ticket()))));
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8));
             JsonObject first = parse(reader.readLine());
-            if (first == null || !"ASSIGNED".equals(str(first, "type"))) {
+            String domain = first == null ? null : str(first, "domain");
+            if (first == null || !"ASSIGNED".equals(str(first, "type")) || domain == null || domain.isBlank()) {
                 LOGGER.warn("LAN+ relay rejected tunnel: {}", first == null ? "no response" : str(first, "reason"));
-                closeQuietly(c);
-                result.complete(null);
                 return;
             }
-            String domain = str(first, "domain");
-            this.open = true;
+            if (!markOpen(session, c)) {
+                return;
+            }
             result.complete(domain);
             LOGGER.info("LAN+ relay tunnel open: {}", domain);
-            maybeStartVoice(ticket, str(first, "voiceHost"), str(first, "voiceKey"));
+            maybeStartVoice(ticket, str(first, "voiceHost"), str(first, "voiceKey"), localPort, session);
 
             String line;
-            while ((line = reader.readLine()) != null) {
+            while (isCurrent(session) && (line = reader.readLine()) != null) {
                 JsonObject msg = parse(line);
                 if (msg == null) {
                     continue;
                 }
-                switch (str(msg, "type")) {
-                    case "SESSION" -> {
-                        String id = str(msg, "id");
-                        pool.execute(() -> proxySession(ticket, id));
+                String type = str(msg, "type");
+                if ("SESSION".equals(type)) {
+                    String id = str(msg, "id");
+                    if (id != null && !id.isBlank()) {
+                        pool.execute(() -> proxySession(ticket, id, localPort, session));
                     }
-                    case "PING" -> writeLine(out, GSON.toJson(Map.of("type", "PONG")));
-                    default -> {
-                    }
+                } else if ("PING".equals(type)) {
+                    writeLine(out, GSON.toJson(Map.of("type", "PONG")));
                 }
             }
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             LOGGER.debug("LAN+ relay tunnel closed: {}", e.toString());
-            result.complete(null);
         } finally {
-            open = false;
+            result.complete(null);
+            finishControl(session, c);
         }
     }
 
-    private void proxySession(RelayTicket ticket, String id) {
+    private void proxySession(RelayTicket ticket, String id, int localPort, long session) {
         Socket data = null;
         Socket local = null;
 
         try {
-
-            LOGGER.info("SESSION {}", id);
-            LOGGER.info("Connecting local minecraft on {}", localPort);
-            LOGGER.info("Connecting to relay {}", ticket.relayHost());
-
             data = connect(ticket.relayHost(), ticket.relayPort());
+            if (!track(session, data)) {
+                return;
+            }
             writeLine(data.getOutputStream(), GSON.toJson(Map.of("type", "DATA", "id", id)));
             local = new Socket();
+            if (!track(session, local)) {
+                return;
+            }
             local.connect(new InetSocketAddress("127.0.0.1", localPort), CONNECT_TIMEOUT_MS);
-
-            LOGGER.info("Connected to local minecraft");
-
             local.setTcpNoDelay(true);
+            if (!isCurrent(session)) {
+                return;
+            }
             pump(data, local);
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             LOGGER.debug("LAN+ relay session {} failed: {}", id, e.toString());
+        } finally {
+            untrack(data, session);
+            untrack(local, session);
             closeQuietly(data);
             closeQuietly(local);
         }
     }
 
-    private void maybeStartVoice(RelayTicket ticket, String voiceHost, String voiceKey) {
+    private void maybeStartVoice(RelayTicket ticket, String voiceHost, String voiceKey, int svcPort, long session) {
+        if (!isCurrent(session)) {
+            return;
+        }
         if (voiceHost != null && !voiceHost.isBlank()) {
             if (!voiceHost.equals(Config.voiceHost)) {
                 Config.voiceHost = voiceHost;
@@ -153,19 +178,36 @@ public final class TCPRelayTunnel implements RelayTunnel {
         if (!Config.voiceEnabled || voiceKey == null || voiceKey.isBlank() || !SVCBridge.installed()) {
             return;
         }
-        pool.execute(() -> startVoice(ticket, voiceKey, localPort));
+        pool.execute(() -> startVoice(ticket, voiceKey, svcPort, session));
     }
 
-    private void startVoice(RelayTicket ticket, String voiceKey, int svcPort) {
+    private void startVoice(RelayTicket ticket, String voiceKey, int svcPort, long session) {
+        Socket socket = null;
         try {
-            Socket vs = connect(ticket.relayHost(), ticket.relayPort());
-            writeLine(vs.getOutputStream(), GSON.toJson(Map.of("type", "VOICE", "key", voiceKey)));
-            VoiceTunnel vt = new VoiceTunnel(vs, svcPort, pool);
-            this.voice = vt;
+            if (!isCurrent(session)) {
+                return;
+            }
+            socket = connect(ticket.relayHost(), ticket.relayPort());
+            if (!isCurrent(session)) {
+                return;
+            }
+            writeLine(socket.getOutputStream(), GSON.toJson(Map.of("type", "VOICE", "key", voiceKey)));
+            VoiceTunnel vt = new VoiceTunnel(socket, svcPort, pool);
+            socket = null;
+            if (!installVoice(session, vt)) {
+                vt.close();
+                return;
+            }
             LOGGER.info("LAN+ voice tunnel open (svc {})", svcPort);
-            vt.run();
-        } catch (IOException e) {
+            try {
+                vt.run();
+            } finally {
+                clearVoice(session, vt);
+            }
+        } catch (IOException | RuntimeException e) {
             LOGGER.debug("LAN+ voice tunnel failed: {}", e.toString());
+        } finally {
+            closeQuietly(socket);
         }
     }
 
@@ -175,7 +217,10 @@ public final class TCPRelayTunnel implements RelayTunnel {
             copy(b, a);
             try {
                 other.get(DRAIN_MS, TimeUnit.MILLISECONDS);
-            } catch (Exception e) {
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                other.cancel(true);
+            } catch (ExecutionException | TimeoutException e) {
                 other.cancel(true);
             }
         } finally {
@@ -210,13 +255,131 @@ public final class TCPRelayTunnel implements RelayTunnel {
             s.setTcpNoDelay(true);
             return s;
         }
-        SSLSocket s = (SSLSocket) SSLSocketFactory.getDefault().createSocket(host, port);
-        SSLParameters params = s.getSSLParameters();
-        params.setEndpointIdentificationAlgorithm("HTTPS");
-        s.setSSLParameters(params);
-        s.setTcpNoDelay(true);
-        s.startHandshake();
-        return s;
+        Socket connection = new Socket();
+        try {
+            connection.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
+            SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+            SSLSocket socket = (SSLSocket) factory.createSocket(connection, host, port, true);
+            SSLParameters params = socket.getSSLParameters();
+            params.setEndpointIdentificationAlgorithm("HTTPS");
+            socket.setSSLParameters(params);
+            socket.setSoTimeout(CONNECT_TIMEOUT_MS);
+            socket.setTcpNoDelay(true);
+            socket.startHandshake();
+            socket.setSoTimeout(0);
+            return socket;
+        } catch (IOException | RuntimeException e) {
+            closeQuietly(connection);
+            throw e;
+        }
+    }
+
+    private boolean installControl(long session, Socket socket) {
+        synchronized (lifecycleLock) {
+            if (generation != session) {
+                return false;
+            }
+            control = socket;
+            return true;
+        }
+    }
+
+    private boolean markOpen(long session, Socket socket) {
+        synchronized (lifecycleLock) {
+            if (generation != session || control != socket) {
+                return false;
+            }
+            open = true;
+            return true;
+        }
+    }
+
+    private void finishControl(long session, Socket socket) {
+        VoiceTunnel staleVoice = null;
+        boolean ended = false;
+        synchronized (lifecycleLock) {
+            if (control == socket) {
+                control = null;
+            }
+            if (generation == session) {
+                generation++;
+                open = false;
+                ended = true;
+                if (voiceGeneration == session) {
+                    staleVoice = voice;
+                    voice = null;
+                    voiceGeneration = -1;
+                }
+            }
+        }
+        closeQuietly(socket);
+        if (staleVoice != null) {
+            staleVoice.close();
+        }
+        if (ended) {
+            closeSessions(session);
+        }
+    }
+
+    private boolean installVoice(long session, VoiceTunnel tunnel) {
+        synchronized (lifecycleLock) {
+            if (generation != session || voice != null) {
+                return false;
+            }
+            voice = tunnel;
+            voiceGeneration = session;
+            return true;
+        }
+    }
+
+    private void clearVoice(long session, VoiceTunnel tunnel) {
+        synchronized (lifecycleLock) {
+            if (voiceGeneration == session && voice == tunnel) {
+                voice = null;
+                voiceGeneration = -1;
+            }
+        }
+    }
+
+    private boolean isCurrent(long session) {
+        return generation == session;
+    }
+
+    private boolean track(long session, Socket socket) {
+        if (!isCurrent(session)) {
+            closeQuietly(socket);
+            return false;
+        }
+        sessions.put(socket, session);
+        if (isCurrent(session)) {
+            return true;
+        }
+        if (sessions.remove(socket, session)) {
+            closeQuietly(socket);
+        }
+        return false;
+    }
+
+    private void untrack(Socket socket, long session) {
+        if (socket != null) {
+            sessions.remove(socket, session);
+        }
+    }
+
+    private void closeSessionsBefore(long session) {
+        sessions.forEach((socket, owner) -> {
+            if (owner < session && sessions.remove(socket, owner)) {
+                closeQuietly(socket);
+            }
+        });
+    }
+
+    private void closeSessions(long session) {
+        sessions.forEach((socket, owner) -> {
+            if (owner == session && sessions.remove(socket, owner)) {
+                closeQuietly(socket);
+            }
+        });
     }
 
     private static void writeLine(OutputStream out, String json) throws IOException {

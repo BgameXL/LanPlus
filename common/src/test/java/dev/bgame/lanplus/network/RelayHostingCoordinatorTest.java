@@ -8,6 +8,7 @@ import dev.bgame.lanplus.api.SkinRef;
 import dev.bgame.lanplus.presence.PresenceManager;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -81,6 +82,25 @@ class RelayHostingCoordinatorTest {
         assertTrue(tunnel.closeCalls >= 1);
     }
 
+    @Test
+    void staleTunnelCannotReplaceAReopenedWorld() {
+        CompletableFuture<String> first = new CompletableFuture<>();
+        CompletableFuture<String> second = new CompletableFuture<>();
+        FakePresence presence = new FakePresence();
+        FakeTunnel tunnel = new FakeTunnel(first, second);
+        coordinator(presence, tunnel, true);
+
+        presence.publish(snapshot(GameplayState.HOSTING, "localhost:25565"));
+        presence.publish(snapshot(GameplayState.MENU, null));
+        presence.publish(snapshot(GameplayState.HOSTING, "localhost:25566"));
+        first.complete("stale.example.test");
+
+        assertEquals("localhost:25566", presence.current().address());
+        second.complete("current.example.test");
+        assertEquals("current.example.test", presence.current().address());
+        assertEquals(2, tunnel.openCalls);
+    }
+
     private static RelayHostingCoordinator coordinator(FakePresence presence, FakeTunnel tunnel, boolean enabled) {
         return new RelayHostingCoordinator(presence, tunnel, null, () -> enabled, () -> false, () -> TICKET);
     }
@@ -92,27 +112,36 @@ class RelayHostingCoordinatorTest {
 
     private static final class FakeTunnel implements RelayTunnel {
 
-        private final CompletableFuture<String> result;
+        private final List<CompletableFuture<String>> results;
         private int openCalls;
         private int closeCalls;
         private int localPort;
         private RelayTicket ticket;
         private boolean open;
+        private int generation;
 
-        private FakeTunnel(CompletableFuture<String> result) {
-            this.result = result;
+        @SafeVarargs
+        private FakeTunnel(CompletableFuture<String>... results) {
+            this.results = List.of(results);
         }
 
         @Override
         public CompletableFuture<String> open(int localPort, RelayTicket ticket) {
+            CompletableFuture<String> result = results.get(Math.min(openCalls, results.size() - 1));
+            int attempt = ++generation;
             openCalls++;
             this.localPort = localPort;
             this.ticket = ticket;
-            return result.whenComplete((domain, error) -> open = error == null && domain != null);
+            return result.whenComplete((domain, error) -> {
+                if (generation == attempt) {
+                    open = error == null && domain != null;
+                }
+            });
         }
 
         @Override
         public void close() {
+            generation++;
             closeCalls++;
             open = false;
         }

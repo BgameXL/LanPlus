@@ -6,6 +6,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -40,17 +42,33 @@ public final class SkinThumbnails {
         }
         if (url != null && !url.isBlank() && pending.add(id)) {
             CompletableFuture.runAsync(() -> {
+                boolean registrationScheduled = false;
                 try {
-                    HttpResponse<byte[]> resp = HTTP.send(
+                    HttpResponse<InputStream> resp = HTTP.send(
                             HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10)).GET().build(),
-                            HttpResponse.BodyHandlers.ofByteArray());
-                    byte[] png = resp.statusCode() == 200 ? resp.body() : null;
-                    if (png != null && png.length <= MAX_BYTES) {
-                        Minecraft.getInstance().execute(() -> register(id, png));
+                            HttpResponse.BodyHandlers.ofInputStream());
+                    try (InputStream body = resp.body()) {
+                        if (resp.statusCode() == 200) {
+                            byte[] png = body.readNBytes(MAX_BYTES + 1);
+                            if (png.length <= MAX_BYTES) {
+                                Minecraft.getInstance().execute(() -> {
+                                    try {
+                                        register(id, png);
+                                    } finally {
+                                        pending.remove(id);
+                                    }
+                                });
+                                registrationScheduled = true;
+                            }
+                        }
                     }
-                } catch (Exception ignored) {
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (IOException | RuntimeException ignored) {
                 } finally {
-                    pending.remove(id);
+                    if (!registrationScheduled) {
+                        pending.remove(id);
+                    }
                 }
             }, IO);
         }

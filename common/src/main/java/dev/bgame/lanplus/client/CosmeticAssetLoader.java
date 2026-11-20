@@ -6,6 +6,8 @@ import dev.bgame.lanplus.cosmetics.CosmeticMeta;
 import dev.bgame.lanplus.network.LanPlusNetwork;
 import net.minecraft.client.Minecraft;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -19,6 +21,7 @@ import java.util.concurrent.Executors;
 
 public final class CosmeticAssetLoader {
 
+    private static final int MAX_ASSET_BYTES = 16 * 1024 * 1024;
     private static final Duration FETCH_TIMEOUT = Duration.ofSeconds(15);
 
     private final LanPlusNetwork network;
@@ -79,7 +82,7 @@ public final class CosmeticAssetLoader {
         if (key != null && cache != null) {
             byte[] cached = cache.get(key);
             if (cached != null) {
-                return cached;
+                return cached.length <= MAX_ASSET_BYTES ? cached : null;
             }
         }
         byte[] bytes = httpGet(url);
@@ -91,11 +94,20 @@ public final class CosmeticAssetLoader {
 
     private byte[] httpGet(String url) {
         try {
-            HttpResponse<byte[]> resp = http.send(
+            HttpResponse<InputStream> resp = http.send(
                     HttpRequest.newBuilder(URI.create(url)).timeout(FETCH_TIMEOUT).GET().build(),
-                    HttpResponse.BodyHandlers.ofByteArray());
-            return resp.statusCode() == 200 ? resp.body() : null;
-        } catch (Exception e) {
+                    HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream body = resp.body()) {
+                if (resp.statusCode() != 200) {
+                    return null;
+                }
+                byte[] bytes = body.readNBytes(MAX_ASSET_BYTES + 1);
+                return bytes.length <= MAX_ASSET_BYTES ? bytes : null;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (IOException | RuntimeException e) {
             return null;
         }
     }

@@ -22,9 +22,10 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
     private final BooleanSupplier relayEnabled;
     private final BooleanSupplier offlineHosting;
     private final Supplier<RelayTicket> devTicket;
+    private long generation;
 
-    private volatile boolean tunneling;
-    private volatile boolean active;
+    private boolean tunneling;
+    private boolean active;
 
     public RelayHostingCoordinator(PresenceManager presence, RelayTunnel tunnel, LanPlusNetwork network,
                                    BooleanSupplier relayEnabled, BooleanSupplier offlineHosting,
@@ -40,10 +41,12 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
 
     @Override
     public void onPresenceChanged(PresenceSnapshot snapshot) {
-        if (snapshot.state() == GameplayState.HOSTING) {
-            onHosting(snapshot);
-        } else {
-            stop();
+        synchronized (presence) {
+            if (snapshot.state() == GameplayState.HOSTING) {
+                onHosting(snapshot);
+            } else {
+                stop();
+            }
         }
     }
 
@@ -57,42 +60,52 @@ public final class RelayHostingCoordinator implements PresenceManager.PresenceLi
         }
         tunneling = true;
         active = true;
+        long attempt = ++generation;
         String worldName = snapshot.worldName();
         ticket().whenComplete((ticket, err) -> {
-            if (!active || ticket == null) {
-                tunneling = false;
-                if (active) {
-                    LOGGER.info("LAN+ relay unavailable - hosting LAN-only");
-                }
-                return;
-            }
-            tunnel.open(localPort, ticket).whenComplete((domain, e) -> {
-                if (!active || domain == null) {
-                    tunneling = false;
-                    if (active) {
-                        LOGGER.warn("LAN+ relay tunnel failed - hosting LAN-only");
-                    } else {
-                        tunnel.close();
-                    }
+            synchronized (presence) {
+                if (!isCurrent(attempt)) {
                     return;
                 }
-                if (presence.current().state() == GameplayState.HOSTING) {
-                    presence.updateState(GameplayState.HOSTING, worldName, domain);
-                    LOGGER.info("LAN+ hosting via relay: {}", domain);
-                } else {
-                    tunnel.close();
+                if (ticket == null) {
                     tunneling = false;
+                    LOGGER.info("LAN+ relay unavailable - hosting LAN-only");
+                    return;
                 }
-            });
+                tunnel.open(localPort, ticket).whenComplete((domain, e) -> {
+                    synchronized (presence) {
+                        if (!isCurrent(attempt)) {
+                            return;
+                        }
+                        if (domain == null) {
+                            tunneling = false;
+                            LOGGER.warn("LAN+ relay tunnel failed - hosting LAN-only");
+                            return;
+                        }
+                        if (presence.current().state() == GameplayState.HOSTING) {
+                            presence.updateState(GameplayState.HOSTING, worldName, domain);
+                            LOGGER.info("LAN+ hosting via relay: {}", domain);
+                        } else {
+                            tunnel.close();
+                            tunneling = false;
+                        }
+                    }
+                });
+            }
         });
     }
 
     private void stop() {
         if (active || tunneling || tunnel.isOpen()) {
+            generation++;
             active = false;
             tunneling = false;
             tunnel.close();
         }
+    }
+
+    private boolean isCurrent(long attempt) {
+        return active && generation == attempt;
     }
 
     private CompletableFuture<RelayTicket> ticket() {

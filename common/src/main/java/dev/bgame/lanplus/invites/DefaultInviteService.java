@@ -10,7 +10,6 @@ import dev.bgame.lanplus.presence.PresenceManager;
 import org.slf4j.Logger;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -24,8 +23,9 @@ public final class DefaultInviteService implements InviteService, PresenceManage
     private final BooleanSupplier relayEnabled;
     private final BooleanSupplier offlineHosting;
 
-    private final AtomicBoolean minting = new AtomicBoolean(false);
-    private volatile String activeCode;
+    private long generation;
+    private long mintingGeneration = -1;
+    private String activeCode;
 
     public DefaultInviteService(LanPlusNetwork network, PresenceManager presence,
                                 Supplier<PlayerIdentity> identity, BooleanSupplier relayEnabled,
@@ -58,36 +58,51 @@ public final class DefaultInviteService implements InviteService, PresenceManage
 
     @Override
     public void refreshHostAccess() {
-        String code = activeCode;
-        if (code == null || presence.current().state() != GameplayState.HOSTING) {
-            return;
+        synchronized (presence) {
+            if (activeCode == null || presence.current().state() != GameplayState.HOSTING) {
+                return;
+            }
+            presence.setJoinCode(activeCode, HostAccessControl.mode(), HostAccessControl.allowedSnapshot());
         }
-        presence.setJoinCode(code, HostAccessControl.mode(), HostAccessControl.allowedSnapshot());
     }
 
     @Override
     public void onPresenceChanged(PresenceSnapshot snapshot) {
         if (snapshot.state() == GameplayState.HOSTING) {
             mintIfNeeded(snapshot);
-        } else if (activeCode != null) {
-            activeCode = null;
-            presence.setJoinCode(null, null, java.util.Set.of());
+        } else {
+            synchronized (presence) {
+                generation++;
+                mintingGeneration = -1;
+                if (activeCode != null) {
+                    activeCode = null;
+                    presence.setJoinCode(null, null, java.util.Set.of());
+                }
+            }
         }
     }
 
     private void mintIfNeeded(PresenceSnapshot snapshot) {
-        if (activeCode != null || snapshot.address() == null) {
-            return;
-        }
-        if (relayEnabled.getAsBoolean() && isLoopback(snapshot.address())) {
-            return;
-        }
-        if (!minting.compareAndSet(false, true)) {
-            return;
+        long attempt;
+        synchronized (presence) {
+            if (activeCode != null || mintingGeneration != -1 || snapshot.address() == null) {
+                return;
+            }
+            if (relayEnabled.getAsBoolean() && isLoopback(snapshot.address())) {
+                return;
+            }
+            attempt = generation;
+            mintingGeneration = attempt;
         }
         create(snapshot.address(), snapshot.worldName()).whenComplete((invite, err) -> {
-            minting.set(false);
-            if (invite != null && presence.current().state() == GameplayState.HOSTING) {
+            synchronized (presence) {
+                if (mintingGeneration == attempt) {
+                    mintingGeneration = -1;
+                }
+                if (attempt != generation || invite == null
+                        || presence.current().state() != GameplayState.HOSTING) {
+                    return;
+                }
                 activeCode = invite.code();
                 presence.setJoinCode(invite.code(), HostAccessControl.mode(), HostAccessControl.allowedSnapshot());
                 LOGGER.info("LAN+ invite created: {}", invite.code());
