@@ -7,14 +7,17 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.logging.LogUtils;
 import dev.bgame.lanplus.platform.PlatformHolder;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -52,44 +55,82 @@ public final class Config {
         LOCAL_COSMETIC_LOADOUT.clear();
         Path file = PlatformHolder.get().getConfigDir().resolve(FILE_NAME);
         if (Files.isRegularFile(file)) {
+            JsonObject json;
             try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-                JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
-                enabled = getBool(json, "enabled", enabled);
-                backendUrl = getString(json, "backendUrl", backendUrl);
-                heartbeatSeconds = getInt(json, "heartbeatSeconds", heartbeatSeconds);
-                relayEnabled = getBool(json, "relayEnabled", relayEnabled);
-                relayDevAddress = getString(json, "relayDevAddress", relayDevAddress);
-                relayDevPlaintext = getBool(json, "relayDevPlaintext", relayDevPlaintext);
-                skinUrl = getString(json, "skinUrl", skinUrl);
-                skinSlim = getBool(json, "skinSlim", skinSlim);
-                skinCustomActive = getBool(json, "skinCustomActive", skinCustomActive);
-                discordEnabled = getBool(json, "discordEnabled", discordEnabled);
-                discordAppId = getString(json, "discordAppId", discordAppId);
-                theme = getString(json, "theme", theme);
-                customAccent = getInt(json, "customAccent", customAccent);
-                customBackground = getInt(json, "customBackground", customBackground);
-                customText = getInt(json, "customText", customText);
-                customMuted = getInt(json, "customMuted", customMuted);
-                uiOpacity = Math.clamp(getInt(json, "uiOpacity", uiOpacity), 0, 100);
-                voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
-                voiceHost = getString(json, "voiceHost", voiceHost);
-                seenUpdateVersion = getString(json, "seenUpdateVersion", seenUpdateVersion);
-                if (json.has("localCosmeticLoadout") && json.get("localCosmeticLoadout").isJsonObject()) {
-                    for (Map.Entry<String, JsonElement> entry
-                            : json.getAsJsonObject("localCosmeticLoadout").entrySet()) {
-                        if (entry.getValue().isJsonPrimitive()) {
-                            LOCAL_COSMETIC_LOADOUT.put(entry.getKey(), entry.getValue().getAsString());
-                        }
+                json = JsonParser.parseReader(reader).getAsJsonObject();
+            } catch (Exception e) {
+                LOGGER.warn("LAN+ configuration at {} is corrupt; backing it up", file, e);
+                backupCorrupt(file);
+                save();
+                return;
+            }
+            enabled = getBool(json, "enabled", enabled);
+            backendUrl = getString(json, "backendUrl", backendUrl);
+            heartbeatSeconds = getInt(json, "heartbeatSeconds", heartbeatSeconds);
+            relayEnabled = getBool(json, "relayEnabled", relayEnabled);
+            relayDevAddress = getString(json, "relayDevAddress", relayDevAddress);
+            relayDevPlaintext = getBool(json, "relayDevPlaintext", relayDevPlaintext);
+            skinUrl = getString(json, "skinUrl", skinUrl);
+            skinSlim = getBool(json, "skinSlim", skinSlim);
+            skinCustomActive = getBool(json, "skinCustomActive", skinCustomActive);
+            discordEnabled = getBool(json, "discordEnabled", discordEnabled);
+            discordAppId = getString(json, "discordAppId", discordAppId);
+            theme = getString(json, "theme", theme);
+            customAccent = getInt(json, "customAccent", customAccent);
+            customBackground = getInt(json, "customBackground", customBackground);
+            customText = getInt(json, "customText", customText);
+            customMuted = getInt(json, "customMuted", customMuted);
+            uiOpacity = Math.clamp(getInt(json, "uiOpacity", uiOpacity), 0, 100);
+            voiceEnabled = getBool(json, "voiceEnabled", voiceEnabled);
+            voiceHost = getString(json, "voiceHost", voiceHost);
+            seenUpdateVersion = getString(json, "seenUpdateVersion", seenUpdateVersion);
+            if (json.has("localCosmeticLoadout") && json.get("localCosmeticLoadout").isJsonObject()) {
+                for (Map.Entry<String, JsonElement> entry
+                        : json.getAsJsonObject("localCosmeticLoadout").entrySet()) {
+                    if (entry.getValue().isJsonPrimitive()) {
+                        LOCAL_COSMETIC_LOADOUT.put(entry.getKey(), entry.getValue().getAsString());
                     }
                 }
-            } catch (Exception ignored) {
             }
         }
         save();
     }
 
+    private static void backupCorrupt(Path file) {
+        try {
+            Files.move(file, file.resolveSibling(FILE_NAME + ".corrupt"),
+                    StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            LOGGER.warn("Failed to back up corrupt LAN+ configuration at {}", file, e);
+        }
+    }
+
     public static boolean save() {
         Path file = PlatformHolder.get().getConfigDir().resolve(FILE_NAME);
+        JsonObject json = createJson();
+        JsonObject localCosmetics = new JsonObject();
+        LOCAL_COSMETIC_LOADOUT.forEach(localCosmetics::addProperty);
+        json.add("localCosmeticLoadout", localCosmetics);
+
+        try {
+            Files.createDirectories(file.getParent());
+            Path tmp = file.resolveSibling(FILE_NAME + ".tmp");
+            try (BufferedWriter writer = Files.newBufferedWriter(tmp, StandardCharsets.UTF_8)) {
+                GSON.toJson(json, writer);
+            }
+            try {
+                Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return true;
+        } catch (IOException e) {
+            LOGGER.warn("Failed to save LAN+ configuration to {}", file, e);
+            return false;
+        }
+    }
+
+    private static @NotNull JsonObject createJson() {
         JsonObject json = new JsonObject();
         json.addProperty("enabled", enabled);
         json.addProperty("backendUrl", backendUrl);
@@ -111,20 +152,7 @@ public final class Config {
         json.addProperty("voiceEnabled", voiceEnabled);
         json.addProperty("voiceHost", voiceHost);
         json.addProperty("seenUpdateVersion", seenUpdateVersion);
-        JsonObject localCosmetics = new JsonObject();
-        LOCAL_COSMETIC_LOADOUT.forEach(localCosmetics::addProperty);
-        json.add("localCosmeticLoadout", localCosmetics);
-
-        try {
-            Files.createDirectories(file.getParent());
-            try (BufferedWriter writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
-                GSON.toJson(json, writer);
-            }
-            return true;
-        } catch (IOException e) {
-            LOGGER.warn("Failed to save LAN+ configuration to {}", file, e);
-            return false;
-        }
+        return json;
     }
 
     public static void setSkin(String url, boolean slim) {

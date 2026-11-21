@@ -7,6 +7,7 @@ import dev.bgame.lanplus.client.LanPlusClient;
 import dev.bgame.lanplus.client.LanPlusKeybinds;
 import dev.bgame.lanplus.client.gui.LanPlusNotifications;
 import dev.bgame.lanplus.client.gui.TitleScreenPanel;
+import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
@@ -16,6 +17,8 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.AdvancementEvent;
+
+import java.util.UUID;
 
 public final class LanplusNeoForgeClient {
 
@@ -67,12 +70,23 @@ public final class LanplusNeoForgeClient {
     }
 
     private static void onAdvancementEarn(AdvancementEvent.AdvancementEarnEvent event) {
-        if (event.getAdvancement() == null) {
+        UUID local = localUuid();
+        if (event.getAdvancement() == null || event.getEntity() == null || local == null
+                || !event.getEntity().getUUID().equals(local)) {
             return;
         }
         ClientAdvancementDetector.onAdvancementEarn(
                 event.getAdvancement().id().toString(),
                 event.getAdvancement().value().display().isPresent());
+    }
+
+    private static UUID localUuid() {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            return mc == null || mc.getUser() == null ? null : mc.getUser().getProfileId();
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
