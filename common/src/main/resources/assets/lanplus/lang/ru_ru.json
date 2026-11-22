@@ -182,6 +182,8 @@
   "gui.lanplus.notif.get": "Get",
   "gui.lanplus.notif.update.title": "LAN+ update available",
   "gui.lanplus.notif.update.sub": "Version %s is out",
+  "gui.lanplus.notif.sessiondown.title": "Mojang unreachable",
+  "gui.lanplus.notif.sessiondown.sub": "Couldn't verify your session, retrying",
   "gui.lanplus.update.title": "Update available",
   "gui.lanplus.update.latest": "Latest version: %s",
   "gui.lanplus.update.current": "You have: %s",
