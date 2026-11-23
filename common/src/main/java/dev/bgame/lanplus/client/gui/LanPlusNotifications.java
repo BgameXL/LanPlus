@@ -249,6 +249,7 @@ public final class LanPlusNotifications {
                 continue;
             }
             if (mx >= n.btnX && mx < n.btnX + n.btnW && my >= n.btnY && my < n.btnY + n.btnH) {
+                LanPlusUI.playerClicks();
                 try {
                     n.onAction.run();
                 } catch (RuntimeException ignored) {

@@ -208,11 +208,13 @@ public final class SkinScreen extends LanPlusScreen {
             for (Tile t : tiles) {
                 if (!t.isDefault() && mouseX >= t.x() + TILE - 9 && mouseX < t.x() + TILE - 1
                         && mouseY >= t.y() + 1 && mouseY < t.y() + 9) {
+                    LanPlusUI.playerClicks();
                     deleteTile(t);
                     return true;
                 }
                 if (mouseX >= t.x() && mouseX < t.x() + TILE && mouseY >= t.y() && mouseY < t.y() + TILE
                         && mouseY >= gridTop && mouseY < gridBottom) {
+                    LanPlusUI.playerClicks();
                     selectTile(t);
                     return true;
                 }

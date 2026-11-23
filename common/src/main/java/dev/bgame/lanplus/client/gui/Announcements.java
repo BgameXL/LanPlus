@@ -340,6 +340,7 @@ public final class Announcements extends LanPlusScreen {
                             .componentStyleAtWidth(h.seq(), (int) (mouseX - h.x()));
                     if (style != null && style.getClickEvent() != null
                             && style.getClickEvent().getAction() == ClickEvent.Action.OPEN_URL) {
+                        LanPlusUI.playerClicks();
                         openLink(style.getClickEvent().getValue());
                         return true;
                     }
@@ -348,6 +349,7 @@ public final class Announcements extends LanPlusScreen {
             if (mouseX >= sidebarX && mouseX < sidebarX + SIDEBAR_W
                     && mouseY >= sidebarTop && mouseY < sidebarTop + FILTERS.length * SB_ROW_H) {
                 int idx = (int) ((mouseY - sidebarTop) / SB_ROW_H);
+                LanPlusUI.playerClicks();
                 if (FILTERS[idx] != selected) {
                     selected = FILTERS[idx];
                     scrollY = 0;

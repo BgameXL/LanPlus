@@ -1715,6 +1715,7 @@ public final class ProfileScreen extends LanPlusScreen {
         if (editing && button == 0) {
             int t = editTabAt(mouseX, mouseY);
             if (t >= 0) {
+                LanPlusUI.playerClicks();
                 if (t != editTab) {
                     editTab = t;
                     rebuildWidgets();
@@ -1725,11 +1726,13 @@ public final class ProfileScreen extends LanPlusScreen {
         if (editing && button == 0 && linkPicker.isOpen()) {
             int ci = linkPicker.clicked(mouseX, mouseY);
             if (ci >= 0) {
+                LanPlusUI.playerClicks();
                 pickLinkPlatform(linkPicker.owner(), linkPickerOptions.get(ci));
                 return true;
             }
             int pb = linkPickerButtonAt(mouseX, mouseY);
             if (pb >= 0 && pb != linkPicker.owner()) {
+                LanPlusUI.playerClicks();
                 linkPicker.open(pb);
             } else {
                 linkPicker.close();
@@ -1739,11 +1742,13 @@ public final class ProfileScreen extends LanPlusScreen {
         if (editing && button == 0 && promptPicker.isOpen()) {
             int ci = promptPicker.clicked(mouseX, mouseY);
             if (ci >= 0) {
+                LanPlusUI.playerClicks();
                 pickPrompt(promptPicker.owner(), promptPickerOptions.get(ci));
                 return true;
             }
             int pb = promptPickerButtonAt(mouseX, mouseY);
             if (pb >= 0 && pb != promptPicker.owner()) {
+                LanPlusUI.playerClicks();
                 promptPicker.open(pb);
             } else {
                 promptPicker.close();
@@ -1753,11 +1758,13 @@ public final class ProfileScreen extends LanPlusScreen {
         if (editing && button == 0 && choicePicker.isOpen()) {
             int ci = choicePicker.clicked(mouseX, mouseY);
             if (ci >= 0) {
+                LanPlusUI.playerClicks();
                 pickChoice(choicePicker.owner(), choicePickerOptions.get(ci));
                 return true;
             }
             int pb = choicePickerButtonAt(mouseX, mouseY);
             if (pb >= 0 && pb != choicePicker.owner()) {
+                LanPlusUI.playerClicks();
                 choicePicker.open(pb);
             } else {
                 choicePicker.close();
@@ -1774,6 +1781,7 @@ public final class ProfileScreen extends LanPlusScreen {
         if (button == 0) {
             for (Hit h : hits) {
                 if (h.in(mouseX, mouseY)) {
+                    LanPlusUI.playerClicks();
                     h.action().run();
                     return true;
                 }

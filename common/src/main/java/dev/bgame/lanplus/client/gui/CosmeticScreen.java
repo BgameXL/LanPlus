@@ -448,6 +448,7 @@ public final class CosmeticScreen extends LanPlusScreen {
         if (button == 0) {
             for (Row r : rows) {
                 if (r.in(mouseX, mouseY)) {
+                    LanPlusUI.playerClicks();
                     r.action().run();
                     return true;
                 }

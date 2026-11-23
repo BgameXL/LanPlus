@@ -1,9 +1,12 @@
 package dev.bgame.lanplus.client.gui;
 
 import dev.bgame.lanplus.Config;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 
 final class LanPlusUI {
@@ -94,6 +97,10 @@ final class LanPlusUI {
 
     static int contrastLime(int bg) {
         return isLight(bg) ? LIME_DARK : LIME;
+    }
+
+    static void playerClicks() {
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
     }
 
     static void background(GuiGraphics g, int width, int height) {

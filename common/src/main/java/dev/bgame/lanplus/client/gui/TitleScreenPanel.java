@@ -135,6 +135,7 @@ public final class TitleScreenPanel {
         }
         for (Hit h : hits) {
             if (mx >= h.x && mx < h.x + h.w && my >= h.y && my < h.y + h.h) {
+                LanPlusUI.playerClicks();
                 h.action.run();
                 return true;
             }
