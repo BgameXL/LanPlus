@@ -159,11 +159,13 @@ final class ColorPicker {
         if (inSvField(mouseX, mouseY)) {
             drag = DRAG_SV;
             setFromSv(mouseX, mouseY);
+            LanPlusUI.playerClicks();
             return true;
         }
         if (inHueBar(mouseX, mouseY)) {
             drag = DRAG_HUE;
             setFromHue(mouseX);
+            LanPlusUI.playerClicks();
             return true;
         }
         return false;

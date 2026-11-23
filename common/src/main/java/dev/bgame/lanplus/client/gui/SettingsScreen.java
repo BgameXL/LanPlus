@@ -691,6 +691,7 @@ public final class SettingsScreen extends LanPlusScreen {
         if (selected == Cat.ABOUT && button == 0) {
             for (LinkHit h : linkHits) {
                 if (mouseX >= h.x() && mouseX < h.x() + h.size() && mouseY >= h.y() && mouseY < h.y() + h.size()) {
+                    LanPlusUI.playerClicks();
                     openLink(h.url());
                     return true;
                 }
@@ -699,15 +700,18 @@ public final class SettingsScreen extends LanPlusScreen {
         if (selected == Cat.THEME && button == 0 && themePicker != null) {
             int preset = presetAt(mouseX, mouseY);
             if (preset >= 0) {
+                LanPlusUI.playerClicks();
                 selectPreset(preset);
                 return true;
             }
             ThemeTarget target = targetAt(mouseX, mouseY);
             if (target != null) {
+                LanPlusUI.playerClicks();
                 selectThemeTarget(target);
                 return true;
             }
             if (inOpacity(mouseX, mouseY)) {
+                LanPlusUI.playerClicks();
                 opacityDrag = true;
                 setOpacityFromMouse(mouseX);
                 return true;

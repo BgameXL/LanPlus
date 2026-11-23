@@ -208,10 +208,12 @@ public final class BackgroundPicker extends LanPlusScreen {
             int ty = panelTop + 26;
             if (mouseY >= ty && mouseY < ty + 14) {
                 if (mouseX >= boxX + 10 && mouseX < boxX + 10 + tabW) {
+                    LanPlusUI.playerClicks();
                     selectTab(0);
                     return true;
                 }
                 if (mouseX >= boxX + 10 + tabW && mouseX < boxX + 10 + 2 * tabW) {
+                    LanPlusUI.playerClicks();
                     selectTab(1);
                     return true;
                 }
@@ -220,6 +222,7 @@ public final class BackgroundPicker extends LanPlusScreen {
         if (tab == 0 && button == 0) {
             for (int[] c : swatchCells) {
                 if (mouseX >= c[0] && mouseX < c[0] + SWATCH && mouseY >= c[1] && mouseY < c[1] + SWATCH) {
+                    LanPlusUI.playerClicks();
                     sink.solid(c[2]);
                     onClose();
                     return true;
@@ -232,6 +235,7 @@ public final class BackgroundPicker extends LanPlusScreen {
         if (tab == 1 && button == 0 && mouseY >= imgTop && mouseY < imgBottom) {
             for (ImgCell c : imgCells) {
                 if (c.in(mouseX, mouseY)) {
+                    LanPlusUI.playerClicks();
                     if (c.none()) {
                         sink.none();
                     } else {

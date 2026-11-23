@@ -98,6 +98,7 @@ public final class InviteOverlay extends LanPlusScreen {
                     break;
                 }
                 if (mouseX >= panelX + 6 && mouseX <= panelX + PANEL_W - 6 && mouseY >= y && mouseY < y + ROW_H) {
+                    LanPlusUI.playerClicks();
                     if (!picked.remove(f.uuid())) {
                         picked.add(f.uuid());
                     }

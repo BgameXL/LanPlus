@@ -940,6 +940,7 @@ public final class FriendsScreen extends LanPlusScreen {
         if (button == 0) {
             Tab clicked = tabAt(mouseX, mouseY);
             if (clicked != null) {
+                LanPlusUI.playerClicks();
                 this.tab = clicked;
                 selectedUuid = null;
                 searchMatches = List.of();
@@ -955,6 +956,7 @@ public final class FriendsScreen extends LanPlusScreen {
             int rows = Math.min(searchMatches.size(), SEARCH_MAX_ROWS);
             for (int i = 0; i < rows; i++) {
                 if (mouseX >= dx && mouseX < dx + dw && mouseY >= dy && mouseY < dy + SEARCH_ROW_H) {
+                    LanPlusUI.playerClicks();
                     pickSearchMatch(searchMatches.get(i));
                     return true;
                 }
@@ -965,6 +967,7 @@ public final class FriendsScreen extends LanPlusScreen {
         if (tab == Tab.JOIN && button == 0) {
             Friend f = joinFriendAt(mouseX, mouseY);
             if (f != null) {
+                LanPlusUI.playerClicks();
                 selectedUuid = f.uuid().equals(selectedUuid) ? null : f.uuid();
                 rebuildWidgets();
                 return true;
@@ -973,17 +976,20 @@ public final class FriendsScreen extends LanPlusScreen {
         if (tab == Tab.FRIENDS && button == 1) {
             Friend f = friendAt(mouseX, mouseY);
             if (f != null) {
+                LanPlusUI.playerClicks();
                 openContextMenu(f, (int) mouseX, (int) mouseY);
                 return true;
             }
         }
         if (tab == Tab.FRIENDS && button == 0) {
             if (offlineHeaderAt(mouseX, mouseY)) {
+                LanPlusUI.playerClicks();
                 offlineCollapsed = !offlineCollapsed;
                 return true;
             }
             Friend f = friendAt(mouseX, mouseY);
             if (f != null) {
+                LanPlusUI.playerClicks();
                 selectedUuid = f.uuid().equals(selectedUuid) ? null : f.uuid();
                 FriendNotifications.markSeen(f.uuid());
                 rebuildWidgets();
@@ -1006,10 +1012,12 @@ public final class FriendsScreen extends LanPlusScreen {
                 int dx = leftX + LEFT_W - 20;
                 if (mouseY >= y + 2 && mouseY <= y + 16) {
                     if (mouseX >= ax && mouseX <= ax + 18) {
+                        LanPlusUI.playerClicks();
                         doAccept(r.uuid());
                         return true;
                     }
                     if (mouseX >= dx && mouseX <= dx + 18) {
+                        LanPlusUI.playerClicks();
                         doDecline(r.uuid());
                         return true;
                     }
@@ -1023,6 +1031,7 @@ public final class FriendsScreen extends LanPlusScreen {
                     break;
                 }
                 if (mouseX >= bx && mouseX <= bx + 18 && mouseY >= sy + 5 && mouseY <= sy + 19) {
+                    LanPlusUI.playerClicks();
                     doAddSuggestion(s);
                     return true;
                 }
@@ -1086,6 +1095,7 @@ public final class FriendsScreen extends LanPlusScreen {
             if (mouseY >= ey && mouseY < ey + MENU_ROW_H) {
                 closeContextMenu();
                 if (e.enabled()) {
+                    LanPlusUI.playerClicks();
                     e.action().run();
                 }
                 return true;

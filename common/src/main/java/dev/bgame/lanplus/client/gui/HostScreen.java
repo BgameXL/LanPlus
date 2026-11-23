@@ -487,6 +487,7 @@ public final class HostScreen extends LanPlusScreen {
                 if (!loading && in(mouseX, mouseY, cardX + PAD, listTop, cardW - 2 * PAD, listBottom - listTop)) {
                     int idx = (int) ((mouseY - (listTop + 2 - listScroll)) / ROW_H);
                     if (idx >= 0 && idx < worlds.size()) {
+                        LanPlusUI.playerClicks();
                         selected = idx;
                         gameTypeDd.close();
                         difficultyDd.close();
@@ -504,6 +505,7 @@ public final class HostScreen extends LanPlusScreen {
         if (!hc && gameTypeDd.isOpen()) {
             int ci = gameTypeDd.clicked(mouseX, mouseY);
             if (ci >= 0) {
+                LanPlusUI.playerClicks();
                 gameType = GAME_TYPES[ci];
             }
             gameTypeDd.close();
@@ -512,6 +514,7 @@ public final class HostScreen extends LanPlusScreen {
         if (!hc && difficultyDd.isOpen()) {
             int ci = difficultyDd.clicked(mouseX, mouseY);
             if (ci >= 0) {
+                LanPlusUI.playerClicks();
                 difficulty = DIFFICULTIES[ci];
             }
             difficultyDd.close();
@@ -519,25 +522,30 @@ public final class HostScreen extends LanPlusScreen {
         }
 
         if (!hc && in(mouseX, mouseY, ctrlX, gameRowY, CTRL_W, DROPDOWN_H)) {
+            LanPlusUI.playerClicks();
             gameTypeDd.open(0);
             difficultyDd.close();
             return true;
         }
         if (!hc && in(mouseX, mouseY, ctrlX, diffRowY, CTRL_W, DROPDOWN_H)) {
+            LanPlusUI.playerClicks();
             difficultyDd.open(0);
             gameTypeDd.close();
             return true;
         }
 
         if (!hc && in(mouseX, mouseY, ctrlX, cmdRowY, CTRL_W, DROPDOWN_H)) {
+            LanPlusUI.playerClicks();
             allowCheats = !allowCheats;
             return true;
         }
         if (in(mouseX, mouseY, ctrlX + 4, playersRowY, STEP_HIT_W, DROPDOWN_H)) {
+            LanPlusUI.playerClicks();
             maxPlayers = Math.max(MIN_PLAYERS, maxPlayers - 1);
             return true;
         }
         if (in(mouseX, mouseY, ctrlX + CTRL_W - 4 - STEP_HIT_W, playersRowY, STEP_HIT_W, DROPDOWN_H)) {
+            LanPlusUI.playerClicks();
             maxPlayers = Math.min(MAX_PLAYERS, maxPlayers + 1);
             return true;
         }
@@ -548,10 +556,12 @@ public final class HostScreen extends LanPlusScreen {
         if (button == 0) {
             HostAccessMode picked = accessModeAt(mouseX, mouseY);
             if (picked != null) {
+                LanPlusUI.playerClicks();
                 accessMode = picked;
                 return true;
             }
             if (in(mouseX, mouseY, ctrlX, premiumRowY, CTRL_W, DROPDOWN_H)) {
+                LanPlusUI.playerClicks();
                 allowNonPremium = !allowNonPremium;
                 return true;
             }

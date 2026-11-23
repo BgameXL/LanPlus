@@ -162,6 +162,7 @@ public final class ImagePicker extends LanPlusScreen {
         if (button == 0 && mouseY >= gridTop && mouseY < gridBottom) {
             for (Cell c : cells) {
                 if (c.in(mouseX, mouseY)) {
+                    LanPlusUI.playerClicks();
                     pick(c.image());
                     return true;
                 }
