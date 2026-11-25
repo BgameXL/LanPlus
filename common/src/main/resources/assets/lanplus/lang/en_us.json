@@ -1,4 +1,6 @@
 {
+  "gui.lanplus.notif.sessiondown.title": "Mojang unreachable",
+  "gui.lanplus.notif.sessiondown.sub": "Couldn't verify your session, retrying",
   "key.categories.lanplus": "LAN+",
   "key.lanplus.friends": "Open Friends",
 

@@ -60,6 +60,9 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final long RECONNECT_BASE_MS = 2_000L;
     private static final long RECONNECT_MAX_MS = 60_000L;
+    private static final int PREMIUM_AUTH_ATTEMPTS = 2;
+    private static final long PREMIUM_RETRY_BACKOFF_MS = 750L;
+    private static final long SESSION_DOWN_WARN_INTERVAL_MS = 60_000L;
 
     private final Supplier<String> baseUrl;
     private final Supplier<PlayerIdentity> identity;
@@ -84,6 +87,9 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
     private final AtomicBoolean reconnectPending = new AtomicBoolean(false);
     private final AtomicInteger reconnectAttempts = new AtomicInteger(0);
     private volatile java.util.function.BiConsumer<UUID, String> profileBodySink;
+    private volatile Runnable sessionServerDownListener = () -> {
+    };
+    private final AtomicReference<Long> lastSessionDownWarnAt = new AtomicReference<>(0L);
 
     public HTTPLanPlusNetwork(Supplier<String> baseUrl, Supplier<PlayerIdentity> identity, MinecraftAuth auth) {
         this.baseUrl = baseUrl;
@@ -823,6 +829,9 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
         if (auth.isPremium()) {
             try {
                 return authenticatePremium(username);
+            } catch (SessionServerUnavailable e) {
+                warnSessionServerDown();
+                throw e;
             } catch (Exception e) {
                 LOGGER.warn("LAN+ premium auth failed, falling back to offline: {}", e.toString());
             }
@@ -831,6 +840,27 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
     }
 
     private String authenticatePremium(String username) throws Exception {
+        SessionServerUnavailable last = null;
+        for (int attempt = 1; attempt <= PREMIUM_AUTH_ATTEMPTS; attempt++) {
+            try {
+                return authenticatePremiumOnce(username);
+            } catch (SessionServerUnavailable e) {
+                last = e;
+                LOGGER.warn("LAN+ premium auth: session server unavailable (attempt {}/{})", attempt, PREMIUM_AUTH_ATTEMPTS);
+                if (attempt < PREMIUM_AUTH_ATTEMPTS) {
+                    try {
+                        Thread.sleep(PREMIUM_RETRY_BACKOFF_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw e;
+                    }
+                }
+            }
+        }
+        throw last;
+    }
+
+    private String authenticatePremiumOnce(String username) throws Exception {
         String challenge = postSync("/auth/challenge", GSON.toJson(Map.of("username", username)));
         Wire.ChallengeResponse c = GSON.fromJson(challenge, Wire.ChallengeResponse.class);
         if (c == null || c.serverId() == null || c.serverId().isBlank()) {
@@ -867,6 +897,12 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
         } catch (IllegalArgumentException e) {
             sessionUuid.set(null);
         }
+    }
+
+    @Override
+    public void setSessionServerDownListener(Runnable listener) {
+        this.sessionServerDownListener = listener == null ? () -> {
+        } : listener;
     }
 
     @Override
@@ -1014,10 +1050,27 @@ public final class HTTPLanPlusNetwork implements LanPlusNetwork {
                 .POST(HttpRequest.BodyPublishers.ofString(json, StandardCharsets.UTF_8))
                 .build();
         HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() == 503) {
+            throw new SessionServerUnavailable();
+        }
         if (resp.statusCode() != 200) {
             throw new IllegalStateException("auth " + path + " -> " + resp.statusCode());
         }
         return resp.body();
+    }
+
+    private void warnSessionServerDown() {
+        long now = System.currentTimeMillis();
+        long prev = lastSessionDownWarnAt.get();
+        if (now - prev >= SESSION_DOWN_WARN_INTERVAL_MS && lastSessionDownWarnAt.compareAndSet(prev, now)) {
+            try {
+                sessionServerDownListener.run();
+            } catch (RuntimeException ignored) {
+            }
+        }
+    }
+
+    private static final class SessionServerUnavailable extends RuntimeException {
     }
 
     private void onError(Throwable err) {

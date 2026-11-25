@@ -88,6 +88,9 @@ public interface LanPlusNetwork {
 
     void setProfileBodySink(java.util.function.BiConsumer<UUID, String> sink);
 
+    default void setSessionServerDownListener(Runnable listener) {
+    }
+
     UUID sessionUuid();
 
     CompletableFuture<Boolean> equipCosmetic(String slot, String cosmeticId);

@@ -39,6 +39,7 @@ import dev.bgame.lanplus.skins.SkinService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.network.chat.Component;
 import dev.bgame.lanplus.platform.PlatformHolder;
 import org.slf4j.Logger;
 
@@ -85,6 +86,9 @@ public final class LanPlusClient {
         }
         network = new HTTPLanPlusNetwork(LanPlusClient::backendUrl, LanPlusClient::localIdentity,
                 new ClientMinecraftAuth());
+        network.setSessionServerDownListener(() -> LanPlusNotifications.info(
+                Component.translatable("gui.lanplus.notif.sessiondown.title"),
+                Component.translatable("gui.lanplus.notif.sessiondown.sub")));
         AssetCache assetCache = new AssetCache(PlatformHolder.get().getGameDir().resolve("lanplus/cache/assets"));
         ProfileCache profileCache = new ProfileCache(PlatformHolder.get().getGameDir().resolve("lanplus/cache/profiles"));
         presence = new DefaultPresenceManager(network);
