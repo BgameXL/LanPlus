@@ -9,6 +9,7 @@ import dev.bgame.lanplus.invites.HostAccessControl;
 import dev.bgame.lanplus.network.SVCBridge;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.HttpUtil;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.GameType;
@@ -81,14 +82,17 @@ public final class HostController {
 
     private static void publish(IntegratedServer server, HostSettings s) {
         UUID host = localUuid();
-        Set<UUID> initial = allowlistFor(s.mode(), s.preInvited(), s.allowNonPremium());
-        offlineHosting = s.allowNonPremium();
+        HostIdentityGuard.Decision identity =
+                HostIdentityGuard.resolve(server, s.allowNonPremium(), hostIdentities());
+        boolean offline = identity.offline();
+        Set<UUID> initial = allowlistFor(s.mode(), s.preInvited(), offline);
+        offlineHosting = offline;
         server.execute(() -> {
             HostAccessControl.set(s.mode(), host, initial, s.maxPlayers());
             if (hostingSince == 0L) {
                 hostingSince = System.currentTimeMillis();
             }
-            if (s.allowNonPremium()) {
+            if (offline) {
                 server.setUsesAuthentication(false);
             }
             if (s.gameType() != null) {
@@ -102,7 +106,36 @@ public final class HostController {
                         s.gameType() != null ? s.gameType() : server.getDefaultGameType(),
                         s.allowCommands(), hostLanPort());
                 LOGGER.info("LAN+ opened world to LAN ({}), access={}, nonPremium={}, gameType={}, cheats={}, difficulty={}",
-                        ok ? "ok" : "failed", s.mode(), s.allowNonPremium(), s.gameType(), s.allowCommands(), s.difficulty());
+                        ok ? "ok" : "failed", s.mode(), offline, s.gameType(), s.allowCommands(), s.difficulty());
+            }
+            if (identity.overridden()) {
+                warnIdentityLocked();
+            }
+        });
+    }
+
+    private static Set<UUID> hostIdentities() {
+        Set<UUID> ids = new HashSet<>();
+        UUID local = localUuid();
+        if (local != null) {
+            ids.add(local);
+        }
+        try {
+            String name = Minecraft.getInstance().getUser().getName();
+            if (name != null && !name.isBlank()) {
+                ids.add(offlineUuid(name));
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return ids;
+    }
+
+    private static void warnIdentityLocked() {
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> {
+            if (mc.player != null) {
+                mc.player.displayClientMessage(
+                        Component.translatable("chat.lanplus.host.identity_locked"), false);
             }
         });
     }

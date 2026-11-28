@@ -90,6 +90,7 @@
   "gui.lanplus.host.nonpremium.on": "开",
   "gui.lanplus.host.nonpremium.off": "关",
   "gui.lanplus.host.nonpremium.tip": "以离线模式开放世界，允许非正版玩家加入。强制将访问权限设为“所有人”，并禁用身份验证，任何人只要知道地址即可加入，且用户名不经过验证。",
+  "chat.lanplus.host.identity_locked": "LAN+ kept this world's player-identity mode unchanged. Switching it would reset player's data of players who already joined.",
   "gui.lanplus.host.gamemode": "Game Mode",
   "gui.lanplus.host.commands": "Allow Commands",
   "gui.lanplus.host.commands.on": "ON",
